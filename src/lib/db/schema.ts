@@ -13,6 +13,16 @@ import {
 /**
  * Users. Email is stored normalized (lowercase, trimmed) and unique at the
  * database level. Passwords are only ever stored as Argon2id hashes.
+ *
+ * `role` supports the Ravelyth Talent portal roles in addition to the original
+ * DNS-tools roles:
+ *   - 'candidate' — job seeker on Ravelyth Talent
+ *   - 'employer'  — company user on Ravelyth Talent
+ *   - 'staff'/'owner' — platform administrators
+ *   - 'customer'  — original DNS tools account (retained, not a portal role)
+ *
+ * Roles are NEVER client-settable: they are assigned by the registration
+ * handler (candidate/employer only) or by a server-side admin/owner action.
  */
 export const users = pgTable(
   'users',
@@ -22,10 +32,29 @@ export const users = pgTable(
     passwordHash: text('password_hash').notNull(),
     name: text('name').notNull(),
     status: text('status').notNull().default('active'),
-    // Platform role. 'customer' is the default for every registration; 'staff'
-    // and 'owner' are granted exclusively by server-side bootstrap/owner
-    // actions (see src/lib/admin/guards.ts). Never client-settable.
     role: text('role').notNull().default('customer'),
+    // -------------------------------------------------------------------------
+    // Ravelyth Talent portal fields (additive; existing accounts are unaffected)
+    // -------------------------------------------------------------------------
+    /**
+     * When the email address was verified. NULL means unverified. Security-
+     * sensitive actions (job applications, posting) can require this without
+     * ever needing the raw address re-confirmation.
+     */
+    emailVerifiedAt: timestamp('email_verified_at', { withTimezone: true }),
+    /** 'active' | 'suspended' | 'pending_deletion' */
+    accountStatus: text('account_status').notNull().default('active'),
+    /** Reason an admin recorded when suspending an account (audit context). */
+    suspensionReason: text('suspension_reason'),
+    suspendedAt: timestamp('suspended_at', { withTimezone: true }),
+    /**
+     * Brute-force protection: consecutive failed logins and the time until
+     * which logins are refused for this account. Reset on success.
+     */
+    failedLoginAttempts: integer('failed_login_attempts').notNull().default(0),
+    lockedUntil: timestamp('locked_until', { withTimezone: true }),
+    /** Last successful sign-in IP, retained for security review only. */
+    lastLoginIp: text('last_login_ip'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
     lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
@@ -33,6 +62,8 @@ export const users = pgTable(
   (table) => [
     uniqueIndex('users_email_unique_idx').on(table.email),
     index('users_role_idx').on(table.role),
+    index('users_status_idx').on(table.status),
+    index('users_account_status_idx').on(table.accountStatus),
   ]
 );
 
@@ -531,6 +562,21 @@ export const NOTIFICATION_TYPES = [
   'candidate_joined',
   'payment_received',
   'payment_overdue',
+  // ---------------------------------------------------------------------------
+  // Ravelyth Talent job portal. In-app only until an email provider is
+  // configured; the email channel is always dispatched through the
+  // transactional email service, never inline in a route handler.
+  // ---------------------------------------------------------------------------
+  'email_verification',
+  'application_submitted',
+  'application_status_changed',
+  'new_application_received',
+  'job_approved',
+  'job_rejected',
+  'job_expiring',
+  'package_purchased',
+  'premium_activated',
+  'security_alert',
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 /** ---------------------------------------------------------------------------
@@ -1040,3 +1086,12 @@ export type CustomerFeedbackRow = typeof customerFeedback.$inferSelect;
 export type NewCustomerFeedbackRow = typeof customerFeedback.$inferInsert;
 export type ContactSubmissionRow = typeof contactSubmissions.$inferSelect;
 export type NewContactSubmissionRow = typeof contactSubmissions.$inferInsert;
+/**
+ * Ravelyth Talent job portal tables. Re-exported so Drizzle Kit sees a single
+ * schema entry point (./src/lib/db/schema.ts) and the runtime drizzle() call
+ * receives the complete table map.
+ *
+ * portal-schema.ts imports { users } from this file, so this re-export is
+ * deliberately placed at the end to avoid an initialisation cycle.
+ */
+export * from './portal-schema';

@@ -78,6 +78,42 @@ interface Config {
   TALENT_APPLICATION_RATE_LIMIT_WINDOW_MS: number;
   // Maximum simultaneously open applications allowed per candidate email.
   TALENT_MAX_OPEN_APPLICATIONS_PER_CANDIDATE: number;
+  // -------------------------------------------------------------------------
+  // Ravelyth Talent — PROFESSIONAL JOB PORTAL
+  // -------------------------------------------------------------------------
+  /**
+   * Whether a job must be approved by an admin before it becomes publicly
+   * visible. Defaults to true. This is the workflow rule the brief requires:
+   * an employer must never be able to self-publish.
+   */
+  JOB_APPROVAL_REQUIRED: boolean;
+  /** Default lifetime of a published posting, in days. */
+  JOB_DEFAULT_VALIDITY_DAYS: number;
+  /** Whether a candidate must verify their email before applying to a job. */
+  JOB_REQUIRE_VERIFIED_EMAIL_TO_APPLY: boolean;
+  /** Whether posting a job consumes one job credit. */
+  JOB_CREDIT_REQUIRED: boolean;
+  /** Private directory for resumes, avatars and company logos. Never in /public. */
+  PORTAL_STORAGE_DIR: string;
+  /** Maximum accepted resume upload size, in bytes. */
+  PORTAL_MAX_RESUME_BYTES: number;
+  /** Maximum accepted logo/avatar upload size, in bytes. */
+  PORTAL_MAX_IMAGE_BYTES: number;
+  /** Accepted image MIME types for avatars/logos. */
+  PORTAL_ALLOWED_IMAGE_TYPES: string;
+  // Rate limits (per client identity) for the sensitive auth endpoints.
+  EMAIL_VERIFICATION_RATE_LIMIT_MAX: number;
+  EMAIL_VERIFICATION_RATE_LIMIT_WINDOW_MS: number;
+  EMAIL_VERIFICATION_RESEND_RATE_LIMIT_MAX: number;
+  EMAIL_VERIFICATION_RESEND_RATE_LIMIT_WINDOW_MS: number;
+  // SMTP transactional email. Blank values mean "not configured", in which case
+  // the application never claims an email was delivered.
+  SMTP_HOST: string;
+  SMTP_PORT: number;
+  SMTP_USER: string;
+  SMTP_PASSWORD: string;
+  SMTP_REQUIRE_TLS: boolean;
+  SMTP_TIMEOUT_MS: number;
 }
 
 export type BillingIntervalConfig = 'monthly' | 'quarterly' | 'yearly';
@@ -209,6 +245,47 @@ function getConfig(): Config {
       'TALENT_MAX_OPEN_APPLICATIONS_PER_CANDIDATE',
       10
     ),
+    // -------------------------------------------------------------------------
+    // Ravelyth Talent — PROFESSIONAL JOB PORTAL
+    // -------------------------------------------------------------------------
+    // Admin approval is the default and the safe behaviour: an employer can
+    // never move a job to 'published' directly.
+    JOB_APPROVAL_REQUIRED: parseEnvBool('JOB_APPROVAL_REQUIRED', true),
+    JOB_DEFAULT_VALIDITY_DAYS: parseEnvInt('JOB_DEFAULT_VALIDITY_DAYS', 60),
+    JOB_REQUIRE_VERIFIED_EMAIL_TO_APPLY: parseEnvBool(
+      'JOB_REQUIRE_VERIFIED_EMAIL_TO_APPLY',
+      true
+    ),
+    JOB_CREDIT_REQUIRED: parseEnvBool('JOB_CREDIT_REQUIRED', true),
+    // Defaults beside the application, never under /public, never committed.
+    PORTAL_STORAGE_DIR: (process.env.PORTAL_STORAGE_DIR || '.ravelyth-private/portal').trim(),
+    PORTAL_MAX_RESUME_BYTES: parseEnvInt('PORTAL_MAX_RESUME_BYTES', 5 * 1024 * 1024),
+    PORTAL_MAX_IMAGE_BYTES: parseEnvInt('PORTAL_MAX_IMAGE_BYTES', 2 * 1024 * 1024),
+    PORTAL_ALLOWED_IMAGE_TYPES: (
+      process.env.PORTAL_ALLOWED_IMAGE_TYPES || 'image/png,image/jpeg,image/webp'
+    )
+      .trim()
+      .toLowerCase(),
+    EMAIL_VERIFICATION_RATE_LIMIT_MAX: parseEnvInt('EMAIL_VERIFICATION_RATE_LIMIT_MAX', 3),
+    EMAIL_VERIFICATION_RATE_LIMIT_WINDOW_MS: parseEnvInt(
+      'EMAIL_VERIFICATION_RATE_LIMIT_WINDOW_MS',
+      60 * 60 * 1000
+    ),
+    EMAIL_VERIFICATION_RESEND_RATE_LIMIT_MAX: parseEnvInt(
+      'EMAIL_VERIFICATION_RESEND_RATE_LIMIT_MAX',
+      3
+    ),
+    EMAIL_VERIFICATION_RESEND_RATE_LIMIT_WINDOW_MS: parseEnvInt(
+      'EMAIL_VERIFICATION_RESEND_RATE_LIMIT_WINDOW_MS',
+      60 * 60 * 1000
+    ),
+    // SMTP. Any blank value means delivery is not configured.
+    SMTP_HOST: (process.env.SMTP_HOST || '').trim(),
+    SMTP_PORT: parseEnvInt('SMTP_PORT', 587),
+    SMTP_USER: (process.env.SMTP_USER || '').trim(),
+    SMTP_PASSWORD: process.env.SMTP_PASSWORD || '',
+    SMTP_REQUIRE_TLS: parseEnvBool('SMTP_REQUIRE_TLS', true),
+    SMTP_TIMEOUT_MS: parseEnvInt('SMTP_TIMEOUT_MS', 15000),
   };
 }
 

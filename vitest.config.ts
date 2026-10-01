@@ -8,6 +8,10 @@ export default defineConfig({
     include: ['tests/**/*.test.ts'],
     restoreMocks: true,
     mockReset: true,
+    // PGlite boots a full PostgreSQL WASM instance per test file, which can take
+    // a few seconds to collect on slower machines.
+    testTimeout: 30000,
+    hookTimeout: 60000,
   },
   resolve: {
     alias: {

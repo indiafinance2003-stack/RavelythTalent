@@ -5,14 +5,32 @@ import type { EmailProvider } from './types';
 /**
  * Registered transactional email providers.
  *
- * Empty by default: no provider is invented. EMAIL_PROVIDER must exactly match
- * a registered provider name before any email can be delivered. Connect a real
- * provider (e.g. an SMTP or HTTP transactional API) by registering it here.
+ * Every secret comes from the environment through `config` — no provider
+ * carries baked-in credentials.
  *
- * Registered providers must never embed credentials: secrets always come from
- * the environment through `config`, exactly like the Razorpay integration.
+ * The SMTP provider is imported LAZILY (inside `getEmailProvider` /
+ * `emailProviderStatus`) rather than at module scope. A top-level import would
+ * create a cycle — smtp.ts needs `registerEmailProvider` from this module — and
+ * would pull nodemailer into every process that merely checks email status.
+ *
+ * To add another provider, import it the same way inside these two functions.
  */
 const registeredProviders: Record<string, EmailProvider> = {};
+
+/** Providers are loaded on first use to avoid an import cycle. */
+let providersLoaded = false;
+
+function loadProviders(): void {
+  if (providersLoaded) return;
+  providersLoaded = true;
+  try {
+    // Registers the 'smtp' provider on import.
+    require('./smtp') as unknown;
+  } catch {
+    // A missing optional dependency must not break the whole application; the
+    // provider simply stays unregistered and is reported as unsupported.
+  }
+}
 
 export function registerEmailProvider(provider: EmailProvider): void {
   registeredProviders[provider.name] = provider;
@@ -24,6 +42,7 @@ export function registerEmailProvider(provider: EmailProvider): void {
  */
 export function getEmailProvider(): EmailProvider | null {
   if (!config.EMAIL_PROVIDER) return null;
+  loadProviders();
   return registeredProviders[config.EMAIL_PROVIDER] ?? null;
 }
 
@@ -45,6 +64,7 @@ export function emailProviderStatus(): EmailProviderStatus {
   if (!providerName || !config.EMAIL_FROM) {
     return { configured: false, configuredProvider: providerName || null, unsupported: false };
   }
+  loadProviders();
   const provider = registeredProviders[providerName];
   return {
     configured: provider !== undefined,
