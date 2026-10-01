@@ -77,13 +77,16 @@ export function buildJobPredicates(filters: JobSearchFilters): SQL[] {
   const keyword = normalizeKeyword(filters.keyword);
   if (keyword) {
     const pattern = `%${escapeLikePattern(keyword)}%`;
-    // `skills` is text[]; `&&` checks overlap with a single-element array.
-    const skillMatch = sql`${jobs.skills}::text[] && ARRAY[${keyword.toLowerCase()}]::text[]`;
+    // The whole group MUST stay parenthesised: without it, SQL's AND-binding
+    // precedence would let unrelated jobs through.
+    // `skills` is a jsonb array, so membership is tested by unnesting it. The
+    // comparison value stays a BOUND PARAMETER (never sql.raw), so a keyword
+    // can never be interpreted as SQL.
     predicates.push(
       sql`(${ilike(jobs.title, pattern)} or ${ilike(jobs.description, pattern)} or ${ilike(
         jobs.location,
         pattern
-      )} or ${ilike(companies.name, pattern)} or ${skillMatch})`
+      )} or ${ilike(companies.name, pattern)} or EXISTS (SELECT 1 FROM jsonb_array_elements_text(${jobs.skills}) AS skill WHERE skill = ${keyword.toLowerCase()}))`
     );
   }
 
@@ -132,9 +135,12 @@ export function buildJobPredicates(filters: JobSearchFilters): SQL[] {
     predicates.push(ilike(companies.industry, `%${escapeLikePattern(filters.industry)}%`));
   }
 
-  // One containment predicate per skill gives AND semantics across skills.
+  // One membership predicate per skill gives AND semantics across skills.
+  // Values stay bound parameters, so a skill can never be interpreted as SQL.
   for (const skill of normalizeSkillList(filters.skills)) {
-    predicates.push(sql`${jobs.skills} @> ARRAY[${skill}]::text[]`);
+    predicates.push(
+      sql`EXISTS (SELECT 1 FROM jsonb_array_elements_text(${jobs.skills}) AS skill WHERE skill = ${skill})`
+    );
   }
 
   if (filters.postedWithinDays !== undefined && filters.postedWithinDays > 0) {
