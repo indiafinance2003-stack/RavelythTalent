@@ -263,6 +263,21 @@ export function sniffContent(body: Uint8Array, extension: string): string | null
 
   if (isExecutable) return 'That file type is not accepted.';
 
+  // A ZIP container (which is what a .docx is) must not also carry an
+  // executable marker. Refusing this blocks a renamed EXE-in-ZIP payload, which
+  // would otherwise satisfy the plain "PK\x03\x04" DOCX signature.
+  if (extension === 'docx' || extension === 'doc') {
+    const window = body.slice(0, Math.min(body.byteLength, 4096));
+    for (let index = 0; index + 1 < window.length; index += 1) {
+      const a = window[index];
+      const b = window[index + 1];
+      // MZ header or a shebang anywhere in the archive window.
+      if ((a === 0x4d && b === 0x5a) || (a === 0x23 && b === 0x21)) {
+        return 'That file type is not accepted.';
+      }
+    }
+  }
+
   if (!hasPlausibleSignature(body, extension)) {
     return 'The file content does not match its file type.';
   }
