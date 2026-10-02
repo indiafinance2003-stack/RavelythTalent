@@ -1,4 +1,4 @@
-﻿import { z } from 'zod';
+import { z } from 'zod';
 import { emailSchema, nameSchema } from '@/lib/auth/schemas';
 import { passwordSchema } from '@/lib/auth/password';
 
@@ -175,6 +175,56 @@ export const jobCreateSchema = z
       message: 'Minimum experience cannot exceed maximum experience.',
       path: ['experienceMinYears'],
     }
+  )
+  .refine(
+    (data) =>
+      data.salaryMinMinor == null ||
+      data.salaryMaxMinor == null ||
+      data.salaryMinMinor <= data.salaryMaxMinor,
+    { message: 'Minimum salary cannot exceed maximum salary.', path: ['salaryMinMinor'] }
+  );
+
+/**
+ * Job edit. Every field is optional.
+ *
+ * `postedForCompanyId` is deliberately NOT editable: re-pointing an already
+ * published vacancy at a different client would bypass the agency authorisation
+ * check that ran at creation time, letting a posting silently change whose
+ * vacancy it claims to be.
+ *
+ * Declared independently rather than derived from `jobCreateSchema`, because
+ * that schema is wrapped in cross-field refinements which cannot be made
+ * partial. The field rules here deliberately mirror it.
+ */
+export const jobUpdateSchema = z
+  .object({
+    title: z.string().min(2).max(160),
+    description: z.string().min(10).max(20000),
+    department: z.string().max(120).nullish(),
+    employmentType: z.enum(['full_time', 'part_time', 'contract', 'internship', 'freelance']),
+    experienceMinYears: z.number().int().min(0).max(70).nullish(),
+    experienceMaxYears: z.number().int().min(0).max(70).nullish(),
+    location: z.string().max(120).nullish(),
+    workMode: z.enum(['onsite', 'hybrid', 'remote']),
+    salaryMinMinor: z.number().int().min(0).nullish(),
+    salaryMaxMinor: z.number().int().min(0).nullish(),
+    salaryPublic: z.boolean().optional(),
+    openings: z.number().int().min(1).max(1000).optional(),
+    responsibilities: z.array(z.string().max(500)).max(30).optional(),
+    requirements: z.array(z.string().max(500)).max(30).optional(),
+    benefits: z.array(z.string().max(500)).max(30).optional(),
+    educationRequirements: z.string().max(500).nullish(),
+    skills: z.array(z.string().min(1).max(60)).max(50).optional(),
+    applicationDeadline: z.string().datetime().nullish(),
+  })
+  .strict()
+  .partial()
+  .refine(
+    (data) =>
+      data.experienceMinYears == null ||
+      data.experienceMaxYears == null ||
+      data.experienceMinYears <= data.experienceMaxYears,
+    { message: 'Minimum experience cannot exceed maximum experience.', path: ['experienceMinYears'] }
   )
   .refine(
     (data) =>
