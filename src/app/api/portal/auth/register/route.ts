@@ -6,6 +6,7 @@ import { registerPortalUser } from '@/lib/auth/portal/register';
 import { createSession } from '@/lib/auth/session';
 import { sendEmailVerificationLink } from '@/lib/auth/email-verification';
 import { recordConsent } from '@/lib/portal/consents';
+import { clientIpForAudit } from '@/lib/portal/request-identity';
 import {
   getRegisterRateLimiter,
   registerKey,
@@ -60,13 +61,42 @@ export async function POST(req: NextRequest): Promise<Response> {
 
       const verification = await sendEmailVerificationLink(user.email);
 
-      // Account creation consent is recorded as a separate, purpose-specific row.
+      // Consent is recorded ONLY for purposes the user affirmatively accepted.
+      // Accepting the terms is NOT blanket consent: `marketing` is opt-in and is
+      // never inferred from the act of registering.
+      const ipAddress = clientIpForAudit(req);
       await recordConsent({
         userId: user.id,
         purpose: 'account_creation',
         policyVersion: 'v1',
-        ipAddress: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null,
+        ipAddress,
       });
+
+      const consents = input.consents ?? {};
+      if (consents.jobApplication) {
+        await recordConsent({
+          userId: user.id,
+          purpose: 'job_application',
+          policyVersion: 'v1',
+          ipAddress,
+        });
+      }
+      if (consents.resumeStorage) {
+        await recordConsent({
+          userId: user.id,
+          purpose: 'resume_storage',
+          policyVersion: 'v1',
+          ipAddress,
+        });
+      }
+      if (consents.marketing) {
+        await recordConsent({
+          userId: user.id,
+          purpose: 'marketing',
+          policyVersion: 'v1',
+          ipAddress,
+        });
+      }
 
       return {
         user,

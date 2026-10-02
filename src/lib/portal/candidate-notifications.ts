@@ -10,6 +10,7 @@ import {
   jobs,
 } from '@/lib/db/portal-schema';
 import {
+  sendApplicationStatusChanged,
   sendApplicationSubmitted,
   sendNewApplication,
 } from '@/lib/email/transactional/dispatch';
@@ -103,3 +104,60 @@ export async function notifyApplicationSubmitted(input: {
   }
 }
 
+
+/**
+ * Notifies a candidate that an employer moved their application.
+ *
+ * Same contract as the submitted notification: runs after the status change has
+ * committed, swallows and logs failures, and never claims delivery it did not
+ * achieve.
+ */
+export async function notifyApplicationStatusChanged(input: {
+  applicationId: string;
+}): Promise<void> {
+  try {
+    const { db } = dbFromRequest();
+
+    const [context] = await db
+      .select({
+        candidateEmail: users.email,
+        candidateName: candidateProfiles.fullName,
+        jobTitle: jobs.title,
+        status: jobApplications.status,
+        companyId: jobs.companyId,
+      })
+      .from(jobApplications)
+      .innerJoin(candidateProfiles, eq(jobApplications.candidateId, candidateProfiles.id))
+      .innerJoin(users, eq(candidateProfiles.userId, users.id))
+      .innerJoin(jobs, eq(jobApplications.jobId, jobs.id))
+      .where(eq(jobApplications.id, input.applicationId))
+      .limit(1);
+
+    if (!context) return;
+
+    const [company] = await db
+      .select({ name: companies.name })
+      .from(companies)
+      .where(eq(companies.id, context.companyId))
+      .limit(1);
+
+    await sendApplicationStatusChanged({
+      to: context.candidateEmail,
+      candidateName: context.candidateName,
+      jobTitle: context.jobTitle,
+      companyName: company?.name ?? '',
+      statusLabel: humanizeStatus(context.status),
+    });
+  } catch (error) {
+    logger.error('Application status notification failed', {
+      applicationId: input.applicationId,
+      reason: error instanceof Error ? error.message : 'unknown',
+    });
+  }
+}
+
+/** Turns `shortlisted` into `Shortlisted` for display in an email. */
+function humanizeStatus(status: string): string {
+  const spaced = status.replace(/_/g, ' ').trim();
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}

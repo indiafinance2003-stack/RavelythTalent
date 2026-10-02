@@ -27,7 +27,21 @@ interface Journal {
   entries: JournalEntry[];
 }
 
-const journal = JSON.parse(readFileSync(JOURNAL_PATH, 'utf8')) as Journal;
+/**
+ * Reads the journal, stripping a UTF-8 BOM if an editor added one.
+ *
+ * A BOM is not merely cosmetic here: `JSON.parse` throws on it, so a stray BOM
+ * turns into a confusing "Unexpected token" failure rather than an obvious one.
+ */
+const journalText = readFileSync(JOURNAL_PATH, 'utf8').replace(/^\uFEFF/, '');
+const journal = JSON.parse(journalText) as Journal;
+
+// Guard the guard: the file must be parseable JSON, which is the property
+// drizzle-kit itself depends on.
+it('parses the journal as JSON', () => {
+  expect(typeof journal.version).toBe('string');
+  expect(Array.isArray(journal.entries)).toBe(true);
+});
 const sqlFiles = readdirSync(DRIZZLE_DIR)
   .filter((name) => name.endsWith('.sql'))
   .sort();

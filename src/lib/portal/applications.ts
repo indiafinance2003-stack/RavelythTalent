@@ -1,4 +1,4 @@
-import 'server-only';
+﻿import 'server-only';
 import { and, desc, eq } from 'drizzle-orm';
 import { dbFromRequest } from '@/lib/db/request';
 import {
@@ -17,7 +17,7 @@ import { recordPortalAudit } from '@/lib/portal/audit';
 import { applicationRejectionReason } from '@/lib/portal/jobs/lifecycle';
 
 /**
- * Job applications (see §10).
+ * Job applications (see Â§10).
  *
  * Authorization model:
  *  - A candidate may only act on their OWN applications; the candidate id is
@@ -359,11 +359,40 @@ export interface StatusHistoryEntry {
   createdAt: string;
 }
 
-/** Status history for one application (test item 39). */
+/**
+ * Status history for one application (test item 39).
+ *
+ * TENANT-SCOPED: the application is joined to its job so history belonging to
+ * another employer's posting is indistinguishable from one that does not exist.
+ * Without this ownership proof the endpoint would leak a rival employer's
+ * pipeline (statuses, notes and timings) to any caller who guessed a UUID.
+ *
+ * Pass isAdmin only from an already-authorized admin request.
+ */
 export async function getApplicationHistory(
-  applicationId: string
+  applicationId: string,
+  companyId?: string,
+  options: { isAdmin?: boolean } = {}
 ): Promise<StatusHistoryEntry[]> {
   const { db } = dbFromRequest();
+
+  if (!options.isAdmin) {
+    const owned = await db
+      .select({ id: jobApplications.id })
+      .from(jobApplications)
+      .innerJoin(jobs, eq(jobApplications.jobId, jobs.id))
+      .where(
+        companyId
+          ? and(eq(jobApplications.id, applicationId), eq(jobs.companyId, companyId))
+          : eq(jobApplications.id, applicationId)
+      )
+      .limit(1);
+
+    if (!owned[0]) {
+      throw new AppError(AppErrorCode.NOT_FOUND, 'The requested application was not found.', 404);
+    }
+  }
+
   const rows = await db
     .select()
     .from(applicationStatusHistory)

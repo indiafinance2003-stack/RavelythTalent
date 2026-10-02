@@ -1,4 +1,4 @@
-﻿import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 import {
   createTestDatabase,
@@ -295,6 +295,33 @@ describe('applications (real database)', () => {
     expect(await listCompanyApplications(companyId, { status: 'rejected' })).toHaveLength(1);
     expect(await listCompanyApplications(companyId, { jobId: jobTwo })).toHaveLength(1);
   });
+  it('scopes application history to the owning company', async () => {
+    await truncateAllTables(db);
+    const candidateId = await fx.candidate();
+    const { userId, companyId } = await fx.employerWithCompany('Owner Ltd');
+    const { companyId: rivalCompanyId } = await fx.employerWithCompany('Rival Ltd');
+
+    const jobId = await publishedJob(companyId);
+    const application = await applyToJob({ candidateProfileId: candidateId, jobId });
+    await updateApplicationStatus({
+      applicationId: application.id,
+      nextStatus: 'shortlisted',
+      companyId,
+      changedByUserId: userId,
+    });
+
+    // The owner sees the full pipeline.
+    const own = await getApplicationHistory(application.id, companyId);
+    expect(own.length).toBeGreaterThan(0);
+
+    // A rival employer guessing the application id must be told it does not
+    // exist, rather than being handed the other company's hiring decisions.
+    await expect(getApplicationHistory(application.id, rivalCompanyId)).rejects.toThrowError(
+      /not found/i
+    );
+
+    // Admin oversight is the one deliberate exception.
+    const asAdmin = await getApplicationHistory(application.id, rivalCompanyId, { isAdmin: true });
+    expect(asAdmin.length).toBe(own.length);
+  });
 });
-
-

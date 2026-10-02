@@ -26,6 +26,27 @@ export const registerSchema = z
     password: passwordSchema,
     confirmPassword: z.string(),
     accountType: accountTypeSchema,
+    /**
+     * Explicit acceptance of the terms and privacy policy. Required, not
+     * defaulted: a registration that has not affirmatively accepted must not
+     * create a consent record claiming that it did.
+     */
+    acceptTerms: z.literal(true, {
+      errorMap: () => ({ message: 'You must accept the terms and privacy policy.' }),
+    }),
+    /**
+     * Purpose-specific opt-ins. `job_application` and `resume_storage` gate the
+     * candidate's core flows and so are refused when absent. `marketing` is
+     * strictly opt-in: omitting it means NO marketing consent is recorded.
+     */
+    consents: z
+      .object({
+        jobApplication: z.boolean().optional(),
+        resumeStorage: z.boolean().optional(),
+        marketing: z.boolean().optional(),
+      })
+      .strict()
+      .nullish(),
     // Only meaningful for an employer account.
     company: z
       .object({

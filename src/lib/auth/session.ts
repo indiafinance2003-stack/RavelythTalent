@@ -136,6 +136,34 @@ export async function getSessionUser(): Promise<AuthenticatedUser | null> {
   return toAuthenticatedUser(row.user);
 }
 
+/**
+ * The current session's database id, or null when unauthenticated.
+ *
+ * Needed by flows that must preserve the caller's own session while revoking
+ * every other one (password change), which the user row alone cannot express.
+ */
+export async function getCurrentSessionId(): Promise<string | null> {
+  const token = await readSessionToken();
+  if (!token) return null;
+
+  try {
+    const { db } = getDatabase();
+    const rows = await db
+      .select({ sessionId: sessions.id })
+      .from(sessions)
+      .where(
+        and(
+          eq(sessions.tokenHash, hashSessionToken(token)),
+          gt(sessions.expiresAt, new Date())
+        )
+      )
+      .limit(1);
+    return rows[0]?.sessionId ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export async function deleteExpiredSessions(): Promise<number> {
   const { db } = getDatabase();
   const deleted = await db

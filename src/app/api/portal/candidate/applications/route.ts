@@ -1,4 +1,4 @@
-import { NextRequest } from 'next/server';
+﻿import { NextRequest } from 'next/server';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { handleApi, parseSearchParams, readJsonBody } from '@/lib/errors/api-handler';
@@ -6,11 +6,10 @@ import { parseWithSchema } from '@/lib/validation/parse';
 import { requireCandidateProfile } from '@/lib/portal/auth-context';
 import { applyToJob, listCandidateApplications } from '@/lib/portal/applications';
 import { requireVerifiedEmail } from '@/lib/auth/email-verification';
-import { recordConsent } from '@/lib/portal/consents';
+import { requireConsent } from '@/lib/portal/consents';
 import { notifyApplicationSubmitted } from '@/lib/portal/candidate-notifications';
 import { dbFromRequest } from '@/lib/db/request';
 import { candidateProfiles } from '@/lib/db/portal-schema';
-import { clientIpForAudit } from '@/lib/portal/request-identity';
 
 const bodySchema = z
   .object({
@@ -63,13 +62,10 @@ export async function POST(req: NextRequest): Promise<Response> {
       // A security gate enforced here, not by hiding a button in the UI.
       await requireVerifiedEmail(owner.userId);
 
-      // Consent is a real server-side precondition, not a client-side checkbox.
-      await recordConsent({
-        userId: owner.userId,
-        purpose: 'job_application',
-        policyVersion: 'v1',
-        ipAddress: clientIpForAudit(req),
-      });
+      // Consent must ALREADY have been given, explicitly, at registration.
+      // Recording it here would let the act of applying manufacture its own
+      // consent, which is exactly what purpose-specific consent exists to stop.
+      await requireConsent(owner.userId, 'job_application');
 
       const application = await applyToJob({
         candidateProfileId: profile.id,
