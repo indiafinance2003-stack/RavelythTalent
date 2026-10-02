@@ -8,6 +8,13 @@ export default defineConfig({
     include: ['tests/**/*.test.ts'],
     restoreMocks: true,
     mockReset: true,
+    // PGlite boots a full PostgreSQL WASM instance per test file, and each one
+    // is memory hungry. Running every integration file at once exhausts the
+    // heap, so the pool is deliberately small: correctness over speed.
+    pool: 'threads',
+    poolOptions: {
+      threads: { minThreads: 1, maxThreads: 2 },
+    },
     // PGlite boots a full PostgreSQL WASM instance per test file, which can take
     // a few seconds to collect on slower machines.
     testTimeout: 30000,
