@@ -24,7 +24,7 @@ export function FeaturedJobs(): React.ReactElement | null {
       <section className="mx-auto max-w-7xl px-4 py-14">
         <h2 className="text-2xl font-semibold tracking-tight text-ink">Latest openings</h2>
         <p className="mt-3 text-sm text-slate-400" role="status">
-          Loading live openingsÃ¢â‚¬Â¦
+          Loading live openings…
         </p>
       </section>
     );

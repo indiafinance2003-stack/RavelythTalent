@@ -129,7 +129,7 @@ export function EmployerJobDetail(): React.ReactElement {
     }
   }
 
-  if (job.loading) return <LoadingState label="Loading this jobâ€¦" />;
+  if (job.loading) return <LoadingState label="Loading this job…" />;
   if (job.error) return <ErrorState message={job.error} onRetry={job.reload} />;
   if (!data) return <ErrorState message="This job could not be loaded." />;
 
@@ -140,7 +140,7 @@ export function EmployerJobDetail(): React.ReactElement {
       <PageHeader
         eyebrow="Manage job"
         title={data.title}
-        description={`${EMPLOYMENT_TYPE_LABELS[data.employmentType as 'full_time'] ?? data.employmentType} Â· ${WORK_MODE_LABELS[data.workMode as 'onsite'] ?? data.workMode}`}
+        description={`${EMPLOYMENT_TYPE_LABELS[data.employmentType as 'full_time'] ?? data.employmentType} · ${WORK_MODE_LABELS[data.workMode as 'onsite'] ?? data.workMode}`}
         action={
           <Link href="/employer/jobs" className="text-sm text-slate-400 hover:text-accent">
             Back to jobs

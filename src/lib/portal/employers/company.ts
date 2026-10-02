@@ -1,4 +1,4 @@
-﻿import 'server-only';
+import 'server-only';
 import { and, desc, eq } from 'drizzle-orm';
 import { dbFromRequest } from '@/lib/db/request';
 import {
@@ -13,7 +13,7 @@ import { recordPortalAudit } from '@/lib/portal/audit';
 import { cleanText, sanitizeUrl } from '@/lib/portal/candidates/profile';
 
 /**
- * Companies and employer accounts (see Â§7).
+ * Companies and employer accounts (see §7).
  *
  * Key behaviours:
  *  - A company is created as 'pending' verification. Verification is NEVER

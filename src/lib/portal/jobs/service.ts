@@ -24,7 +24,7 @@ import {
 /**
  * Employer/admin job posting service.
  *
- * The approval workflow is the security-critical part (see Â§8):
+ * The approval workflow is the security-critical part (see §8):
  *  - when `JOB_APPROVAL_REQUIRED` is on (the default), an employer submitting a
  *    job lands in 'pending_approval' and CANNOT publish it; only an admin can;
  *  - the transition table in `lifecycle.ts` is the single source of truth, so a

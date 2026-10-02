@@ -210,7 +210,7 @@ export function JobDetail({ jobId }: { jobId: string }): React.ReactElement {
                 {!user.emailVerified ? (
                   <Alert kind="warning">
                     Verify your email address before applying.{' '}
-                    <Link href="/candidate/verify" className="underline">
+                    <Link href="/verify-email" className="underline">
                       Send a new link
                     </Link>
                     .

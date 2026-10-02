@@ -11,7 +11,7 @@ import type {
  *
  * Money is stored as integer MINOR units (paise) everywhere. It is only ever
  * divided here, for display, so no component can accidentally send a formatted
- * string such as "â‚¹9,900" to an endpoint that expects a number.
+ * string such as "₹9,900" to an endpoint that expects a number.
  */
 
 /** Renders minor units as a rupee amount. */
@@ -35,6 +35,11 @@ export function formatMoney(minor: number | null | undefined, currency = 'INR'):
  * validation error instead of silently charging zero.
  */
 export function parseMoneyToMinor(input: string): number | null {
+  // A leading or trailing minus is rejected outright rather than stripped.
+  // Silently turning "-50" into 5000 would let a stray sign, or a credit note
+  // pasted as "-₹50", become a positive price with no warning to the user.
+  if (/[-−]/.test(input)) return null;
+
   const cleaned = input.replace(/[^0-9.]/g, '');
   if (cleaned.length === 0) return null;
   const value = Number.parseFloat(cleaned);
@@ -57,23 +62,23 @@ export function formatSalaryBand(
   currency = 'INR'
 ): string {
   if (!isPublic || (min === null && max === null)) return 'Salary not disclosed';
-  if (min !== null && max !== null) return `${formatMoney(min, currency)} â€“ ${formatMoney(max, currency)}`;
+  if (min !== null && max !== null) return `${formatMoney(min, currency)} – ${formatMoney(max, currency)}`;
   if (min !== null) return `From ${formatMoney(min, currency)}`;
   return `Up to ${formatMoney(max, currency)}`;
 }
 
-/** "3 â€“ 6 yrs", "2+ yrs", or null when the employer left it blank. */
+/** "3 – 6 yrs", "2+ yrs", or null when the employer left it blank. */
 export function formatExperienceBand(min: number | null, max: number | null): string | null {
   if (min === null && max === null) return null;
-  if (min !== null && max !== null) return `${min} â€“ ${max} yrs`;
+  if (min !== null && max !== null) return `${min} – ${max} yrs`;
   if (min !== null) return `${min}+ yrs`;
   return `Up to ${max} yrs`;
 }
 
 export function formatDate(iso: string | null | undefined): string {
-  if (!iso) return 'â€”';
+  if (!iso) return '—';
   const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return 'â€”';
+  if (Number.isNaN(date.getTime())) return '—';
   return new Intl.DateTimeFormat('en-IN', {
     day: '2-digit',
     month: 'short',
@@ -82,9 +87,9 @@ export function formatDate(iso: string | null | undefined): string {
 }
 
 export function formatDateTime(iso: string | null | undefined): string {
-  if (!iso) return 'â€”';
+  if (!iso) return '—';
   const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return 'â€”';
+  if (Number.isNaN(date.getTime())) return '—';
   return new Intl.DateTimeFormat('en-IN', {
     day: '2-digit',
     month: 'short',

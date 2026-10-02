@@ -1,4 +1,4 @@
-﻿import 'server-only';
+import 'server-only';
 import { and, desc, eq, sql } from 'drizzle-orm';
 import { config } from '@/lib/config';
 import { dbFromRequest } from '@/lib/db/request';
@@ -19,9 +19,9 @@ import { refreshProfileCompletion } from './profile';
 import { recordPortalAudit } from '@/lib/portal/audit';
 
 /**
- * Resume and Resume Builder backend (see Â§5).
+ * Resume and Resume Builder backend (see §5).
  *
- * Security model â€” resumes are the most sensitive data on the platform:
+ * Security model — resumes are the most sensitive data on the platform:
  *  - Files are stored under a server-generated, opaque storage key OUTSIDE the
  *    public directory. There is no route that maps a key to a public file, so a
  *    resume can never be fetched by guessing a URL.
@@ -226,7 +226,7 @@ export async function uploadResumeVersion(
     stored = await putFile(validation.file.extension, input.body, validation.file.mimeType);
   } catch (error) {
     if (error instanceof StorageError) {
-      throw new AppError(AppErrorCode.INTERNAL_ERROR, 'The résumé could not be stored.', 500);
+      throw new AppError(AppErrorCode.INTERNAL_ERROR, 'The r�sum� could not be stored.', 500);
     }
     throw error;
   }

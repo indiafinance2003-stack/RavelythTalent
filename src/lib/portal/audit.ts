@@ -5,7 +5,7 @@ import { dbFromRequest } from '@/lib/db/request';
 import { auditLog, type AuditLogRow } from '@/lib/db/schema';
 
 /**
- * Audit logging for Ravelyth Talent (see Â§21 of the brief).
+ * Audit logging for Ravelyth Talent (see §21 of the brief).
  *
  * The existing `audit_log` table and Control audit helper are reused rather
  * than duplicated, so audit history stays in one place.

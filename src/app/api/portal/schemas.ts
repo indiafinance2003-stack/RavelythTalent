@@ -10,7 +10,7 @@ import { passwordSchema } from '@/lib/auth/password';
  * field differently.
  *
  * Note what is NOT here: a role that can be 'admin', a price, a credit count
- * or a target user id. Those are never accepted from a client â€” the services
+ * or a target user id. Those are never accepted from a client — the services
  * read them from the database.
  */
 
@@ -145,7 +145,7 @@ export const jobCreateSchema = z
     experienceMaxYears: z.number().int().min(0).max(70).nullish(),
     location: z.string().max(120).nullish(),
     workMode: z.enum(['onsite', 'hybrid', 'remote']),
-    // Money is integer minor units (paise) â€” never a float.
+    // Money is integer minor units (paise) — never a float.
     salaryMinMinor: z.number().int().min(0).nullish(),
     salaryMaxMinor: z.number().int().min(0).nullish(),
     salaryPublic: z.boolean().optional(),

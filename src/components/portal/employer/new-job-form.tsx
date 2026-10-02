@@ -179,7 +179,7 @@ export function NewJobForm(): React.ReactElement {
   }
 
   if (jobs.loading || clients.loading) {
-    return <LoadingState label="Loading the job formÃ¢â‚¬Â¦" />;
+    return <LoadingState label="Loading the job form…" />;
   }
 
   return (
@@ -232,7 +232,7 @@ export function NewJobForm(): React.ReactElement {
                   value={values.clientCompanyId}
                   onChange={(event) => update('clientCompanyId', event.target.value)}
                 >
-                  <option value="">Choose a client companyÃ¢â‚¬Â¦</option>
+                  <option value="">Choose a client company…</option>
                   {activeClients.map((client) => (
                     <option key={client.clientCompanyId} value={client.clientCompanyId}>
                       {client.name}
@@ -329,7 +329,7 @@ export function NewJobForm(): React.ReactElement {
                   onChange={(event) => update('experienceMaxYears', event.target.value)}
                 />
               </Field>
-              <Field label="Salary from (Ã¢â€šÂ¹ per year)" htmlFor="j-salary-min">
+              <Field label="Salary from (₹ per year)" htmlFor="j-salary-min">
                 <input
                   id="j-salary-min"
                   inputMode="numeric"
@@ -338,7 +338,7 @@ export function NewJobForm(): React.ReactElement {
                   onChange={(event) => update('salaryMin', event.target.value)}
                 />
               </Field>
-              <Field label="Salary to (Ã¢â€šÂ¹ per year)" htmlFor="j-salary-max">
+              <Field label="Salary to (₹ per year)" htmlFor="j-salary-max">
                 <input
                   id="j-salary-max"
                   inputMode="numeric"

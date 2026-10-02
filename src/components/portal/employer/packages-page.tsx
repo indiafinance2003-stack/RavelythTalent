@@ -110,12 +110,12 @@ export function PackagesPage(): React.ReactElement {
           </p>
           <p className="mt-2 text-xs">
             Gateway reference <code>{pay.providerOrderId}</code>. Credits are granted only when the
-            gateway&apos;s signed webhook confirms payment â€” refreshing this page will not mark it paid.
+            gateway&apos;s signed webhook confirms payment — refreshing this page will not mark it paid.
           </p>
         </Alert>
       ) : null}
 
-      {credits.loading ? <LoadingState label="Loading packagesâ€¦" /> : null}
+      {credits.loading ? <LoadingState label="Loading packages…" /> : null}
       {credits.error ? <ErrorState message={credits.error} onRetry={credits.reload} /> : null}
 
       {balance ? (
@@ -184,7 +184,7 @@ export function PackagesPage(): React.ReactElement {
             <span className="text-sm text-slate-300">
               I understand that job credits are non-refundable once purchased and cannot be
               transferred. Credits are returned only if a job is withdrawn before approval.{' '}
-              <Link href="/legal/no-refund" className="text-accent-soft underline">
+              <Link href="/legal/cancellation" className="text-accent-soft underline">
                 Read the cancellation terms
               </Link>
               .
@@ -196,7 +196,7 @@ export function PackagesPage(): React.ReactElement {
       <Card>
         <CardHeader title="Your orders" />
         <div className="p-5">
-          {orders.loading ? <LoadingState label="Loading ordersâ€¦" /> : null}
+          {orders.loading ? <LoadingState label="Loading orders…" /> : null}
           {orders.error ? <ErrorState message={orders.error} onRetry={orders.reload} /> : null}
           {orders.data && orders.data.items.length === 0 ? (
             <EmptyState title="You have not purchased any credits yet" />
@@ -208,9 +208,9 @@ export function PackagesPage(): React.ReactElement {
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-ink">{order.orderNumber}</p>
                     <p className="text-xs text-slate-500">
-                      {formatMoney(order.amountMinor, order.currency)} Â· created{' '}
+                      {formatMoney(order.amountMinor, order.currency)} · created{' '}
                       {formatDate(order.createdAt)}
-                      {order.paidAt ? ` Â· paid ${formatDate(order.paidAt)}` : ''}
+                      {order.paidAt ? ` · paid ${formatDate(order.paidAt)}` : ''}
                     </p>
                   </div>
                   <Badge

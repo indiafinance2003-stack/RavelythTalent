@@ -25,7 +25,7 @@ import {
  * Resume Builder.
  *
  * IMPORTANT AND DELIBERATE: a builder document is stored against an existing
- * uploaded VERSION, because that is the backend's real model ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â every version has
+ * uploaded VERSION, because that is the backend's real model — every version has
  * a stored file, and there is no "content with no document". The builder
  * therefore lets you pick one of your uploaded versions and keeps its structured
  * content attached to it. It does not pretend to generate a PDF: the download
@@ -120,7 +120,7 @@ export function ResumeBuilder(): React.ReactElement {
   }
 
   if (resumes.loading || profile.loading || details.loading) {
-    return <LoadingState label="Loading the Resume BuilderÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦" />;
+    return <LoadingState label="Loading the Resume Builder…" />;
   }
   if (resumes.error) return <ErrorState message={resumes.error} onRetry={resumes.reload} />;
 
@@ -210,7 +210,7 @@ export function ResumeBuilder(): React.ReactElement {
               ) : null}
               {(versions.data?.versions ?? []).map((version) => (
                 <option key={version.id} value={version.id}>
-                  Version {version.versionNumber} ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â {version.originalFilename}
+                  Version {version.versionNumber} — {version.originalFilename}
                 </option>
               ))}
             </select>
@@ -318,7 +318,7 @@ export function ResumeBuilder(): React.ReactElement {
                       aria-label="Period"
                       className={inputClass}
                       value={item.period}
-                      placeholder="2023 ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ Present"
+                      placeholder="2023 – Present"
                       onChange={(event) => updateExperience(index, 'period', event.target.value)}
                     />
                   </div>
@@ -506,7 +506,7 @@ function ResumePreview({
                   <p className="text-sm font-medium text-ink">{item.title || 'Role'}</p>
                   <p className="text-sm text-slate-400">
                     {item.company}
-                    {item.period ? ` ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· ${item.period}` : ''}
+                    {item.period ? ` · ${item.period}` : ''}
                   </p>
                   {item.description ? (
                     <p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-slate-400">
@@ -554,8 +554,8 @@ function readContent(
         title: item.title,
         company: item.company,
         period: item.isCurrent
-          ? `${item.startDate ?? ''} ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ Present`.trim()
-          : `${item.startDate ?? ''} ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ ${item.endDate ?? ''}`.trim(),
+          ? `${item.startDate ?? ''} – Present`.trim()
+          : `${item.startDate ?? ''} – ${item.endDate ?? ''}`.trim(),
         description: item.description ?? '',
       }));
 

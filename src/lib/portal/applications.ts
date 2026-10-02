@@ -1,4 +1,4 @@
-﻿import 'server-only';
+import 'server-only';
 import { and, desc, eq } from 'drizzle-orm';
 import { dbFromRequest } from '@/lib/db/request';
 import {
@@ -17,7 +17,7 @@ import { recordPortalAudit } from '@/lib/portal/audit';
 import { applicationRejectionReason } from '@/lib/portal/jobs/lifecycle';
 
 /**
- * Job applications (see Â§10).
+ * Job applications (see §10).
  *
  * Authorization model:
  *  - A candidate may only act on their OWN applications; the candidate id is

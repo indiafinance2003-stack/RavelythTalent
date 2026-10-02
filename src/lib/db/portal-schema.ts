@@ -16,7 +16,7 @@ import { users } from './schema';
 
 /**
  * ============================================================================
- * RAVELYTH TALENT â€” PROFESSIONAL JOB PORTAL SCHEMA
+ * RAVELYTH TALENT — PROFESSIONAL JOB PORTAL SCHEMA
  * ============================================================================
  *
  * These tables are additive and deliberately separate from the older
@@ -25,7 +25,7 @@ import { users } from './schema';
  * that posts a job on this portal is a portal employer, NOT automatically a
  * recruitment-service client, and hiring through the portal never triggers a
  * placement fee. `recruitmentLeads` below is an optional, non-intrusive
- * linkage surface for a later decision â€” nothing in the portal workflow
+ * linkage surface for a later decision — nothing in the portal workflow
  * writes to it automatically.
  *
  * Money is always stored as integer minor units (paise for INR), never floats.
@@ -59,7 +59,7 @@ export const emailVerificationTokens = pgTable(
 );
 
 /**
- * Candidate profile â€” exactly one row per candidate user. Contains only
+ * Candidate profile — exactly one row per candidate user. Contains only
  * professional job-seeker information. Date of birth is OPTIONAL and is never
  * required to register, build a profile, or apply to a job.
  */
@@ -88,7 +88,7 @@ export const candidateProfiles = pgTable(
     portfolioUrl: text('portfolio_url'),
     linkedinUrl: text('linkedin_url'),
     githubUrl: text('github_url'),
-    /** 'public' | 'employers' | 'private' â€” who may view the profile. */
+    /** 'public' | 'employers' | 'private' — who may view the profile. */
     profileVisibility: text('profile_visibility').notNull().default('employers'),
     openToWork: boolean('open_to_work').notNull().default(true),
     /** Denormalised completion percentage (0-100), recomputed server-side. */
@@ -278,7 +278,7 @@ export const resumeTemplates = pgTable(
 /**
  * A resume is a stable container owned by a candidate. Multiple resumes per
  * candidate are supported (different job targets), and each resume has many
- * versions â€” there is deliberately no single hard-coded resume.
+ * versions — there is deliberately no single hard-coded resume.
  */
 export const resumes = pgTable(
   'resumes',
@@ -509,7 +509,7 @@ export const employerCompanyMembers = pgTable(
     userId: uuid('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    /** 'owner' | 'admin' | 'member' â€” controls company-scoped actions. */
+    /** 'owner' | 'admin' | 'member' — controls company-scoped actions. */
     memberRole: text('member_role').notNull().default('member'),
     status: text('status').notNull().default('active'),
     invitedByUserId: uuid('invited_by_user_id').references(() => users.id, {
@@ -529,7 +529,7 @@ export const employerCompanyMembers = pgTable(
 
 /**
  * A portal job posting. `status` encodes the full lifecycle, and the transition
- * rules are enforced server-side in the job service â€” an employer can never
+ * rules are enforced server-side in the job service — an employer can never
  * move a job straight to PUBLISHED when approval is required.
  */
 export const jobs = pgTable(
@@ -777,7 +777,7 @@ export const candidatePremiumPlans = pgTable(
 
 /**
  * Capability definitions. Adding a future premium feature means adding a row
- * here and mapping it to a plan â€” no schema or user-model change required.
+ * here and mapping it to a plan — no schema or user-model change required.
  */
 export const premiumEntitlements = pgTable(
   'premium_entitlements',
@@ -885,7 +885,7 @@ export const candidateEntitlements = pgTable(
  * ========================================================================== */
 
 /**
- * Job posting packages. Names, prices and credit counts are DATA â€” an admin
+ * Job posting packages. Names, prices and credit counts are DATA — an admin
  * creates and edits them; no pricing is hard-coded anywhere in the codebase.
  */
 export const jobPackages = pgTable(
@@ -999,7 +999,7 @@ export const orders = pgTable(
 
 /**
  * A payment attempt against an order. Only provider references and the quoted
- * amount are stored â€” never card numbers, CVVs, or raw payment credentials.
+ * amount are stored — never card numbers, CVVs, or raw payment credentials.
  *
  * `providerPaymentId` is uniquely indexed so the same provider payment can
  * never be recorded twice, which is the first line of defence against
