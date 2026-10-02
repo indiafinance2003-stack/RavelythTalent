@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { ApiRequestError, apiGet, apiPost } from '@/lib/client/api';
 
@@ -72,7 +72,7 @@ export async function portalPost<T>(path: string, body: unknown): Promise<T> {
 
 /** PUT / PATCH with a JSON body. */
 export async function portalSend<T>(
-  method: 'PUT' | 'PATCH' | 'POST',
+  method: 'PUT' | 'PATCH' | 'POST' | 'DELETE',
   path: string,
   body: unknown
 ): Promise<T> {

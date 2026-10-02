@@ -370,3 +370,95 @@ export interface NotificationDTO {
   read: boolean;
   createdAt: string;
 }
+
+/** A job row as the owning employer sees it, including workflow state. */
+export interface EmployerJob {
+  id: string;
+  companyId: string;
+  postedForCompanyId: string | null;
+  title: string;
+  department: string | null;
+  employmentType: string;
+  workMode: string;
+  location: string | null;
+  experienceMinYears: number | null;
+  experienceMaxYears: number | null;
+  salaryMinMinor: number | null;
+  salaryMaxMinor: number | null;
+  salaryPublic: boolean;
+  openings: number;
+  description: string;
+  responsibilities: string[];
+  requirements: string[];
+  benefits: string[];
+  educationRequirements: string | null;
+  skills: string[];
+  status: string;
+  rejectionReason: string | null;
+  publishedAt: string | null;
+  expiresAt: string | null;
+  applicationDeadline: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** An application as the employer sees it. */
+export interface EmployerApplication {
+  id: string;
+  jobId: string;
+  candidateId: string;
+  status: string;
+  coverLetter: string | null;
+  employerNotes: string | null;
+  appliedAt: string;
+  updatedAt: string;
+  jobTitle?: string;
+  companyName?: string;
+  candidateName?: string;
+  candidateEmail?: string;
+  candidatePhone?: string | null;
+  candidateLocation?: string | null;
+  candidateHeadline?: string | null;
+}
+
+/** An authorised client relationship for a recruitment agency. */
+export interface AgencyClient {
+  id: string;
+  clientCompanyId: string;
+  name: string;
+  status: string;
+  verified: boolean;
+}
+
+export interface AgencyClientsResponse {
+  companyType: CompanyType | null;
+  clients: AgencyClient[];
+}
+
+/** A job credit balance, derived from the ledger by the server. */
+export interface CreditBalance {
+  total: number;
+  used: number;
+  available: number;
+  earliestExpiry: string | null;
+}
+
+/** The employer's own company record. */
+export interface EmployerCompany {
+  id: string;
+  name: string;
+  slug: string;
+  website: string | null;
+  industry: string | null;
+  companySize: string | null;
+  location: string | null;
+  description: string | null;
+  phone: string | null;
+  officialEmail: string | null;
+  authorizedContactName: string | null;
+  authorizedContactPhone: string | null;
+  verificationStatus: string;
+  verificationNotes: string | null;
+  companyType: CompanyType;
+  status: string;
+}
