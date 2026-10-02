@@ -36,6 +36,10 @@ export const PORTAL_AUDIT_ACTIONS = [
   'company_verification_granted',
   'company_verification_rejected',
   'company_suspended',
+  // Resume lifecycle
+  'resume_uploaded',
+  'resume_deleted',
+  'resume_downloaded',
   // Job workflow
   'job_created',
   'job_submitted_for_approval',
