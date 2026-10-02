@@ -63,7 +63,9 @@ export function CompanyPage(): React.ReactElement {
     setError(null);
     setMessage(null);
     try {
-      await portalSend('PUT', '/api/portal/employer/company', {
+      // PATCH, not PUT: the route implements a partial update, and a PUT here
+      // would be answered with 405 and the employer could never save at all.
+      await portalSend('PATCH', '/api/portal/employer/company', {
         name: current.name,
         website: current.website || null,
         industry: current.industry || null,

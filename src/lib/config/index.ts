@@ -114,6 +114,21 @@ interface Config {
   SMTP_PASSWORD: string;
   SMTP_REQUIRE_TLS: boolean;
   SMTP_TIMEOUT_MS: number;
+  /**
+   * Official Ravelyth Talent social profiles.
+   *
+   * Every one is OPTIONAL and empty by default. A blank or absent value means
+   * "this channel is not configured", and the UI renders nothing for it rather
+   * than a link to a guessed or placeholder address. Accounts are only ever
+   * pointed at URLs an operator supplies, so the site can never link to a profile
+   * that does not exist.
+   */
+  SOCIAL_X: string;
+  SOCIAL_LINKEDIN: string;
+  SOCIAL_GITHUB: string;
+  SOCIAL_YOUTUBE: string;
+  SOCIAL_INSTAGRAM: string;
+  SOCIAL_FACEBOOK: string;
 }
 
 export type BillingIntervalConfig = 'monthly' | 'quarterly' | 'yearly';
@@ -286,6 +301,14 @@ function getConfig(): Config {
     SMTP_PASSWORD: process.env.SMTP_PASSWORD || '',
     SMTP_REQUIRE_TLS: parseEnvBool('SMTP_REQUIRE_TLS', true),
     SMTP_TIMEOUT_MS: parseEnvInt('SMTP_TIMEOUT_MS', 15000),
+    // Trimmed and empty-by-default. An unconfigured channel yields an empty
+    // string, which the social-links helper treats as "render nothing".
+    SOCIAL_X: (process.env.SOCIAL_X || '').trim(),
+    SOCIAL_LINKEDIN: (process.env.SOCIAL_LINKEDIN || '').trim(),
+    SOCIAL_GITHUB: (process.env.SOCIAL_GITHUB || '').trim(),
+    SOCIAL_YOUTUBE: (process.env.SOCIAL_YOUTUBE || '').trim(),
+    SOCIAL_INSTAGRAM: (process.env.SOCIAL_INSTAGRAM || '').trim(),
+    SOCIAL_FACEBOOK: (process.env.SOCIAL_FACEBOOK || '').trim(),
   };
 }
 
