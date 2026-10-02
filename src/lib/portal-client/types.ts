@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Types mirroring the Ravelyth Talent backend contracts.
  *
  * These describe what the API actually returns. They are hand-written to match
@@ -232,7 +232,15 @@ export interface CandidateDetails {
   achievements: CandidateAchievement[];
 }
 
-export type DetailsSection = keyof CandidateDetails;
+/** Union of the section names the details endpoint accepts as 	ype. */
+export type DetailsSection =
+  | 'skill'
+  | 'language'
+  | 'education'
+  | 'experience'
+  | 'project'
+  | 'certification'
+  | 'achievement';
 
 export interface CandidatePreferences {
   candidateId: string;

@@ -1,29 +1,46 @@
+﻿import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
-import { RegisterForm } from '@/components/auth/register-form';
-import { getSessionUser } from '@/lib/auth/session';
+import { PortalRegisterForm } from '@/components/portal/auth/portal-register-form';
+import { currentPortalUser } from '@/lib/portal/auth-context';
+import { LoadingState } from '@/components/portal/ui';
 
 export const metadata: Metadata = {
-  title: 'Create Account',
-  description: 'Create a free Ravelyth account to save DNS analyses.',
-  robots: { index: false, follow: false },
+  title: 'Create your account — Ravelyth Talent',
+  description:
+    'Register on Ravelyth Talent as a candidate, an employer, or a recruitment agency. Consent is recorded separately for each purpose.',
+  robots: { index: false, follow: true },
+  alternates: { canonical: '/register' },
 };
 
+/**
+ * Portal registration.
+ *
+ * Already-signed-in visitors are sent to the dashboard for their role. The
+ * session lookup is best-effort so a missing database never turns a marketing
+ * page into a 500.
+ */
 export default async function RegisterPage(): Promise<React.ReactElement> {
-  // Already signed in visitors go straight to their account.
-  if (await getSessionUser()) {
-    redirect('/account');
+  try {
+    const user = await currentPortalUser();
+    if (user) {
+      redirect(user.role === 'employer' ? '/employer' : user.role === 'admin' ? '/admin' : '/candidate');
+    }
+  } catch {
+    // Treat an unavailable session as "not signed in".
   }
 
   return (
-    <div className="mx-auto max-w-md px-4 py-16">
-      <h1 className="text-3xl font-semibold tracking-tight text-ink">Create account</h1>
+    <div className="mx-auto max-w-2xl px-4 py-12">
+      <h1 className="text-3xl font-semibold tracking-tight text-ink">Create your account</h1>
       <p className="mt-2 text-sm text-muted">
-        A free account lets you save DNS lookup results for later. Public tools remain available without an
-        account.
+        Join Ravelyth Talent to apply for roles, or to hire and manage candidates.
       </p>
+
       <div className="mt-8 rounded-xl border border-line bg-navy-surface p-6">
-        <RegisterForm />
+        <Suspense fallback={<LoadingState label="Loading the form…" />}>
+          <PortalRegisterForm />
+        </Suspense>
       </div>
     </div>
   );
