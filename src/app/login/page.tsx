@@ -1,4 +1,5 @@
-﻿import { Suspense } from 'react';
+import Link from 'next/link';
+import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { currentPortalUser } from '@/lib/portal/auth-context';
@@ -42,6 +43,12 @@ export default async function LoginPage(): Promise<React.ReactElement> {
           <PortalLoginForm />
         </Suspense>
       </div>
+
+      <p className="mt-6 text-center text-sm text-muted">
+        <Link href="/forgot-password" className="underline">
+          Forgot password?
+        </Link>
+      </p>
     </div>
   );
 }
