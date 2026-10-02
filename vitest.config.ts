@@ -8,17 +8,20 @@ export default defineConfig({
     include: ['tests/**/*.test.ts'],
     restoreMocks: true,
     mockReset: true,
-    // PGlite boots a full PostgreSQL WASM instance per test file, and each one
-    // is memory hungry. Running every integration file at once exhausts the
-    // heap, so the pool is deliberately small: correctness over speed.
+    // PGlite boots a full PostgreSQL WASM instance per test file, and each one is
+    // memory hungry. Two at a time still intermittently crashed the V8 heap
+    // ("Check failed: jit_page_->allocations_.erase"), so the pool is pinned to a
+    // single worker: correctness and a reproducible green run over speed.
     pool: 'threads',
     poolOptions: {
-      threads: { minThreads: 1, maxThreads: 2 },
+      threads: { minThreads: 1, maxThreads: 1 },
     },
     // PGlite boots a full PostgreSQL WASM instance per test file, which can take
     // a few seconds to collect on slower machines.
     testTimeout: 30000,
     hookTimeout: 60000,
+    // A crashed worker must not be reported as a partial pass.
+    teardownTimeout: 30000,
   },
   resolve: {
     alias: {

@@ -1,4 +1,4 @@
-﻿import 'server-only';
+import 'server-only';
 import { and, eq } from 'drizzle-orm';
 import { dbFromRequest } from '@/lib/db/request';
 import { users } from '@/lib/db/schema';
@@ -12,6 +12,8 @@ import {
 import {
   sendApplicationStatusChanged,
   sendApplicationSubmitted,
+  sendJobApproved,
+  sendJobRejected,
   sendNewApplication,
 } from '@/lib/email/transactional/dispatch';
 import { logger } from '@/lib/logging/logger';
@@ -160,4 +162,71 @@ export async function notifyApplicationStatusChanged(input: {
 function humanizeStatus(status: string): string {
   const spaced = status.replace(/_/g, ' ').trim();
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
+/**
+ * Notifies an employer of an admin's decision on one of their job postings.
+ *
+ * Runs after the decision has committed and never fails it: a moderation mail
+ * outage must not roll back or block an approval that already happened.
+ */
+export async function notifyJobDecision(input: {
+  jobId: string;
+  approved: boolean;
+  rejectionReason?: string | null;
+}): Promise<void> {
+  try {
+    const { db } = dbFromRequest();
+
+    const [context] = await db
+      .select({
+        title: jobs.title,
+        companyId: jobs.companyId,
+      })
+      .from(jobs)
+      .where(eq(jobs.id, input.jobId))
+      .limit(1);
+
+    if (!context) return;
+
+    // The primary contact for the company that owns the posting.
+    const [contact] = await db
+      .select({ email: users.email, name: users.name })
+      .from(employerProfiles)
+      .innerJoin(users, eq(employerProfiles.userId, users.id))
+      .where(
+        and(
+          eq(employerProfiles.companyId, context.companyId),
+          eq(employerProfiles.isPrimaryContact, true)
+        )
+      )
+      .limit(1);
+
+    if (!contact) return;
+
+    const dashboardPath = `/employer/jobs/${input.jobId}`;
+
+    if (input.approved) {
+      await sendJobApproved({
+        to: contact.email,
+        employerName: contact.name,
+        jobTitle: context.title,
+        dashboardPath,
+      });
+      return;
+    }
+
+    await sendJobRejected({
+      to: contact.email,
+      employerName: contact.name,
+      jobTitle: context.title,
+      rejectionReason: input.rejectionReason ?? null,
+      dashboardPath,
+    });
+  } catch (error) {
+    logger.error('Job decision notification failed', {
+      jobId: input.jobId,
+      reason: error instanceof Error ? error.message : 'unknown',
+    });
+  }
 }

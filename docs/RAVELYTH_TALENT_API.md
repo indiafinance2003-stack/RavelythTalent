@@ -1,4 +1,4 @@
-﻿# Ravelyth Talent — Backend API (Part 1)
+# Ravelyth Talent — Backend API (Part 1)
 
 This document is the contract the Part 2 frontend builds against.
 
@@ -81,10 +81,13 @@ One published job. Draft, pending, closed, expired and rejected jobs all return
 ```json
 { "name": "...", "email": "...", "password": "...",
   "confirmPassword": "...", "accountType": "candidate" | "employer",
+  "acceptTerms": true,
+  "consents": { "jobApplication": true, "resumeStorage": true,
+                "marketing": false },
   "company": { "name": "..." } }
 ```
 Creates the account, opens a session, queues the verification email and records
-`account_creation` consent. `accountType` is the ONLY accepted role source: a
+`account_creation` consent, plus any per-purpose consents the user affirmatively gave. `acceptTerms` is **required**: a registration that has not accepted the terms is rejected rather than having consent recorded on the user's behalf, and `marketing` is strictly opt-in. `accountType` is the ONLY accepted role source: a
 client cannot register as `admin`. An employer **must** supply a company, which
 is created with `verificationStatus = "pending"` — never auto-verified.
 
@@ -113,6 +116,15 @@ includes `role`, `emailVerified`, and for candidates `candidateProfile`,
 ### `POST /api/portal/auth/logout`
 Destroys the server-side session and clears the cookie.
 
+### `POST /api/portal/auth/change-password`
+`{ currentPassword, newPassword, confirmPassword }`. The **current** password is
+required, so a hijacked session alone cannot take the account over. On success
+every other session for the account is destroyed and any outstanding password
+reset tokens are consumed; the caller's own session is preserved.
+
+Password RESET is a separate, token-based flow shared with the main product:
+`POST /api/auth/forgot-password` and `POST /api/auth/reset-password`.
+
 ## Candidate endpoints
 
 | Method | Path | Notes |
@@ -128,6 +140,35 @@ Destroys the server-side session and clears the cookie.
 | `POST` | `/api/portal/candidate/saved-jobs` | Save (idempotent) |
 | `DELETE` | `/api/portal/candidate/saved-jobs?jobId=` | Unsave |
 | `GET` | `/api/portal/candidate/alerts` | Own job alerts |
+| `POST` | `/api/portal/candidate/alerts` | Create an alert with real criteria |
+| `PUT` | `/api/portal/candidate/alerts` | Update an alert |
+| `DELETE` | `/api/portal/candidate/alerts?alertId=` | Delete an alert |
+| `GET` | `/api/portal/candidate/resumes/[id]/versions` | Version history of one resume |
+| `POST` | `/api/portal/candidate/resumes/[id]/versions` | Upload a new version (`multipart/form-data`, part `file`) |
+| `GET` | `/api/portal/candidate/resumes/versions/[versionId]` | **Download the file bytes** |
+| `GET` | `/api/portal/candidate/premium` | Plans, current subscription and entitlements |
+| `POST` | `/api/portal/candidate/premium` | Cancel at period end |
+| `GET` | `/api/portal/candidate/consent` | Full consent history |
+| `POST` | `/api/portal/candidate/consent` | Grant one purpose |
+| `DELETE` | `/api/portal/candidate/consent` | Withdraw one purpose |
+
+### Candidate notes
+
+**Resume downloads return raw bytes**, not a JSON envelope, with
+`Content-Disposition: attachment` and `Cache-Control: private, no-store`. A read
+is permitted only for the owning candidate, an employer holding a real
+application to a job at their **own** company for that exact version, or an
+admin. Anything else returns `404` — not `403` — so resume ids cannot be probed
+for existence. Every successful read writes a `resume_access_logs` row.
+
+**Premium cannot be activated from this API.** Activation happens only through
+`activateSubscription`, which is reachable exclusively from a verified payment
+path; there is deliberately no "subscribe" call a client could make.
+
+**Consent is a precondition, not a side effect.** Applying requires prior
+`job_application` consent and uploading requires `resume_storage`; neither
+records its own consent. Withdrawing `marketing` leaves `job_application`
+untouched. `account_creation` cannot be withdrawn via the API.
 
 Applying returns `201` with `{ application }`. Errors are explicit:
 `409` for a duplicate, for a closed job, or after the deadline.
@@ -148,6 +189,31 @@ authorized read endpoint, which records an access log entry.
 | `GET` | `/api/portal/employer/credits` | Balance, ledger and package catalogue |
 | `GET` | `/api/portal/employer/orders` | Company orders |
 | `POST` | `/api/portal/employer/orders` | Start a purchase |
+| `GET` | `/api/portal/employer/jobs/[id]` | One of the caller's own jobs + its history |
+| `PATCH` | `/api/portal/employer/jobs/[id]` | Edit a job (may require reapproval) |
+| `DELETE` | `/api/portal/employer/jobs/[id]` | Withdraw, returning any consumed credit |
+| `GET` | `/api/portal/employer/applications/[id]` | One application + status history |
+| `PATCH` | `/api/portal/employer/applications/[id]` | Move the application to a new status |
+| `PUT` | `/api/portal/employer/company` | Update company details |
+| `GET` | `/api/portal/employer/company/clients` | Clients this agency may post for |
+| `POST` | `/api/portal/employer/company/clients` | Authorise a client company |
+| `DELETE` | `/api/portal/employer/company/clients` | Revoke a client company |
+
+### Recruitment agencies
+
+`companies.company_type` is either `employer` (hires directly) or
+`recruitment_agency`. An agency may post a vacancy for a client by passing
+`postedForCompanyId` on `POST /api/portal/employer/jobs`, but only for a client
+linked through `/api/portal/employer/company/clients`.
+
+Authorisation is enforced server-side: an agency with no active client link is
+refused, and a company whose type is not `recruitment_agency` is refused even if
+a link row exists. `postedForCompanyId` is **not** editable on a live job.
+
+`jobs.company_id` always remains the agency, so billing, moderation and tenant
+scoping are unchanged; only `postedForCompanyId` records whose vacancy it is.
+Only an admin can set `companyType`, and downgrading an agency revokes its
+client links in the same operation.
 
 **An employer can never publish a job.** `POST` creates a draft and `PUT`
 submits it for review; the status is decided server-side. When approval is
@@ -165,6 +231,17 @@ A client claiming a payment succeeded changes nothing — only a verified webhoo
 or a server-side signature check can mark an order paid. Returns
 `503 PAYMENT_NOT_CONFIGURED` when no gateway is configured, rather than
 pretending a checkout exists.
+
+## Reports
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| `GET` | `/api/portal/reports` | Reports the caller filed, with their outcome |
+| `POST` | `/api/portal/reports` | File a report about a job, company or person |
+
+The reporter is taken from the session, never the body. Filing a report does not
+hide the target or notify the reported party; takedown is an admin decision
+recorded through `PUT /api/portal/admin/reports`.
 
 ## Admin endpoints
 
@@ -194,11 +271,15 @@ Configure this exact URL in the gateway dashboard.
 
 1. The raw body is verified against the webhook secret **before** parsing.
    A bad signature returns `400` and nothing is read.
-2. The event id is claimed under a unique index. A replay returns `200` with
-   `{ duplicate: true }` and performs **no** side effects.
-3. The order is located by the provider's own order id; the credited amount
+2. The event id is claimed under a unique index and stored as `processing`, NOT
+   as done. Completion is recorded only after the side effects commit.
+3. A claim re-admits anything not yet completed, so a delivery that failed or
+   whose process died is retried safely. Only a completed event is refused,
+   returning `200` with `{ duplicate: true }` and performing no side effects.
+4. The order is located by the provider's own order id; the credited amount
    comes from the stored order.
-4. Marking paid and granting credits are atomic and idempotent.
+5. Marking paid and granting credits are atomic and idempotent, so re-admitting
+   an in-flight event still cannot double-credit.
 
 ## Frontend contracts
 

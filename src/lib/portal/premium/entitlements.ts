@@ -1,4 +1,4 @@
-﻿import 'server-only';
+import 'server-only';
 import { and, desc, eq, gt, isNull, or, sql } from 'drizzle-orm';
 import { dbFromRequest } from '@/lib/db/request';
 import {
@@ -10,6 +10,7 @@ import {
   type CandidatePremiumPlanRow,
 } from '@/lib/db/portal-schema';
 import { AppError, AppErrorCode } from '@/lib/errors/app-error';
+import type { AppDatabase } from '@/lib/db';
 import { recordPortalAudit } from '@/lib/portal/audit';
 
 /**
@@ -164,9 +165,19 @@ export async function listActivePlans(): Promise<
   }));
 }
 
-/** One plan by id, reading the authoritative price from the database. */
-export async function getPlan(planId: string): Promise<CandidatePremiumPlanRow> {
-  const { db } = dbFromRequest();
+/**
+ * One plan by id, reading the authoritative price from the database.
+ *
+ * Accepts an executor so a caller already inside a transaction can resolve the
+ * plan WITHOUT taking a second connection. That matters: PGlite and a
+ * single-connection pool both deadlock if a non-transactional query runs while
+ * the transaction still holds the only connection.
+ */
+export async function getPlan(
+  planId: string,
+  executor?: DbExecutor
+): Promise<CandidatePremiumPlanRow> {
+  const db = executor ?? dbFromRequest().db;
   const [plan] = await db
     .select()
     .from(candidatePremiumPlans)
@@ -174,6 +185,92 @@ export async function getPlan(planId: string): Promise<CandidatePremiumPlanRow> 
     .limit(1);
   if (!plan) throw new AppError(AppErrorCode.NOT_FOUND, 'The requested plan was not found.', 404);
   return plan;
+}
+
+/** Either the root database or an existing transaction, for composable helpers. */
+type DbExecutor = Pick<
+  AppDatabase,
+  'select' | 'insert' | 'update' | 'delete' | 'execute'
+>;
+
+/**
+ * Activates a subscription inside an EXISTING transaction.
+ *
+ * Payment confirmation must use this rather than the standalone wrapper: the
+ * order must never be able to commit as paid while the subscription and its
+ * entitlements fail, which would leave a customer who has paid with nothing to
+ * show for it. Everything below therefore runs on the caller's executor.
+ *
+ * Auditing is the caller's responsibility, because an audit written inside a
+ * business transaction would be rolled back along with it.
+ */
+export async function activateSubscriptionWith(
+  tx: DbExecutor,
+  input: {
+    candidateId: string;
+    plan: CandidatePremiumPlanRow;
+    orderId?: string | null;
+    paymentId?: string | null;
+    now?: Date;
+  }
+): Promise<{ subscriptionId: string; granted: string[] }> {
+  const now = input.now ?? new Date();
+  const plan = input.plan;
+
+  // Supersede any earlier active subscription for this candidate.
+  await tx
+    .update(candidatePremiumSubscriptions)
+    .set({ status: 'cancelled', cancelledAt: now, updatedAt: now })
+    .where(
+      and(
+        eq(candidatePremiumSubscriptions.candidateId, input.candidateId),
+        eq(candidatePremiumSubscriptions.status, 'active')
+      )
+    );
+
+  const [subscription] = await tx
+    .insert(candidatePremiumSubscriptions)
+    .values({
+      candidateId: input.candidateId,
+      planId: plan.id,
+      status: 'active',
+      startedAt: now,
+      currentPeriodStart: now,
+      currentPeriodEnd: new Date(now.getTime() + plan.durationDays * 86_400_000),
+      orderId: input.orderId ?? null,
+      paymentId: input.paymentId ?? null,
+    })
+    .returning();
+
+  // Materialise exactly the entitlements this plan maps to.
+  const mapped = await tx
+    .select({ id: premiumEntitlements.id, code: premiumEntitlements.code })
+    .from(candidatePremiumPlanEntitlements)
+    .innerJoin(
+      premiumEntitlements,
+      eq(candidatePremiumPlanEntitlements.entitlementId, premiumEntitlements.id)
+    )
+    .where(eq(candidatePremiumPlanEntitlements.planId, plan.id));
+
+  const expiresAt = new Date(now.getTime() + plan.durationDays * 86_400_000);
+
+  for (const entitlement of mapped) {
+    await tx
+      .insert(candidateEntitlements)
+      .values({
+        candidateId: input.candidateId,
+        entitlementId: entitlement.id,
+        subscriptionId: subscription.id,
+        grantedAt: now,
+        expiresAt,
+      })
+      .onConflictDoUpdate({
+        target: [candidateEntitlements.candidateId, candidateEntitlements.entitlementId],
+        set: { revokedAt: null, grantedAt: now, expiresAt, subscriptionId: subscription.id },
+      });
+  }
+
+  return { subscriptionId: subscription.id, granted: mapped.map((row) => row.code) };
 }
 
 /**

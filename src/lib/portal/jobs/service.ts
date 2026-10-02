@@ -1,4 +1,4 @@
-﻿import 'server-only';
+import 'server-only';
 import { and, desc, eq } from 'drizzle-orm';
 import { config } from '@/lib/config';
 import { dbFromRequest } from '@/lib/db/request';
@@ -14,6 +14,7 @@ import { AppError, AppErrorCode } from '@/lib/errors/app-error';
 import { recordPortalAudit } from '@/lib/portal/audit';
 import { consumeCreditWith, refundCreditForJob } from '@/lib/portal/credits';
 import { requireAgencyClientAccess } from '@/lib/portal/agencies';
+import { notifyJobDecision } from '@/lib/portal/candidate-notifications';
 import {
   assertTransition,
   changedMaterialFields,
@@ -324,6 +325,15 @@ export async function reviewJob(input: {
     actorUserId: input.adminUserId,
     description: `Job ${input.decision === 'approve' ? 'approved' : 'rejected'}: ${updated.title}`,
     metadata: { jobId: input.jobId, from: job.status, to: nextStatus },
+  });
+
+  // The employer hears about the decision. This runs AFTER the commit and
+  // swallows its own failures, so a mail outage can neither roll back nor
+  // block a moderation decision that has already taken effect.
+  await notifyJobDecision({
+    jobId: input.jobId,
+    approved: input.decision === 'approve',
+    rejectionReason: input.reason ?? null,
   });
 
   return updated;

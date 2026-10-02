@@ -71,6 +71,13 @@
       "when": 1790921399235,
       "tag": "0009_recruitment_agency_clients",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790922924035,
+      "tag": "0010_premium_order_package_fk",
+      "breakpoints": true
     }
   ]
 }

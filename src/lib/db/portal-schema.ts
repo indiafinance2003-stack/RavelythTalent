@@ -1,4 +1,4 @@
-﻿import {
+import {
   index,
   jsonb,
   pgTable,
@@ -834,6 +834,14 @@ export const candidatePremiumSubscriptions = pgTable(
     providerSubscriptionId: text('provider_subscription_id'),
     /** Links to the portal order/payment that funded this subscription. */
     orderId: uuid('order_id'),
+    /**
+     * The PAYMENT ROW's id (a uuid), NOT the gateway's payment reference.
+     *
+     * A provider payment id is an opaque string like `pay_abc123` and does
+     * not fit a uuid; storing it here would make every premium purchase fail
+     * with an invalid-uuid error. The external reference lives on
+     * payments.provider_payment_id.
+     */
     paymentId: uuid('payment_id'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -949,9 +957,19 @@ export const orders = pgTable(
     userId: uuid('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'restrict' }),
-    packageId: uuid('package_id')
-      .notNull()
-      .references(() => jobPackages.id, { onDelete: 'restrict' }),
+    /**
+     * What was bought.
+     *
+     * For a 'job_package' order this is a job_packages row; for a
+     * 'candidate_premium' order it is a candidate_premium_plans row.
+     *
+     * There is deliberately NO foreign key here: a single column cannot be
+     * constrained to two different parent tables, and a check constraint that
+     * enforced the pairing would have to hard-code the FK anyway. The pairing is
+     * therefore validated in the service against the order's orderType, and the
+     * price is always read from the parent row rather than from this id.
+     */
+    packageId: uuid('package_id').notNull(),
     /** 'job_package' | 'candidate_premium' */
     orderType: text('order_type').notNull().default('job_package'),
     /** Candidate target for premium orders; null for job packages. */

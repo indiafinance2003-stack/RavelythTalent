@@ -12,6 +12,7 @@ import {
 import { AppError, AppErrorCode } from '@/lib/errors/app-error';
 import { recordPortalAudit } from '@/lib/portal/audit';
 import { grantCreditsWith } from '@/lib/portal/credits';
+import { activateSubscriptionWith, getPlan } from '@/lib/portal/premium/entitlements';
 
 /**
  * Orders and payments (see §14).
@@ -233,17 +234,55 @@ export async function markOrderPaidAndGrantCredits(input: {
     }
 
     // Guard 2: one provider payment maps to exactly one payment row.
-    await tx.insert(payments).values({
-      orderId: input.orderId,
-      status: 'captured',
-      amountMinor: order.amountMinor,
-      currency: order.currency,
-      providerOrderId: input.providerOrderId ?? order.providerOrderId ?? null,
-      providerPaymentId: input.providerPaymentId,
-      method: input.method ?? null,
-      authorizedAt: now,
-      capturedAt: now,
-    });
+    const [payment] = await tx
+      .insert(payments)
+      .values({
+        orderId: input.orderId,
+        status: 'captured',
+        amountMinor: order.amountMinor,
+        currency: order.currency,
+        providerOrderId: input.providerOrderId ?? order.providerOrderId ?? null,
+        providerPaymentId: input.providerPaymentId,
+        method: input.method ?? null,
+        authorizedAt: now,
+        capturedAt: now,
+      })
+      .returning({ id: payments.id });
+
+    // A candidate PREMIUM purchase grants a subscription, not job credits.
+    // Without this branch a premium order would silently pay out employer job
+    // credits, because `jobPackages.credits` is always defined, and the
+    // customer would receive no premium entitlements at all.
+    if (order.orderType === 'candidate_premium') {
+      if (!order.candidateId) {
+        throw new AppError(
+          AppErrorCode.VALIDATION_ERROR,
+          'A premium order must name the candidate it belongs to.',
+          400
+        );
+      }
+
+      // `packageId` carries the premium PLAN for this order type. The plan is
+      // read on THIS executor: a second connection here would deadlock against
+      // the transaction that already holds the only one.
+      const plan = await getPlan(order.packageId, tx);
+
+      await activateSubscriptionWith(tx, {
+        candidateId: order.candidateId,
+        plan,
+        orderId: input.orderId,
+        // The payment ROW id, not the gateway reference: `payment_id` is a
+        // uuid that references `payments`.
+        paymentId: payment.id,
+        now,
+      });
+
+      return {
+        grantedCredits: 0,
+        alreadyProcessed: false,
+        orderNumber: order.orderNumber,
+      };
+    }
 
     const [pkg] = await tx
       .select()
