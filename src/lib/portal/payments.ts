@@ -11,7 +11,7 @@ import {
 } from '@/lib/db/portal-schema';
 import { AppError, AppErrorCode } from '@/lib/errors/app-error';
 import { recordPortalAudit } from '@/lib/portal/audit';
-import { grantCreditsForOrder } from '@/lib/portal/credits';
+import { grantCreditsWith } from '@/lib/portal/credits';
 
 /**
  * Orders and payments (see §14).
@@ -212,7 +212,9 @@ export async function markOrderPaidAndGrantCredits(input: {
   const now = input.now ?? new Date();
   const { db } = dbFromRequest();
 
-  return db.transaction(async (tx) => {
+  // The transaction contains ONLY the business work. Auditing runs after the
+  // commit so it can never hold the business transaction open.
+  const result = await db.transaction(async (tx) => {
     const [order] = await tx.select().from(orders).where(eq(orders.id, input.orderId)).limit(1);
     if (!order) {
       throw new AppError(AppErrorCode.NOT_FOUND, 'The requested order was not found.', 404);
@@ -227,7 +229,7 @@ export async function markOrderPaidAndGrantCredits(input: {
 
     if (!claimed) {
       // Already paid (or cancelled): this is a replay. No side effects.
-      return { grantedCredits: 0, alreadyProcessed: true };
+      return { grantedCredits: 0, alreadyProcessed: true, orderNumber: order.orderNumber };
     }
 
     // Guard 2: one provider payment maps to exactly one payment row.
@@ -249,22 +251,27 @@ export async function markOrderPaidAndGrantCredits(input: {
       .where(eq(jobPackages.id, order.packageId))
       .limit(1);
 
-    // Guard 3: the ledger is unique per order (enforced by a DB index).
-    await grantCreditsForOrder(input.orderId);
+    // Guard 3: the ledger is unique per order (enforced by a DB index). This
+    // runs on the SAME transaction so the order and its credits commit together.
+    await grantCreditsWith(tx, input.orderId);
 
+
+    return { grantedCredits: pkg?.credits ?? 0, alreadyProcessed: false, orderNumber: order.orderNumber };
+  });
+
+  if (!result.alreadyProcessed) {
     await recordPortalAudit({
       action: 'payment_status_changed',
-      description: `Order ${order.orderNumber} marked paid`,
+      description: `Order ${result.orderNumber} marked paid`,
       metadata: {
         orderId: input.orderId,
         providerPaymentId: input.providerPaymentId,
-        amountMinor: order.amountMinor,
-        credits: pkg?.credits ?? 0,
+        credits: result.grantedCredits,
       },
     });
+  }
 
-    return { grantedCredits: pkg?.credits ?? 0, alreadyProcessed: false };
-  });
+  return { grantedCredits: result.grantedCredits, alreadyProcessed: result.alreadyProcessed };
 }
 
 /**

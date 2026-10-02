@@ -16,3 +16,8 @@ import { requireDatabase } from './require-database';
 export function dbFromRequest(): { db: AppDatabase } {
   return { db: requireDatabase().db };
 }
+
+// The test-only database override lives in ./require-database (a leaf module) so
+// that exposing it here cannot create an import cycle. Production code must never
+// call it; it throws when NODE_ENV is production.
+export { setDatabaseForTests, getTestDatabase } from './require-database';

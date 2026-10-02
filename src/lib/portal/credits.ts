@@ -11,6 +11,8 @@ import {
 } from '@/lib/db/portal-schema';
 import { AppError, AppErrorCode } from '@/lib/errors/app-error';
 import { recordPortalAudit } from '@/lib/portal/audit';
+import type { AppDatabase } from '@/lib/db';
+import { rowsFromExecute } from '@/lib/db/rows';
 
 /**
  * Job credits: an append-only ledger, never a mutable counter.
@@ -38,10 +40,22 @@ export interface CreditBalance {
   earliestExpiry: string | null;
 }
 
+/**
+ * Reads rows out of a raw `db.execute()` result.
+ *
+ * Drivers differ: postgres-js resolves to the row array directly, while the
+ * PGlite driver (used by the integration tests) resolves to `{ rows: [...] }`.
+ * Normalising here keeps every service portable across both, and means the
+ * production query is exercised verbatim by the tests.
+ */
+function rowsFrom<T>(result: unknown): T[] {
+  return rowsFromExecute<T>(result);
+}
+
 /** Computes a company's credit balance directly from the ledger. */
 export async function getCreditBalance(companyId: string): Promise<CreditBalance> {
   const { db } = dbFromRequest();
-  const rows = await db.execute<{ total: number; used: number; available: number }>(sql`
+  const result = await db.execute(sql`
     SELECT
       COALESCE(SUM(amount) FILTER (WHERE amount > 0), 0)::int AS total,
       COALESCE(-SUM(amount) FILTER (WHERE amount < 0), 0)::int AS used,
@@ -50,7 +64,7 @@ export async function getCreditBalance(companyId: string): Promise<CreditBalance
     WHERE company_id = ${companyId}
   `);
 
-  const row = (rows as unknown as Array<{ total: number; used: number; available: number }>)[0];
+  const row = rowsFrom<{ total: number; used: number; available: number }>(result)[0];
   const total = row?.total ?? 0;
   const used = row?.used ?? 0;
   const available = row?.available ?? 0;
@@ -76,68 +90,85 @@ export async function getCreditBalance(companyId: string): Promise<CreditBalance
   };
 }
 
+/** Either the root database or an existing transaction, for composable helpers. */
+type DbExecutor = Pick<AppDatabase, 'select' | 'insert' | 'update' | 'delete' | 'execute'>;
+
 /**
  * Grants credits for a paid order. Idempotent per order.
  *
  * Called ONLY from a verified payment path. Returns null when the order was
  * already credited, which is the correct outcome for a replayed webhook.
+ *
+ * The caller supplies the executor so this can join an EXISTING transaction
+ * (payment confirmation + credit allocation must be one atomic unit). Opening a
+ * second transaction here would deadlock on a single-connection pool.
+ */
+export async function grantCreditsWith(
+  tx: DbExecutor,
+  orderId: string,
+  actorUserId: string | null = null
+): Promise<JobCreditLedgerRow | null> {
+  const [order] = await tx.select().from(orders).where(eq(orders.id, orderId)).limit(1);
+  if (!order) {
+    throw new AppError(AppErrorCode.NOT_FOUND, 'The requested order was not found.', 404);
+  }
+
+  // Only a paid order grants credits. A browser claim is never consulted.
+  if (order.status !== 'paid') {
+    throw new AppError(
+      AppErrorCode.CONFLICT,
+      'Credits are granted only after a payment has been verified.',
+      409
+    );
+  }
+
+  const [pkg] = await tx
+    .select()
+    .from(jobPackages)
+    .where(eq(jobPackages.id, order.packageId))
+    .limit(1);
+  if (!pkg) {
+    throw new AppError(AppErrorCode.NOT_FOUND, 'The requested package was not found.', 404);
+  }
+
+  // Already granted? Returning null keeps callers quiet on a replay; the unique
+  // index on order_id remains the hard backstop.
+  const [existing] = await tx
+    .select({ id: jobCreditLedger.id })
+    .from(jobCreditLedger)
+    .where(eq(jobCreditLedger.orderId, orderId))
+    .limit(1);
+  if (existing) return null;
+
+  const expiresAt = new Date(Date.now() + Math.max(1, pkg.validityDays) * 24 * 60 * 60 * 1000);
+
+  const [row] = await tx
+    .insert(jobCreditLedger)
+    .values({
+      companyId: order.companyId,
+      amount: pkg.credits,
+      reason: 'order',
+      orderId,
+      expiresAt,
+      notes: `Credits from ${pkg.name}`,
+      createdByUserId: actorUserId,
+    })
+    .returning();
+
+  return row;
+}
+
+/**
+ * Standalone variant for callers that are not already inside a transaction.
+ * Payment confirmation uses `grantCreditsWith` instead so that marking an order
+ * paid and granting credits commit together.
  */
 export async function grantCreditsForOrder(
   orderId: string,
   actorUserId: string | null = null
 ): Promise<JobCreditLedgerRow | null> {
   const { db } = dbFromRequest();
-
-  return db.transaction(async (tx) => {
-    const [order] = await tx.select().from(orders).where(eq(orders.id, orderId)).limit(1);
-    if (!order) {
-      throw new AppError(AppErrorCode.NOT_FOUND, 'The requested order was not found.', 404);
-    }
-
-    // Only a paid order grants credits. A browser claim is never consulted.
-    if (order.status !== 'paid') {
-      throw new AppError(
-        AppErrorCode.CONFLICT,
-        'Credits are granted only after a payment has been verified.',
-        409
-      );
-    }
-
-    const [pkg] = await tx
-      .select()
-      .from(jobPackages)
-      .where(eq(jobPackages.id, order.packageId))
-      .limit(1);
-    if (!pkg) {
-      throw new AppError(AppErrorCode.NOT_FOUND, 'The requested package was not found.', 404);
-    }
-
-    const [existing] = await tx
-      .select({ id: jobCreditLedger.id })
-      .from(jobCreditLedger)
-      .where(eq(jobCreditLedger.orderId, orderId))
-      .limit(1);
-    if (existing) return null;
-
-    const expiresAt = new Date(
-      Date.now() + Math.max(1, pkg.validityDays) * 24 * 60 * 60 * 1000
-    );
-
-    const [row] = await tx
-      .insert(jobCreditLedger)
-      .values({
-        companyId: order.companyId,
-        amount: pkg.credits,
-        reason: 'order',
-        orderId,
-        expiresAt,
-        notes: `Credits from ${pkg.name}`,
-        createdByUserId: actorUserId,
-      })
-      .returning();
-
-    return row;
-  });
+  return db.transaction((tx) => grantCreditsWith(tx, orderId, actorUserId));
 }
 
 /**
@@ -173,12 +204,14 @@ export async function consumeCreditForJob(input: {
       );
     }
 
-    const rows = await tx.execute<{ available: number }>(sql`
+    // The balance is recomputed INSIDE the transaction, so the decision can
+    // never rely on a stale, client-visible number.
+    const balanceResult = await tx.execute(sql`
       SELECT COALESCE(SUM(amount), 0)::int AS available
         FROM job_credit_ledger
        WHERE company_id = ${input.companyId}
     `);
-    const available = (rows as unknown as Array<{ available: number }>)[0]?.available ?? 0;
+    const available = rowsFromExecute<{ available: number }>(balanceResult)[0]?.available ?? 0;
 
     if (available <= 0) {
       throw new AppError(

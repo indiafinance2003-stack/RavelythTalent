@@ -3,6 +3,7 @@ import { and, asc, count, eq, inArray, sql } from 'drizzle-orm';
 import { dbFromRequest } from '@/lib/db/request';
 import { companies, jobs, PUBLIC_JOB_STATUSES } from '@/lib/db/portal-schema';
 import { notFound } from '@/lib/portal/authz';
+import { rowsFromExecute } from '@/lib/db/rows';
 import {
   buildJobPredicates,
   DEFAULT_PAGE_SIZE,
@@ -252,21 +253,27 @@ export async function getJobFacets(): Promise<JobFacets> {
     .where(inArray(jobs.status, [...PUBLIC_JOB_STATUSES]))
     .orderBy(asc(jobs.workMode));
 
-  // unnest() flattens the text[] column in the database rather than in JS.
-  const skillResult = await db.execute<{ skill: string }>(sql`
+  // `skills` is a jsonb array, so it is flattened with jsonb_array_elements_text
+  // in the database rather than in JavaScript.
+  const skillResult = await db.execute(sql`
     SELECT DISTINCT skill
-      FROM jobs, unnest(${jobs.skills}) AS skill
+      FROM jobs, jsonb_array_elements_text(${jobs.skills}) AS skill
      WHERE ${jobs.status} IN ('published')
      ORDER BY skill
      LIMIT 100
   `);
 
+  const skills = rowsFromExecute<{ skill: string }>(skillResult)
+    .map((row) => row.skill)
+    .filter((value): value is string => typeof value === 'string' && value.length > 0);
+
   return {
     locations: locationRows
       .map((row) => row.location)
       .filter((value): value is string => !!value),
-    skills: skillResult.map((row) => row.skill).filter((value): value is string => !!value),
+    skills,
     employmentTypes: typeRows.map((row) => row.employmentType),
     workModes: modeRows.map((row) => row.workMode),
   };
 }
+

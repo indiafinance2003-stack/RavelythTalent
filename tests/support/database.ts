@@ -3,6 +3,8 @@ import { drizzle } from 'drizzle-orm/pglite';
 import fs from 'node:fs';
 import path from 'node:path';
 import * as schema from '@/lib/db/schema';
+import type { AppDatabase, Database } from '@/lib/db';
+import { setDatabaseForTests } from '@/lib/db/request';
 
 /**
  * A REAL PostgreSQL instance for tests, compiled to WebAssembly by PGlite.
@@ -53,6 +55,27 @@ export async function createTestDatabase(): Promise<TestDatabase> {
   return db;
 }
 
+/**
+ * Installs this test database as the application's database for the duration of
+ * a test, so the REAL service code (payments, credits, applications, ...) can be
+ * exercised end-to-end instead of being mocked.
+ *
+ * Call `restoreDatabase` in afterEach/afterAll.
+ */
+export function installTestDatabase(db: TestDatabase): void {
+  // The PGlite handle is a real Drizzle database with the same query interface
+  // the application uses, so the services under test run unmodified.
+  setDatabaseForTests({
+    db: db as unknown as AppDatabase,
+    sql: db.$client as unknown as Database['sql'],
+  });
+}
+
+/** Removes the test-installed database. */
+export function restoreDatabase(): void {
+  setDatabaseForTests(undefined);
+}
+
 /** Removes all rows while keeping the schema, so each test starts clean. */
 export async function truncateAllTables(db: TestDatabase): Promise<void> {
   await db.$client.exec(`
@@ -70,3 +93,4 @@ export async function truncateAllTables(db: TestDatabase): Promise<void> {
     END $$;
   `);
 }
+

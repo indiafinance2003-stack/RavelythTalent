@@ -8,6 +8,7 @@ import {
   type UserConsentRow,
 } from '@/lib/db/portal-schema';
 import { AppError, AppErrorCode } from '@/lib/errors/app-error';
+import { rowsFromExecute } from '@/lib/db/rows';
 
 /**
  * Purpose-specific consent records.
@@ -171,7 +172,7 @@ export async function consentSummary(): Promise<
   Array<{ purpose: string; granted: number; withdrawn: number }>
 > {
   const { db } = dbFromRequest();
-  const rows = await db.execute<{ purpose: string; granted: number; withdrawn: number }>(sql`
+  const result = await db.execute(sql`
     SELECT purpose,
            count(*) FILTER (WHERE withdrawn_at IS NULL)::int AS granted,
            count(*) FILTER (WHERE withdrawn_at IS NOT NULL)::int AS withdrawn
@@ -179,5 +180,5 @@ export async function consentSummary(): Promise<
      GROUP BY purpose
      ORDER BY purpose
   `);
-  return rows as unknown as Array<{ purpose: string; granted: number; withdrawn: number }>;
+  return rowsFromExecute<{ purpose: string; granted: number; withdrawn: number }>(result);
 }
