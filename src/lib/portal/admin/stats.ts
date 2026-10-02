@@ -45,11 +45,9 @@ export interface PlatformStats {
 export async function getPlatformStats(): Promise<PlatformStats> {
   const { db } = dbFromRequest();
 
-  const scalar = async (table: Parameters<typeof db.select>[0] extends never ? never : never) =>
-    table as never;
-  void scalar;
-
-  const [userCounts] = await db.execute(sql`
+  // `db.execute()` resolves to a row array, but the exact shape differs by
+  // driver, so every result is read through `rowsFromExecute` below.
+  const userCounts = await db.execute(sql`
     SELECT
       count(*) FILTER (WHERE role = 'candidate')::int AS candidates,
       count(*) FILTER (WHERE role = 'employer')::int AS employers,
@@ -57,45 +55,45 @@ export async function getPlatformStats(): Promise<PlatformStats> {
     FROM users
   `);
 
-  const [companyCounts] = await db.execute(sql`
+  const companyCounts = await db.execute(sql`
     SELECT
       count(*)::int AS companies,
       count(*) FILTER (WHERE verification_status = 'verified')::int AS verified_companies
     FROM companies
   `);
 
-  const [jobCounts] = await db.execute(sql`
+  const jobCounts = await db.execute(sql`
     SELECT
       count(*) FILTER (WHERE status = 'published')::int AS active_jobs,
       count(*) FILTER (WHERE status = 'pending_approval')::int AS pending_approval_jobs
     FROM jobs
   `);
 
-  const [applicationCounts] = await db.execute(sql`
+  const applicationCounts = await db.execute(sql`
     SELECT
       count(*)::int AS total_applications,
       count(*) FILTER (WHERE status = 'hired')::int AS hires
     FROM job_applications
   `);
 
-  const [orderCounts] = await db.execute(sql`
+  const orderCounts = await db.execute(sql`
     SELECT
       count(*) FILTER (WHERE status = 'paid')::int AS paid_orders,
       COALESCE(SUM(amount_minor) FILTER (WHERE status = 'paid'), 0)::int AS revenue_minor
     FROM orders
   `);
 
-  const [packageCounts] = await db.execute(sql`
+  const packageCounts = await db.execute(sql`
     SELECT count(*) FILTER (WHERE status = 'active')::int AS active_packages
     FROM job_packages
   `);
 
-  const [premiumCounts] = await db.execute(sql`
+  const premiumCounts = await db.execute(sql`
     SELECT count(*) FILTER (WHERE status = 'active')::int AS active_premium
     FROM candidate_premium_subscriptions
   `);
 
-  const [reportCounts] = await db.execute(sql`
+  const reportCounts = await db.execute(sql`
     SELECT count(*) FILTER (WHERE status = 'open')::int AS open_reports FROM reports
   `);
 

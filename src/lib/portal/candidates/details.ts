@@ -400,12 +400,18 @@ export async function updatePreferences(
   }
 ) {
   const { db } = dbFromRequest();
-  const cleanList = (values: string[] | undefined, max: number): string[] =>
-    (values ?? [])
-      .filter((value) => typeof value === 'string')
-      .map((value) => value.trim().toLowerCase())
-      .filter((value) => value.length > 0)
-      .slice(0, max);
+  // Normalised AND de-duplicated: "Remote" and "remote" are the same preference,
+  // and storing both would show the candidate a duplicated chip.
+  const cleanList = (values: string[] | undefined, max: number): string[] => {
+    const unique = new Set<string>();
+    for (const value of values ?? []) {
+      if (typeof value !== 'string') continue;
+      const normalized = value.trim().toLowerCase();
+      if (normalized.length > 0) unique.add(normalized);
+      if (unique.size >= max) break;
+    }
+    return [...unique];
+  };
 
   const patch: Record<string, unknown> = { updatedAt: new Date() };
   if (input.preferredLocations !== undefined) {
