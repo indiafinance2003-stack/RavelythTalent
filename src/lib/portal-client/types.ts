@@ -307,10 +307,19 @@ export interface StatusHistoryEntry {
 
 export interface SavedJob {
   jobId: string;
+  title: string;
+  companyName: string;
+  location: string | null;
+  workMode: string;
+  employmentType: string;
+  salaryMinMinor: number | null;
+  salaryMaxMinor: number | null;
+  salaryPublic: boolean;
+  status: string;
   savedAt: string;
-  job?: JobListItem;
 }
 
+/** A saved job alert, as stored. */
 export interface JobAlert {
   id: string;
   name: string;
@@ -327,14 +336,7 @@ export interface JobAlert {
   createdAt: string;
 }
 
-export interface ConsentRecord {
-  id: string;
-  purpose: string;
-  policyVersion: string;
-  acceptedAt: string;
-  withdrawnAt: string | null;
-}
-
+/** A candidate premium plan. Price is authoritative from the database. */
 export interface PremiumPlan {
   id: string;
   code: string;
@@ -346,74 +348,19 @@ export interface PremiumPlan {
   billingPeriod: string;
   isActive: boolean;
   sortOrder: number;
-  entitlements: Array<{ code: string; name: string; description?: string | null }>;
+  entitlements: Array<{ id?: string; code: string; name: string; description?: string | null }>;
 }
 
-export interface CreditBalance {
-  total: number;
-  used: number;
-  available: number;
-  earliestExpiry: string | null;
-}
-
-export interface JobPackage {
+/** A recorded consent decision for one purpose. */
+export interface ConsentRecord {
   id: string;
-  code: string;
-  name: string;
-  description: string | null;
-  priceMinor: number;
-  currency: string;
-  credits: number;
-  validityDays: number;
-  status: string;
+  purpose: string;
+  policyVersion: string;
+  acceptedAt: string;
+  withdrawnAt: string | null;
 }
 
-export interface OrderDTO {
-  id: string;
-  orderNumber: string;
-  packageId: string;
-  amountMinor: number;
-  currency: string;
-  status: OrderStatus;
-  paidAt: string | null;
-  createdAt: string;
-  nonRefundableAccepted: boolean;
-  providerOrderId?: string | null;
-}
-
-export interface EmployerCompany {
-  id: string;
-  name: string;
-  slug: string;
-  website: string | null;
-  industry: string | null;
-  companySize: string | null;
-  location: string | null;
-  description: string | null;
-  phone: string | null;
-  officialEmail: string | null;
-  authorizedContactName: string | null;
-  authorizedContactPhone: string | null;
-  verificationStatus: string;
-  verificationNotes: string | null;
-  companyType: CompanyType;
-  status: string;
-}
-
-export interface AgencyClient {
-  id: string;
-  clientCompanyId: string;
-  name: string;
-  status: string;
-  verified: boolean;
-}
-
-/** GET /api/portal/employer/company/clients */
-export interface AgencyClientsResponse {
-  companyType: CompanyType | null;
-  clients: AgencyClient[];
-}
-
+/** An in-app notification row. */
 export interface NotificationDTO {
   id: string;
   type: string;
@@ -422,13 +369,4 @@ export interface NotificationDTO {
   link: string | null;
   read: boolean;
   createdAt: string;
-}
-
-export interface AdminStats {
-  [key: string]: number;
-}
-
-export interface SeriesPoint {
-  date: string;
-  count: number;
 }
