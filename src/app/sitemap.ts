@@ -32,6 +32,19 @@ const infoPaths = [
   '/terms',
   '/security',
   '/contact',
+  // Ravelyth Talent — the Part 2 public job board. The `/talent` tree below is
+  // the recruitment-services marketing site; `/jobs` is the live vacancy board
+  // that candidates search and apply through, so both are listed deliberately.
+  '/jobs',
+  // Ravelyth Talent — the policy set. These are indexable on purpose: the terms
+  // a user is asked to accept have to be readable without an account.
+  '/legal',
+  '/legal/terms',
+  '/legal/privacy',
+  '/legal/candidate-consent',
+  '/legal/employer-terms',
+  '/legal/job-posting-policy',
+  '/legal/cancellation',
   // Ravelyth Talent — public recruitment pages (job detail pages are added
   // dynamically below from the published job list).
   '/talent',

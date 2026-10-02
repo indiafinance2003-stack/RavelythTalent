@@ -46,6 +46,20 @@ const columns: Array<{
       { label: 'Security', href: '/security' },
     ],
   },
+  {
+    // The Ravelyth Talent policies, kept separate from the DNS tools legal
+    // pages above because they are different documents with different terms.
+    title: 'Ravelyth Talent',
+    links: [
+      { label: 'All policies', href: '/legal' },
+      { label: 'Terms of service', href: '/legal/terms' },
+      { label: 'Privacy policy', href: '/legal/privacy' },
+      { label: 'Candidate consent', href: '/legal/candidate-consent' },
+      { label: 'Employer terms', href: '/legal/employer-terms' },
+      { label: 'Job posting policy', href: '/legal/job-posting-policy' },
+      { label: 'Cancellation and refunds', href: '/legal/cancellation' },
+    ],
+  },
 ];
 
 export function SiteFooter({ authenticated = false }: { authenticated?: boolean }): React.ReactElement {

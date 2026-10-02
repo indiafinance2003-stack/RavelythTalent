@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import Link from 'next/link';
 import { useState } from 'react';
@@ -16,6 +16,7 @@ import {
   formatSalaryBand,
 } from '@/lib/portal-client/format';
 import { Alert, Badge, Button, Card, CardHeader, LoadingState, ErrorState } from '@/components/portal/ui';
+import { SaveJobButton } from '@/components/portal/jobs/save-job-button';
 
 /**
  * Public job detail and the apply action.
@@ -220,6 +221,22 @@ export function JobDetail({ jobId }: { jobId: string }): React.ReactElement {
                 </Button>
               </>
             )}
+          </div>
+        </Card>
+
+        <Card>
+          <CardHeader title="Save this role" />
+          <div className="space-y-2 p-5">
+            <p className="text-sm text-slate-400">
+              Saved roles stay in your account so you can come back to them, and you can set an alert
+              for new openings like this one.
+            </p>
+            <SaveJobButton jobId={data.id} title={data.title} />
+            {status === 'authenticated' && user?.role === 'candidate' ? (
+              <Link href="/candidate/saved-jobs" className="block text-sm text-accent-soft underline">
+                View your saved roles
+              </Link>
+            ) : null}
           </div>
         </Card>
 

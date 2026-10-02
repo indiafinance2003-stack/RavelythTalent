@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import Link from 'next/link';
 import type { JobListItem } from '@/lib/portal-client/types';
@@ -10,6 +10,7 @@ import {
   formatSalaryBand,
 } from '@/lib/portal-client/format';
 import { Badge } from '@/components/portal/ui';
+import { SaveJobButton } from '@/components/portal/jobs/save-job-button';
 
 /**
  * One job in a list.
@@ -87,12 +88,15 @@ export function JobCard({
         <p className="text-xs text-slate-500">
           {job.publishedAt ? `Posted ${formatRelative(job.publishedAt)}` : null}
         </p>
-        <Link
-          href={`/jobs/${job.id}`}
-          className="text-sm font-medium text-accent-soft hover:text-accent"
-        >
-          View role &rarr;
-        </Link>
+        <div className="flex items-center gap-3">
+          <SaveJobButton jobId={job.id} title={job.title} />
+          <Link
+            href={`/jobs/${job.id}`}
+            className="text-sm font-medium text-accent-soft hover:text-accent"
+          >
+            View role &rarr;
+          </Link>
+        </div>
       </div>
 
       {footer ? <div className="mt-3 border-t border-line pt-3">{footer}</div> : null}
