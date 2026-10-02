@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -58,6 +58,7 @@ const NAV: Record<PortalRole, NavItem[]> = {
     { href: '/admin/companies', label: 'Companies' },
     { href: '/admin/jobs', label: 'Jobs' },
     { href: '/admin/applications', label: 'Applications' },
+    { href: '/admin/payments', label: 'Payments' },
     { href: '/admin/packages', label: 'Packages' },
     { href: '/admin/premium-plans', label: 'Premium plans' },
     { href: '/admin/reports', label: 'Reports' },

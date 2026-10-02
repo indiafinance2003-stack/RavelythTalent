@@ -500,3 +500,181 @@ export interface CreditLedgerEntry {
   orderId: string | null;
   createdAt: string;
 }
+
+/* ==========================================================================
+   Admin console shapes.
+   ========================================================================== */
+
+/** Aggregate platform counters for the admin dashboard. */
+export interface PlatformStats {
+  candidates: number;
+  employers: number;
+  companies: number;
+  verifiedCompanies: number;
+  activeJobs: number;
+  pendingApprovalJobs: number;
+  totalApplications: number;
+  hires: number;
+  paidOrders: number;
+  revenueMinor: number;
+  activePackages: number;
+  activePremiumSubscriptions: number;
+  openReports: number;
+  suspendedUsers: number;
+}
+
+/** One point in a daily activity series. */
+export interface DailyPoint {
+  day: string;
+  value: number;
+}
+
+/** A registration series point, broken down by role. */
+export interface RegistrationPoint extends DailyPoint {
+  role: string;
+}
+
+/** An account row in the admin user list. */
+export interface AdminUserRow {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  accountStatus: string;
+  emailVerified: boolean;
+  createdAt: string;
+  lastLoginAt: string | null;
+}
+
+/** A company row in the admin company list. */
+export interface AdminCompanyRow {
+  id: string;
+  name: string;
+  companyType: CompanyType;
+  verificationStatus: string;
+  verificationNotes: string | null;
+  website: string | null;
+  officialEmail: string | null;
+  phone: string | null;
+  location: string | null;
+  industry: string | null;
+  companySize: string | null;
+  description: string | null;
+  createdAt: string;
+}
+
+/** A job row in the admin job list (mirrors the `jobs` table). */
+export interface AdminJobRow {
+  id: string;
+  title: string;
+  department: string | null;
+  status: JobStatus;
+  employmentType: EmploymentType;
+  workMode: WorkMode;
+  location: string | null;
+  companyId: string;
+  postedForCompanyId: string | null;
+  createdByUserId: string;
+  openings: number;
+  salaryPublic: boolean;
+  publishedAt: string | null;
+  expiresAt: string | null;
+  createdAt: string;
+  rejectionReason: string | null;
+}
+
+/** A report row in the admin report queue (mirrors the `reports` table). */
+export interface AdminReportRow {
+  id: string;
+  reporterUserId: string;
+  targetType: string;
+  targetId: string | null;
+  reason: string;
+  description: string;
+  status: string;
+  adminNotes: string | null;
+  resolution: string | null;
+  resolvedByUserId: string | null;
+  resolvedAt: string | null;
+  createdAt: string;
+}
+
+/** One audit log entry, as the admin console sees it. */
+export interface AuditLogEntry {
+  id: string;
+  action: string;
+  actorUserId: string | null;
+  actorServerId: string | null;
+  description: string | null;
+  metadata: unknown;
+  ipAddress: string | null;
+  createdAt: string;
+}
+
+/** A candidate premium plan in the admin catalogue. */
+export interface PremiumPlanRow {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  priceMinor: number;
+  currency: string;
+  billingPeriod: string;
+  durationDays: number;
+  isActive: boolean;
+  sortOrder: number;
+}
+
+/** A platform setting key/value row. `value` is JSONB, not a string. */
+export interface PlatformSettingRow {
+  key: string;
+  value: unknown;
+  description: string | null;
+  updatedAt: string;
+}
+
+/** A job credit package in the admin catalogue. */
+export interface AdminJobPackageRow extends JobPackage {
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** A platform-wide application row, as the admin console sees it. */
+export interface AdminApplicationRow {
+  id: string;
+  jobId: string;
+  jobTitle: string;
+  companyId: string;
+  candidateId: string;
+  status: string;
+  coverLetter: string | null;
+  employerNotes: string | null;
+  appliedAt: string;
+  updatedAt: string;
+}
+
+/** One payment attempt recorded against an order. */
+export interface PaymentAttemptRow {
+  id: string;
+  orderId: string;
+  status: string;
+  amountMinor: number;
+  currency: string;
+  provider: string | null;
+  providerPaymentId: string | null;
+  method: string | null;
+  failureReason: string | null;
+  createdAt: string;
+}
+
+/** An order plus every payment attempt recorded against it. */
+export interface AdminPaymentRow {
+  order: OrderDTO & {
+    orderType: string;
+    companyId: string;
+    candidateId: string | null;
+    providerOrderId: string | null;
+  };
+  payments: PaymentAttemptRow[];
+}
+
