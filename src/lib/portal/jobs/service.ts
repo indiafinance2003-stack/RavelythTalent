@@ -12,7 +12,7 @@ import {
 } from '@/lib/db/portal-schema';
 import { AppError, AppErrorCode } from '@/lib/errors/app-error';
 import { recordPortalAudit } from '@/lib/portal/audit';
-import { consumeCreditForJob, refundCreditForJob } from '@/lib/portal/credits';
+import { consumeCreditWith, refundCreditForJob } from '@/lib/portal/credits';
 import {
   assertTransition,
   changedMaterialFields,
@@ -142,8 +142,11 @@ export async function createJob(input: JobInput): Promise<JobRow> {
  *
  * When approval is required this lands in 'pending_approval'; an employer can
  * never jump straight to 'published'. A job credit is consumed here (when
- * credits are required) so the employer cannot submit unlimited postings, and
- * the consumption is rolled back with the transaction if the transition fails.
+ * credits are required) so the employer cannot submit unlimited postings.
+ *
+ * The credit consumption and the status change run in ONE transaction: if the
+ * status update fails the credit is rolled back, so an employer is never charged
+ * for a posting that did not actually go anywhere.
  */
 export async function submitJobForApproval(input: {
   jobId: string;
@@ -154,62 +157,65 @@ export async function submitJobForApproval(input: {
   const now = input.now ?? new Date();
   const { db } = dbFromRequest();
 
-  const [job] = await db
-    .select()
-    .from(jobs)
-    .where(and(eq(jobs.id, input.jobId), eq(jobs.companyId, input.companyId)))
-    .limit(1);
-  if (!job) throw new AppError(AppErrorCode.NOT_FOUND, 'The requested job was not found.', 404);
-
-  assertTransition(job.status, 'pending_approval', 'employer');
-
-  const expiresAt = new Date(
-    now.getTime() + Math.max(1, config.JOB_DEFAULT_VALIDITY_DAYS) * 24 * 60 * 60 * 1000
-  );
-
-  if (config.JOB_CREDIT_REQUIRED) {
-    // Consumed BEFORE the transition so an employer cannot submit more jobs than
-    // they have credits for. The unique index on job_id makes this exactly once.
-    await consumeCreditForJob({
-      companyId: input.companyId,
-      jobId: input.jobId,
-      actorUserId: input.actorUserId,
-    });
-  }
-
   const nextStatus: JobStatus = config.JOB_APPROVAL_REQUIRED
     ? 'pending_approval'
     : 'published';
 
-  const [updated] = await db
-    .update(jobs)
-    .set({
-      status: nextStatus,
-      updatedAt: now,
-      ...(nextStatus === 'published'
-        ? { publishedAt: now, expiresAt }
-        : {}),
-    })
-    .where(and(eq(jobs.id, input.jobId), eq(jobs.status, job.status)))
-    .returning();
+  const updated = await db.transaction(async (tx) => {
+    const [job] = await tx
+      .select()
+      .from(jobs)
+      .where(and(eq(jobs.id, input.jobId), eq(jobs.companyId, input.companyId)))
+      .limit(1);
+    if (!job) throw new AppError(AppErrorCode.NOT_FOUND, 'The requested job was not found.', 404);
 
-  if (!updated) {
-    throw new AppError(
-      AppErrorCode.CONFLICT,
-      'The job changed while you were working on it. Please reload and try again.',
-      409
+    assertTransition(job.status, 'pending_approval', 'employer');
+
+    if (config.JOB_CREDIT_REQUIRED) {
+      // Joins THIS transaction, so a later failure returns the credit.
+      await consumeCreditWith(tx, {
+        companyId: input.companyId,
+        jobId: input.jobId,
+        actorUserId: input.actorUserId,
+      });
+    }
+
+    const expiresAt = new Date(
+      now.getTime() + Math.max(1, config.JOB_DEFAULT_VALIDITY_DAYS) * 24 * 60 * 60 * 1000
     );
-  }
 
-  await db.insert(jobStatusHistory).values({
-    jobId: input.jobId,
-    fromStatus: job.status,
-    toStatus: nextStatus,
-    changedByUserId: input.actorUserId,
-    reason: 'Submitted by employer',
-    createdAt: now,
+    const [row] = await tx
+      .update(jobs)
+      .set({
+        status: nextStatus,
+        updatedAt: now,
+        ...(nextStatus === 'published' ? { publishedAt: now, expiresAt } : {}),
+      })
+      .where(and(eq(jobs.id, input.jobId), eq(jobs.status, job.status)))
+      .returning();
+
+    if (!row) {
+      throw new AppError(
+        AppErrorCode.CONFLICT,
+        'The job changed while you were working on it. Please reload and try again.',
+        409
+      );
+    }
+
+    await tx.insert(jobStatusHistory).values({
+      jobId: input.jobId,
+      fromStatus: job.status,
+      toStatus: nextStatus,
+      changedByUserId: input.actorUserId,
+      reason: 'Submitted by employer',
+      createdAt: now,
+    });
+
+    return row;
   });
 
+  // Audit runs AFTER commit: writing it inside the transaction would roll the
+  // audit record back along with the business change it describes.
   await recordPortalAudit({
     action: 'job_submitted_for_approval',
     actorUserId: input.actorUserId,

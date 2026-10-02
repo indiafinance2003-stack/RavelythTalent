@@ -352,4 +352,61 @@ describe('job posting and approval workflow (real database)', () => {
     expect(rows.length).toBeGreaterThanOrEqual(2);
     expect(rows.every((row) => row.changedByUserId !== null)).toBe(true);
   });
+
+
+  it('does not consume a credit when the submission itself is rejected', async () => {
+    await truncateAllTables(db);
+    const { userId, companyId } = await employerWithCredits(2);
+
+    // Publish directly so 'draft -> pending_approval' is no longer legal.
+    const jobId = await fx.job({ companyId, status: 'published' });
+
+    await expect(
+      submitJobForApproval({ jobId, companyId, actorUserId: userId })
+    ).rejects.toThrowError();
+
+    // The failed attempt must leave the balance untouched.
+    const balance = await getCreditBalance(companyId);
+    expect(balance.used).toBe(0);
+    expect(balance.available).toBe(2);
+  });
+
+  it('consumes a credit and records history as one atomic unit', async () => {
+    await truncateAllTables(db);
+    const { userId, companyId } = await employerWithCredits(2);
+    const jobId = await fx.job({ companyId, status: 'draft' });
+
+    await submitJobForApproval({ jobId, companyId, actorUserId: userId });
+
+    const balance = await getCreditBalance(companyId);
+    expect(balance.used).toBe(1);
+    expect(balance.available).toBe(1);
+
+    // Status, history and ledger must all agree: they committed together.
+    const job = await getCompanyJob(jobId, companyId);
+    expect(['pending_approval', 'published']).toContain(job.status);
+    const history = await db
+      .select()
+      .from(jobStatusHistory)
+      .where(and(eq(jobStatusHistory.jobId, jobId)));
+    expect(history.length).toBeGreaterThan(0);
+  });
+
+  it('never leaves a submitted job without a consumed credit', async () => {
+    await truncateAllTables(db);
+    const { userId, companyId } = await employerWithCredits(1);
+    const jobId = await fx.job({ companyId, status: 'draft' });
+
+    await submitJobForApproval({ jobId, companyId, actorUserId: userId });
+
+    const job = await getCompanyJob(jobId, companyId);
+    const used = (await getCreditBalance(companyId)).used;
+
+    // The invariant that makes billing trustworthy: submitted implies charged.
+    if (job.status !== 'draft') {
+      expect(used).toBe(1);
+    } else {
+      expect(used).toBe(0);
+    }
+  });
 });

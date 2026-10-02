@@ -1,4 +1,4 @@
-{
+﻿{
   "version": "7",
   "dialect": "postgresql",
   "entries": [
@@ -62,7 +62,7 @@
       "idx": 8,
       "version": "7",
       "when": 1790879025952,
-      "tag": "0008_clumsy_wonder_man",
+      "tag": "0008_ravelyth_talent_job_portal",
       "breakpoints": true
     }
   ]

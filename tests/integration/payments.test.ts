@@ -214,6 +214,36 @@ describe('orders and job credits (real transactions)', () => {
     expect((await getCreditBalance(companyId)).available).toBe(2);
   });
 
+  it('does not oversubscribe when the last credit is raced for by different jobs', async () => {
+    await truncateAllTables(db);
+    const { companyId, userId } = await fx.employerWithCompany('One Credit Ltd');
+
+    // Exactly ONE credit. Two different jobs then race for it, so the job-scoped
+    // lock alone cannot serialise them: each locks a different jobs row.
+    await db.insert(jobCreditLedger).values({
+      companyId,
+      amount: 1,
+      reason: 'admin_adjustment',
+      notes: 'seed single credit',
+    });
+
+    const jobIds = await Promise.all([fx.job({ companyId }), fx.job({ companyId })]);
+
+    const results = await Promise.allSettled(
+      jobIds.map((jobId) => consumeCreditForJob({ companyId, jobId, actorUserId: userId }))
+    );
+
+    // The balance must never go negative, and only one job may take the credit.
+    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+    expect((await getCreditBalance(companyId)).available).toBe(0);
+
+    const consumed = await db
+      .select()
+      .from(jobCreditLedger)
+      .where(eq(jobCreditLedger.reason, 'job_post'));
+    expect(consumed).toHaveLength(1);
+  });
+
   it('makes webhook processing replay-safe', async () => {
     await truncateAllTables(db);
 

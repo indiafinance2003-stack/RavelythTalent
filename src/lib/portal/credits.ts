@@ -174,12 +174,17 @@ export async function grantCreditsForOrder(
 /**
  * Consumes exactly one credit for a job, atomically.
  *
- * Guarded three ways:
- *  1. `FOR UPDATE` on the job row serialises concurrent submissions.
- *  2. The balance is recomputed inside the transaction, so the decision can
+ * Guarded four ways:
+ *  1. A transaction-scoped ADVISORY lock keyed on the COMPANY id serialises all
+ *     credit allocation for that company. A row lock on the job alone is not
+ *     enough: two concurrent submissions for DIFFERENT jobs lock different rows,
+ *     so both could read the same balance and both succeed, oversubscribing the
+ *     account. Advisory locking is the only guard that orders them.
+ *  2. `FOR UPDATE` on the job row serialises concurrent submissions for the SAME job.
+ *  3. The balance is recomputed inside the transaction, so the decision can
  *     never rely on a stale, client-visible number.
- *  3. The unique index on `job_id` makes a second consumption of the same job
- *     impossible even if the first two guards were bypassed.
+ *  4. The unique index on `job_id` makes a second consumption of the same job
+ *     impossible even if the other guards were bypassed.
  */
 export async function consumeCreditForJob(input: {
   companyId: string;
@@ -187,53 +192,75 @@ export async function consumeCreditForJob(input: {
   actorUserId?: string | null;
 }): Promise<JobCreditLedgerRow> {
   const { db } = dbFromRequest();
+  return db.transaction((tx) => consumeCreditWith(tx, input));
+}
 
-  return db.transaction(async (tx) => {
-    await tx.execute(sql`SELECT id FROM jobs WHERE id = ${input.jobId} FOR UPDATE`);
+/**
+ * Composable variant for callers that are already inside a transaction.
+ *
+ * Job submission MUST use this: consuming the credit and moving the job to
+ * 'pending_approval' are one business operation, so a failure to update the job
+ * has to roll the credit back too. With the standalone form the credit would
+ * already be committed and the employer would be charged for a posting that
+ * never went anywhere.
+ */
+export async function consumeCreditWith(
+  tx: DbExecutor,
+  input: {
+    companyId: string;
+    jobId: string;
+    actorUserId?: string | null;
+  }
+): Promise<JobCreditLedgerRow> {
+  // Locks are taken in a fixed order (company advisory, then job row) so two
+  // concurrent transactions can never deadlock against each other.
+  await tx.execute(
+    sql`SELECT pg_advisory_xact_lock(hashtext(${`rvly-credits:${input.companyId}`}))`
+  );
+  await tx.execute(sql`SELECT id FROM jobs WHERE id = ${input.jobId} FOR UPDATE`);
 
-    const [existing] = await tx
-      .select({ id: jobCreditLedger.id })
-      .from(jobCreditLedger)
-      .where(eq(jobCreditLedger.jobId, input.jobId))
-      .limit(1);
-    if (existing) {
-      throw new AppError(
-        AppErrorCode.CONFLICT,
-        'A job credit has already been used for this posting.',
-        409
-      );
-    }
+  const [existing] = await tx
+    .select({ id: jobCreditLedger.id })
+    .from(jobCreditLedger)
+    .where(eq(jobCreditLedger.jobId, input.jobId))
+    .limit(1);
+  if (existing) {
+    throw new AppError(
+      AppErrorCode.CONFLICT,
+      'A job credit has already been used for this posting.',
+      409
+    );
+  }
 
-    // The balance is recomputed INSIDE the transaction, so the decision can
-    // never rely on a stale, client-visible number.
-    const balanceResult = await tx.execute(sql`
-      SELECT COALESCE(SUM(amount), 0)::int AS available
-        FROM job_credit_ledger
-       WHERE company_id = ${input.companyId}
-    `);
-    const available = rowsFromExecute<{ available: number }>(balanceResult)[0]?.available ?? 0;
+  // The balance is recomputed INSIDE the transaction, so the decision can
+  // never rely on a stale, client-visible number.
+  const balanceResult = await tx.execute(sql`
+    SELECT COALESCE(SUM(amount), 0)::int AS available
+      FROM job_credit_ledger
+     WHERE company_id = ${input.companyId}
+  `);
+  const available = rowsFromExecute<{ available: number }>(balanceResult)[0]?.available ?? 0;
 
-    if (available <= 0) {
-      throw new AppError(
-        AppErrorCode.INSUFFICIENT_CREDITS,
-        'You do not have any job credits left. Purchase a job posting package to post another job.',
-        402
-      );
-    }
+  if (available <= 0) {
+    throw new AppError(
+      AppErrorCode.INSUFFICIENT_CREDITS,
+      'You do not have any job credits left. Purchase a job posting package to post another job.',
+      402
+    );
+  }
 
-    const [row] = await tx
-      .insert(jobCreditLedger)
-      .values({
-        companyId: input.companyId,
-        amount: -1,
-        reason: 'job_post',
-        jobId: input.jobId,
-        createdByUserId: input.actorUserId ?? null,
-      })
-      .returning();
+  const [row] = await tx
+    .insert(jobCreditLedger)
+    .values({
+      companyId: input.companyId,
+      amount: -1,
+      reason: 'job_post',
+      jobId: input.jobId,
+      createdByUserId: input.actorUserId ?? null,
+    })
+    .returning();
 
-    return row;
-  });
+  return row;
 }
 
 /**
@@ -253,6 +280,9 @@ export async function refundCreditForJob(input: {
   const notes = `Refund: ${(input.reason ?? 'job withdrawn').slice(0, 200)}`;
 
   return db.transaction(async (tx) => {
+    // Same lock ordering as consumption (company advisory, then job row) so a
+    // refund can never deadlock against a concurrent consumption.
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`rvly-credits:${input.companyId}`}))`);
     await tx.execute(sql`SELECT id FROM jobs WHERE id = ${input.jobId} FOR UPDATE`);
 
     const [consumed] = await tx
