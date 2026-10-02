@@ -1,5 +1,5 @@
 import 'server-only';
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { dbFromRequest } from '@/lib/db/request';
 import { users } from '@/lib/db/schema';
 import {
@@ -17,6 +17,7 @@ import {
   sendNewApplication,
 } from '@/lib/email/transactional/dispatch';
 import { logger } from '@/lib/logging/logger';
+import { safeCreateNotification } from '@/lib/notifications/notifications';
 
 /**
  * Application event notifications.
@@ -66,6 +67,15 @@ export async function notifyApplicationSubmitted(input: {
       .where(eq(users.id, context.candidateUserId))
       .limit(1);
 
+    // In-app first: it is the durable record the user can always come back to.
+    await safeCreateNotification({
+      userId: context.candidateUserId,
+      type: 'application_submitted',
+      title: 'Application sent',
+      body: `Your application for "${context.title}" was sent to "${company?.name ?? 'the employer'}".`,
+      link: '/candidate/applications',
+    });
+
     if (candidate) {
       await sendApplicationSubmitted({
         to: candidate.email,
@@ -75,18 +85,32 @@ export async function notifyApplicationSubmitted(input: {
       });
     }
 
-    // The employer's primary contact is notified, if one is recorded.
-    const [employerContact] = await db
-      .select({ email: users.email, name: users.name })
+    // Everyone who works at the company is notified in-app, because an
+    // application must not be invisible merely because nobody ticked
+    // "primary contact". Email is sent to the primary contact when one exists.
+    const recipients = await db
+      .select({
+        id: users.id,
+        email: users.email,
+        name: users.name,
+        isPrimary: employerProfiles.isPrimaryContact,
+      })
       .from(employerProfiles)
       .innerJoin(users, eq(employerProfiles.userId, users.id))
-      .where(
-        and(
-          eq(employerProfiles.companyId, context.companyId),
-          eq(employerProfiles.isPrimaryContact, true)
-        )
-      )
-      .limit(1);
+      .where(eq(employerProfiles.companyId, context.companyId));
+
+    for (const recipient of recipients) {
+      await safeCreateNotification({
+        userId: recipient.id,
+        type: 'new_application_received',
+        title: 'New application received',
+        body: `${context.fullName} applied for "${context.title}".`,
+        link: `/employer/applications/${input.applicationId}`,
+      });
+    }
+
+    const employerContact =
+      recipients.find((recipient) => recipient.isPrimary) ?? recipients[0];
 
     if (employerContact) {
       await sendNewApplication({
@@ -123,6 +147,7 @@ export async function notifyApplicationStatusChanged(input: {
     const [context] = await db
       .select({
         candidateEmail: users.email,
+        candidateUserId: users.id,
         candidateName: candidateProfiles.fullName,
         jobTitle: jobs.title,
         status: jobApplications.status,
@@ -143,12 +168,22 @@ export async function notifyApplicationStatusChanged(input: {
       .where(eq(companies.id, context.companyId))
       .limit(1);
 
+    const statusLabel = humanizeStatus(context.status);
+
+    await safeCreateNotification({
+      userId: context.candidateUserId,
+      type: 'application_status_changed',
+      title: `Application ${statusLabel.toLowerCase()}`,
+      body: `Your application for "${context.jobTitle}" is now ${statusLabel.toLowerCase()}.`,
+      link: '/candidate/applications',
+    });
+
     await sendApplicationStatusChanged({
       to: context.candidateEmail,
       candidateName: context.candidateName,
       jobTitle: context.jobTitle,
       companyName: company?.name ?? '',
-      statusLabel: humanizeStatus(context.status),
+      statusLabel,
     });
   } catch (error) {
     logger.error('Application status notification failed', {
@@ -189,24 +224,35 @@ export async function notifyJobDecision(input: {
 
     if (!context) return;
 
-    // The primary contact for the company that owns the posting.
-    const [contact] = await db
-      .select({ email: users.email, name: users.name })
+    // Same rule as applications: notify every company member in-app, and
+    // email the primary contact when one is designated.
+    const recipients = await db
+      .select({
+        id: users.id,
+        email: users.email,
+        name: users.name,
+        isPrimary: employerProfiles.isPrimaryContact,
+      })
       .from(employerProfiles)
       .innerJoin(users, eq(employerProfiles.userId, users.id))
-      .where(
-        and(
-          eq(employerProfiles.companyId, context.companyId),
-          eq(employerProfiles.isPrimaryContact, true)
-        )
-      )
-      .limit(1);
+      .where(eq(employerProfiles.companyId, context.companyId));
 
+    const contact = recipients.find((recipient) => recipient.isPrimary) ?? recipients[0];
+
+    if (!contact) return;
     if (!contact) return;
 
     const dashboardPath = `/employer/jobs/${input.jobId}`;
 
     if (input.approved) {
+      await safeCreateNotification({
+        userId: contact.id,
+        type: 'job_approved',
+        title: 'Job posting approved',
+        body: `"${context.title}" is now live on the portal.`,
+        link: dashboardPath,
+      });
+
       await sendJobApproved({
         to: contact.email,
         employerName: contact.name,
@@ -215,6 +261,14 @@ export async function notifyJobDecision(input: {
       });
       return;
     }
+
+    await safeCreateNotification({
+      userId: contact.id,
+      type: 'job_rejected',
+      title: 'Job posting needs changes',
+      body: `"${context.title}" was not approved. Review the reason and resubmit.`,
+      link: dashboardPath,
+    });
 
     await sendJobRejected({
       to: contact.email,
