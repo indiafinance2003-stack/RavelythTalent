@@ -36,7 +36,11 @@ describe('the employer company screen cannot self-verify or self-reclassify', ()
 
   it('states plainly that client authorisation grants posting only', () => {
     // The agency flow must not read as though it creates a login for the client.
-    const clients = readSource('src', 'app', 'employer', 'company', 'clients', 'page.tsx');
+    // The screen lives outside the page file because a Next.js page may only
+    // export the route fields plus a default.
+    const clients = readSource(
+      'src', 'components', 'portal', 'employer', 'agency-clients-page.tsx'
+    );
     expect(clients).toMatch(/does not grant the client/i);
     expect(clients).toMatch(/PUBLISHING authority only|no login/i);
   });
