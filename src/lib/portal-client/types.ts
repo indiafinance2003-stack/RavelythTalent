@@ -406,6 +406,7 @@ export interface EmployerJob {
 export interface EmployerApplication {
   id: string;
   jobId: string;
+  resumeVersionId: string | null;
   candidateId: string;
   status: string;
   coverLetter: string | null;
@@ -461,4 +462,41 @@ export interface EmployerCompany {
   verificationNotes: string | null;
   companyType: CompanyType;
   status: string;
+}
+/** A purchasable job credit package. */
+export interface JobPackage {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  priceMinor: number;
+  currency: string;
+  credits: number;
+  validityDays: number;
+  status: string;
+}
+
+/** A purchase order. Paid only via a verified gateway callback. */
+export interface OrderDTO {
+  id: string;
+  orderNumber: string;
+  packageId: string;
+  amountMinor: number;
+  currency: string;
+  status: OrderStatus;
+  paidAt: string | null;
+  createdAt: string;
+  nonRefundableAccepted: boolean;
+  providerOrderId?: string | null;
+}
+
+/** One line of the append-only job credit ledger. */
+export interface CreditLedgerEntry {
+  id: string;
+  amount: number;
+  reason: string;
+  notes: string | null;
+  jobId: string | null;
+  orderId: string | null;
+  createdAt: string;
 }

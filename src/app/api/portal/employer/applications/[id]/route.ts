@@ -1,9 +1,14 @@
-﻿import { NextRequest } from 'next/server';
+import { NextRequest } from 'next/server';
 import { handleApi, readJsonBody } from '@/lib/errors/api-handler';
 import { parseWithSchema } from '@/lib/validation/parse';
 import { z } from 'zod';
 import { requireCompanyContext } from '@/lib/portal/auth-context';
-import { getApplicationHistory, updateApplicationStatus } from '@/lib/portal/applications';
+import {
+  getApplicationHistory,
+  listCompanyApplications,
+  updateApplicationStatus,
+} from '@/lib/portal/applications';
+import { AppError, AppErrorCode } from '@/lib/errors/app-error';
 import { APPLICATION_STATUSES } from '@/lib/db/portal-schema';
 import { notifyApplicationStatusChanged } from '@/lib/portal/candidate-notifications';
 
@@ -36,6 +41,21 @@ export async function GET(req: NextRequest, context: RouteContext): Promise<Resp
     const { company } = await requireCompanyContext();
     const { id } = await context.params;
 
+    // Tenant-scoped inside the service: another employer's application id is
+    // reported as not found rather than forbidden, so the endpoint cannot be
+    // used to discover that a rival pipeline exists.
+    //
+    // `resumeVersionId` is included deliberately: it is the handle the authorised
+    // resume download needs, and the backend decides whether this employer may
+    // actually read that version. Handing out the id is not permission - the
+    // download endpoint re-checks it and logs the access.
+    const owned = await listCompanyApplications(company.id, { limit: 100 });
+    const application = owned.find((item) => item.id === id);
+    if (!application) {
+      throw new AppError(AppErrorCode.NOT_FOUND, 'The requested application was not found.', 404);
+    }
+
+    return { application, history: await getApplicationHistory(id, company.id) };
     // Tenant-scoped inside the service: another employer's application id is
     // reported as not found rather than forbidden, so this endpoint cannot be
     // used to discover that a rival pipeline exists.
