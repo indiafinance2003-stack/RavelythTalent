@@ -1,4 +1,4 @@
-﻿import 'server-only';
+import 'server-only';
 import { and, desc, eq } from 'drizzle-orm';
 import type { SQL } from 'drizzle-orm';
 import { dbFromRequest } from '@/lib/db/request';
@@ -33,6 +33,8 @@ export const PORTAL_AUDIT_ACTIONS = [
   'agency_client_linked',
   'agency_client_revoked',
   'company_type_changed',
+  'premium_plan_created',
+  'premium_plan_updated',
   'email_verified',
   'verification_email_sent',
   // Company management

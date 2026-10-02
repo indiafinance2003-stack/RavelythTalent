@@ -2,6 +2,7 @@ import 'server-only';
 import { and, desc, eq, lt, sql } from 'drizzle-orm';
 import { dbFromRequest } from '@/lib/db/request';
 import {
+  companies,
   jobPackages,
   orders,
   payments,
@@ -175,6 +176,88 @@ export async function attachProviderOrderId(
     .update(orders)
     .set({ providerOrderId, updatedAt: new Date() })
     .where(and(eq(orders.id, orderId), eq(orders.status, 'created')));
+}
+
+/**
+ * Creates a pending order for a CANDIDATE PREMIUM plan.
+ *
+ * Mirrors `createOrder` exactly, with two differences that matter:
+ *  - the amount is copied from the premium PLAN row, never from the request;
+ *  - `orderType` is `candidate_premium` and `candidateId` is recorded, which is
+ *    what makes the verified webhook activate a subscription instead of paying
+ *    out employer job credits.
+ *
+ * A candidate still cannot simply POST here and become premium: the row stays
+ * 'created' until a verified payment confirms it.
+ */
+export async function createPremiumOrder(input: {
+  candidateId: string;
+  userId: string;
+  planId: string;
+}): Promise<OrderRow> {
+  const { db } = dbFromRequest();
+
+  // Resolving through getPlan enforces `is_active`, so a retired plan cannot be
+  // bought even with a valid id.
+  const plan = await getPlan(input.planId);
+
+  // `orders.company_id` is NOT NULL for every order, but a candidate has no
+  // company. A dedicated, clearly-labelled placeholder row keeps the column
+  // honest and prevents any company-scoped query from matching it.
+  const [placeholder] = await db
+    .insert(companies)
+    .values({
+      name: 'Candidate purchase',
+      slug: `candidate-purchase-${input.candidateId.slice(0, 8)}`,
+      status: 'active',
+    })
+    .onConflictDoNothing()
+    .returning({ id: companies.id });
+
+  let companyId = placeholder?.id ?? null;
+  if (!companyId) {
+    const [existing] = await db
+      .select({ id: companies.id })
+      .from(companies)
+      .where(eq(companies.slug, `candidate-purchase-${input.candidateId.slice(0, 8)}`))
+      .limit(1);
+    companyId = existing?.id ?? null;
+  }
+  if (!companyId) {
+    throw new AppError(
+      AppErrorCode.INTERNAL_ERROR,
+      'The premium purchase could not be prepared.',
+      500
+    );
+  }
+
+  const [order] = await db
+    .insert(orders)
+    .values({
+      orderNumber: generateOrderNumber(),
+      companyId,
+      userId: input.userId,
+      packageId: plan.id,
+      orderType: 'candidate_premium',
+      candidateId: input.candidateId,
+      // Authoritative, server-side price.
+      amountMinor: plan.priceMinor,
+      currency: plan.currency,
+      status: 'created',
+      // Premium plans are a recurring-style commitment, so the same commercial
+      // terms acceptance applies as for job packages.
+      nonRefundableAccepted: true,
+    })
+    .returning();
+
+  await recordPortalAudit({
+    action: 'order_created',
+    actorUserId: input.userId,
+    description: `Premium order ${order.orderNumber} created for plan ${plan.code}`,
+    metadata: { orderId: order.id, planId: plan.id, amountMinor: plan.priceMinor },
+  });
+
+  return order;
 }
 
 export async function markOrderFailed(orderId: string): Promise<void> {

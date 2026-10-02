@@ -3,8 +3,8 @@ import { handleApi, readJsonBody } from '@/lib/errors/api-handler';
 import { parseWithSchema } from '@/lib/validation/parse';
 import { createOrderSchema } from '@/app/api/portal/schemas';
 import { requireCompanyContext } from '@/lib/portal/auth-context';
-import { createOrder, listCompanyOrders } from '@/lib/portal/payments';
-import { isPaymentConfigured } from '@/lib/billing/providers';
+import { attachProviderOrderId, createOrder, listCompanyOrders } from '@/lib/portal/payments';
+import { getBillingProvider, isPaymentConfigured } from '@/lib/billing/providers';
 import { AppError, AppErrorCode } from '@/lib/errors/app-error';
 
 /**
@@ -32,7 +32,8 @@ export async function POST(req: NextRequest): Promise<Response> {
       const input = parseWithSchema(createOrderSchema, body);
 
       // Be honest when payments are not configured rather than pretending.
-      if (!isPaymentConfigured()) {
+      const provider = getBillingProvider();
+      if (!isPaymentConfigured() || !provider) {
         throw new AppError(
           AppErrorCode.PAYMENT_NOT_CONFIGURED,
           'Payments are not available yet. Please contact support to purchase job credits.',
@@ -47,7 +48,22 @@ export async function POST(req: NextRequest): Promise<Response> {
         nonRefundableAccepted: input.nonRefundableAccepted,
       });
 
-      return { order };
+      // Create the matching order at the gateway so the browser has something
+      // payable. The local row already exists, so the receipt can reference it.
+      const created = await provider.createOrder({
+        receipt: order.orderNumber,
+        amountMinor: order.amountMinor,
+        currency: order.currency,
+        note: `Ravelyth Talent job credits ${order.orderNumber}`,
+      });
+
+      await attachProviderOrderId(order.id, created.providerOrderId);
+
+      return {
+        order: { ...order, providerOrderId: created.providerOrderId },
+        // The PUBLIC key id only; the secret never leaves the server.
+        providerKeyId: process.env.RAZORPAY_KEY_ID ?? null,
+      };
     },
     () => 201
   );

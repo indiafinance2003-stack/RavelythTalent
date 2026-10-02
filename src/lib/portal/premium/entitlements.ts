@@ -512,3 +512,175 @@ export async function getCandidateSubscription(candidateId: string): Promise<{
   };
 }
 
+
+/**
+ * Admin: creates a premium plan.
+ *
+ * Prices live ONLY here, on a database row. Nothing in the request path or the
+ * client bundle contains a price, so commercial terms can change without a
+ * deploy and cannot be tampered with in the browser.
+ */
+export async function createPremiumPlan(input: {
+  code: string;
+  name: string;
+  description?: string | null;
+  priceMinor: number;
+  currency?: string;
+  billingPeriod: string;
+  durationDays: number;
+  sortOrder?: number;
+  isActive?: boolean;
+  adminUserId: string;
+}): Promise<CandidatePremiumPlanRow> {
+  const { db } = dbFromRequest();
+  const code = input.code.trim().toLowerCase();
+
+  if (code.length === 0 || code.length > 40) {
+    throw new AppError(AppErrorCode.VALIDATION_ERROR, 'Plan code is required.');
+  }
+  if (!Number.isInteger(input.priceMinor) || input.priceMinor < 0) {
+    throw new AppError(
+      AppErrorCode.VALIDATION_ERROR,
+      'Price must be a non-negative integer in minor units.'
+    );
+  }
+  if (!['monthly', 'quarterly', 'yearly'].includes(input.billingPeriod)) {
+    throw new AppError(AppErrorCode.VALIDATION_ERROR, 'Unsupported billing period.');
+  }
+
+  const [row] = await db
+    .insert(candidatePremiumPlans)
+    .values({
+      code,
+      name: input.name.trim().slice(0, 120),
+      description: input.description ?? null,
+      priceMinor: input.priceMinor,
+      currency: input.currency ?? 'INR',
+      billingPeriod: input.billingPeriod,
+      durationDays: Math.max(1, Math.floor(input.durationDays)),
+      sortOrder: input.sortOrder ?? 0,
+      isActive: input.isActive ?? true,
+    })
+    .returning();
+
+  await recordPortalAudit({
+    action: 'premium_plan_created',
+    actorUserId: input.adminUserId,
+    description: `Premium plan created: ${row.code}`,
+    metadata: { planId: row.id, code: row.code, priceMinor: row.priceMinor },
+  });
+
+  return row;
+}
+
+/** Admin: updates a plan. Deactivating stops new purchases immediately. */
+export async function updatePremiumPlan(input: {
+  planId: string;
+  name?: string;
+  description?: string | null;
+  priceMinor?: number;
+  billingPeriod?: string;
+  durationDays?: number;
+  sortOrder?: number;
+  isActive?: boolean;
+  adminUserId: string;
+}): Promise<CandidatePremiumPlanRow> {
+  const { db } = dbFromRequest();
+
+  if (input.priceMinor !== undefined && (!Number.isInteger(input.priceMinor) || input.priceMinor < 0)) {
+    throw new AppError(
+      AppErrorCode.VALIDATION_ERROR,
+      'Price must be a non-negative integer in minor units.'
+    );
+  }
+  if (
+    input.billingPeriod !== undefined &&
+    !['monthly', 'quarterly', 'yearly'].includes(input.billingPeriod)
+  ) {
+    throw new AppError(AppErrorCode.VALIDATION_ERROR, 'Unsupported billing period.');
+  }
+
+  const patch: Record<string, unknown> = { updatedAt: new Date() };
+  if (input.name !== undefined) patch.name = input.name.trim().slice(0, 120);
+  if (input.description !== undefined) patch.description = input.description;
+  if (input.priceMinor !== undefined) patch.priceMinor = input.priceMinor;
+  if (input.billingPeriod !== undefined) patch.billingPeriod = input.billingPeriod;
+  if (input.durationDays !== undefined) patch.durationDays = Math.max(1, Math.floor(input.durationDays));
+  if (input.sortOrder !== undefined) patch.sortOrder = input.sortOrder;
+  if (input.isActive !== undefined) patch.isActive = input.isActive;
+
+  const [row] = await db
+    .update(candidatePremiumPlans)
+    .set(patch)
+    .where(eq(candidatePremiumPlans.id, input.planId))
+    .returning();
+
+  if (!row) throw new AppError(AppErrorCode.NOT_FOUND, 'The requested plan was not found.', 404);
+
+  await recordPortalAudit({
+    action: 'premium_plan_updated',
+    actorUserId: input.adminUserId,
+    description: `Premium plan updated: ${row.code}`,
+    metadata: { planId: row.id, isActive: row.isActive, priceMinor: row.priceMinor },
+  });
+
+  return row;
+}
+
+/** Admin: every plan, including retired ones, with its mapped entitlements. */
+export async function listAllPlansForAdmin(): Promise<
+  Array<{
+    id: string;
+    code: string;
+    name: string;
+    description: string | null;
+    priceMinor: number;
+    currency: string;
+    billingPeriod: string;
+    durationDays: number;
+    isActive: boolean;
+    sortOrder: number;
+    entitlements: Array<{ id: string; code: string; name: string }>;
+  }>
+> {
+  const { db } = dbFromRequest();
+
+  const plans = await db
+    .select()
+    .from(candidatePremiumPlans)
+    .orderBy(candidatePremiumPlans.sortOrder, candidatePremiumPlans.name);
+
+  const mapped = await db
+    .select({
+      planId: candidatePremiumPlanEntitlements.planId,
+      id: premiumEntitlements.id,
+      code: premiumEntitlements.code,
+      name: premiumEntitlements.name,
+    })
+    .from(candidatePremiumPlanEntitlements)
+    .innerJoin(
+      premiumEntitlements,
+      eq(candidatePremiumPlanEntitlements.entitlementId, premiumEntitlements.id)
+    );
+
+  const byPlan = new Map<string, Array<{ id: string; code: string; name: string }>>();
+  for (const row of mapped) {
+    const list = byPlan.get(row.planId) ?? [];
+    list.push({ id: row.id, code: row.code, name: row.name });
+    byPlan.set(row.planId, list);
+  }
+
+  return plans.map((plan) => ({
+    id: plan.id,
+    code: plan.code,
+    name: plan.name,
+    description: plan.description,
+    priceMinor: plan.priceMinor,
+    currency: plan.currency,
+    billingPeriod: plan.billingPeriod,
+    durationDays: plan.durationDays,
+    isActive: plan.isActive,
+    sortOrder: plan.sortOrder,
+    entitlements: byPlan.get(plan.id) ?? [],
+  }));
+}
