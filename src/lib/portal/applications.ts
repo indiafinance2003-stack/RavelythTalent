@@ -273,7 +273,10 @@ export async function updateApplicationStatus(input: {
   const now = input.now ?? new Date();
   const { db } = dbFromRequest();
 
-  return db.transaction(async (tx) => {
+  // The transaction holds ONLY the business work. The audit entry is written
+  // after the commit so it can never hold the transaction open (and so a
+  // single-connection pool cannot deadlock against a non-transactional query).
+  const audited = await db.transaction(async (tx) => {
     const [row] = await tx
       .select({
         application: jobApplications,
@@ -321,26 +324,32 @@ export async function updateApplicationStatus(input: {
       .where(eq(companies.id, row.jobCompanyId))
       .limit(1);
 
-    await recordPortalAudit({
-      action: 'application_status_changed',
-      actorUserId: input.changedByUserId,
-      description: `Application moved from ${row.application.status} to ${input.nextStatus}`,
-      metadata: {
-        applicationId: input.applicationId,
-        jobId: row.application.jobId,
-        from: row.application.status,
-        to: input.nextStatus,
-      },
-    });
-
-    return toApplicationDTO({
-      application: updated,
-      jobTitle: row.jobTitle,
-      companyId: row.jobCompanyId,
-      companyName: company?.name ?? '',
-      candidateName: row.candidateName,
-    });
+    return {
+      dto: toApplicationDTO({
+        application: updated,
+        jobTitle: row.jobTitle,
+        companyId: row.jobCompanyId,
+        companyName: company?.name ?? '',
+        candidateName: row.candidateName,
+      }),
+      from: row.application.status,
+      jobId: row.application.jobId,
+    };
   });
+
+  await recordPortalAudit({
+    action: 'application_status_changed',
+    actorUserId: input.changedByUserId,
+    description: `Application moved from ${audited.from} to ${input.nextStatus}`,
+    metadata: {
+      applicationId: input.applicationId,
+      jobId: audited.jobId,
+      from: audited.from,
+      to: input.nextStatus,
+    },
+  });
+
+  return audited.dto;
 }
 
 export interface StatusHistoryEntry {

@@ -82,7 +82,9 @@ export async function createCompanyForEmployer(
 
   const slug = await uniqueSlug(name);
 
-  return db.transaction(async (tx) => {
+  // The transaction holds only the company + membership write. The audit entry
+  // is written after the commit so it never holds the transaction open.
+  const created = await db.transaction(async (tx) => {
     const [company] = await tx
       .insert(companies)
       .values({
@@ -118,15 +120,17 @@ export async function createCompanyForEmployer(
       })
       .returning();
 
-    await recordPortalAudit({
-      action: 'company_created',
-      actorUserId: input.ownerUserId,
-      description: `Company created: ${company.name}`,
-      metadata: { companyId: company.id },
-    });
-
     return { company, member };
   });
+
+  await recordPortalAudit({
+    action: 'company_created',
+    actorUserId: input.ownerUserId,
+    description: `Company created: ${created.company.name}`,
+    metadata: { companyId: created.company.id },
+  });
+
+  return created;
 }
 
 /** The company the given employer user acts for, or null. */
