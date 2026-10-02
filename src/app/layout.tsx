@@ -3,6 +3,7 @@ import './globals.css';
 import { SiteHeader } from '@/components/layout/site-header';
 import { SiteFooter } from '@/components/layout/site-footer';
 import { getSessionUser, type AuthenticatedUser } from '@/lib/auth/session';
+import { currentPortalUser } from '@/lib/portal/auth-context';
 
 const siteUrl = process.env.APP_URL || 'https://ravelyth.in';
 
@@ -13,37 +14,40 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: 'Ravelyth — Free DNS & Email Diagnostics',
-    template: '%s · Ravelyth',
+    // The root is the Ravelyth Talent job portal; the DNS and email tools are a
+    // secondary product that now lives at /tools, and each of its pages sets its
+    // own title, so the default describes what a visitor actually lands on.
+    default: 'Ravelyth Talent — Find your next role',
+    template: '%s | Ravelyth Talent',
   },
   description:
-    'Free DNS and email diagnostic tools for DNS lookup, SPF, DKIM, DMARC, nameservers, DNS health, PTR records and email header analysis.',
-  applicationName: 'Ravelyth',
+    'Search live vacancies on Ravelyth Talent by keyword, location, experience, salary, employment type and work mode. Build a profile and resume, apply in one click, and let employers find you.',
+  applicationName: 'Ravelyth Talent',
   alternates: {
     canonical: '/',
   },
   openGraph: {
-    title: 'Ravelyth — DNS & Email Diagnostics',
+    title: 'Ravelyth Talent — Find your next role',
     description:
-      'Inspect DNS records, SPF, DKIM, DMARC, DNSSEC-related data and raw email headers using real technical evidence.',
+      'Search live vacancies, build a profile and resume, and apply directly to employers hiring now.',
     type: 'website',
     locale: 'en_US',
     url: siteUrl,
-    siteName: 'Ravelyth',
+    siteName: 'Ravelyth Talent',
     images: [
       {
         url: '/opengraph-image',
         width: 1200,
         height: 630,
-        alt: 'Ravelyth — DNS and email diagnostics',
+        alt: 'Ravelyth Talent job portal',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Ravelyth — DNS & Email Diagnostics',
+    title: 'Ravelyth Talent — Find your next role',
     description:
-      'Free DNS and email diagnostic tools for DNS lookup, SPF, DKIM, DMARC, nameservers, DNS health, PTR records and email header analysis.',
+      'Search live vacancies, build a profile and resume, and apply directly to employers hiring now.',
     images: ['/opengraph-image'],
   },
   icons: {
@@ -64,16 +68,30 @@ export default async function RootLayout({
   // header and footer can render accurate account controls. Public tools are
   // unaffected when no session exists (or when the database is unavailable).
   let user: AuthenticatedUser | null = null;
+  let role: string | undefined;
   try {
     user = await getSessionUser();
   } catch {
     user = null;
   }
 
+  // The role is re-read from the database rather than taken from the session
+  // row, so a suspension or a role change is reflected in the header
+  // immediately instead of on the next sign-in. A failure here must not take
+  // the whole page down, so it degrades to "no role" rather than throwing.
+  try {
+    const portalUser = await currentPortalUser();
+    role = portalUser?.role;
+  } catch {
+    role = undefined;
+  }
+
   return (
     <html lang="en">
       <body className="flex min-h-screen flex-col bg-paper text-ink">
-        <SiteHeader user={user ? { name: user.name, email: user.email } : null} />
+        <SiteHeader
+          user={user ? { name: user.name, email: user.email, role } : null}
+        />
         <main className="flex-1">{children}</main>
         <SiteFooter authenticated={user !== null} />
       </body>

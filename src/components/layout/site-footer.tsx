@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { RavelythMark } from '@/components/ui/logo';
+import { configuredSocialLinks } from '@/lib/social';
 
 const columns: Array<{
   title: string;
@@ -46,9 +47,25 @@ const columns: Array<{
       { label: 'Security', href: '/security' },
     ],
   },
+  {
+    // The Ravelyth Talent policies, kept separate from the DNS tools legal
+    // pages above because they are different documents with different terms.
+    title: 'Ravelyth Talent',
+    links: [
+      { label: 'All policies', href: '/legal' },
+      { label: 'Terms of service', href: '/legal/terms' },
+      { label: 'Privacy policy', href: '/legal/privacy' },
+      { label: 'Candidate consent', href: '/legal/candidate-consent' },
+      { label: 'Employer terms', href: '/legal/employer-terms' },
+      { label: 'Job posting policy', href: '/legal/job-posting-policy' },
+      { label: 'Cancellation and refunds', href: '/legal/cancellation' },
+    ],
+  },
 ];
 
 export function SiteFooter({ authenticated = false }: { authenticated?: boolean }): React.ReactElement {
+  // Resolved from configuration on the server. Empty until real accounts are set.
+  const social = configuredSocialLinks();
   const year = new Date().getFullYear();
 
   const accountColumn = authenticated
@@ -109,7 +126,7 @@ export function SiteFooter({ authenticated = false }: { authenticated?: boolean 
       <div className="border-t border-line">
         <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-5 text-sm text-slate-400 sm:flex-row sm:items-center sm:justify-between">
           <p>© {year} Ravelyth. All rights reserved.</p>
-          <div className="flex gap-4">
+          <div className="flex flex-wrap gap-4">
             <Link href="/privacy" className="hover:text-accent">
               Privacy
             </Link>
@@ -119,6 +136,22 @@ export function SiteFooter({ authenticated = false }: { authenticated?: boolean 
             <Link href="/security" className="hover:text-accent">
               Security
             </Link>
+            {/* Only channels an operator has configured and that pass validation
+                are rendered. An unconfigured network contributes no link at all,
+                rather than a placeholder pointing at an account that may not
+                exist. See src/lib/social.ts. */}
+            {social.map((link) => (
+              <a
+                key={link.network}
+                href={link.href}
+                // External profile: open in a new tab, and noopener/noreferrer
+                // so the destination cannot reach back through window.opener.
+                target="_blank"
+                rel="noopener noreferrer me"
+              >
+                {link.label}
+              </a>
+            ))}
           </div>
         </div>
       </div>

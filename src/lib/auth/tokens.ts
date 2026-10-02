@@ -15,6 +15,33 @@ export function hashSessionToken(token: string): string {
 }
 
 /**
+ * Email verification tokens.
+ *
+ * Same security contract as session and password-reset tokens:
+ *  - 256 bits of cryptographically secure randomness, base64url encoded;
+ *  - only the SHA-256 hash is ever persisted, so a database leak does not
+ *    yield a usable verification link;
+ *  - tokens expire server-side (24h) and are single use, enforced by an
+ *    atomic conditional UPDATE rather than a read-then-write.
+ *
+ * The raw token exists only in server memory and the emailed URL, and must
+ * never be logged or returned to a client other than inside that URL.
+ */
+export function generateEmailVerificationToken(): string {
+  return randomBytes(32).toString('base64url');
+}
+
+export function hashEmailVerificationToken(token: string): string {
+  return createHash('sha256').update(token, 'utf8').digest('hex');
+}
+
+/** Builds the verification URL from APP_URL (never from request input). */
+export function buildEmailVerificationUrl(appUrl: string, token: string): string {
+  const base = appUrl.replace(/\/+$/, '');
+  return `${base}/verify-email?token=${encodeURIComponent(token)}`;
+}
+
+/**
  * Password reset tokens use the same primitive as session tokens: at least 32
  * cryptographically secure random bytes rendered as a URL-safe base64url
  * string. Only the SHA-256 hash is ever persisted; the raw token exists only in

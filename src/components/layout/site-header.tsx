@@ -5,22 +5,37 @@ import { useState } from 'react';
 import { RavelythLogo } from '@/components/ui/logo';
 
 const nav = [
-  { href: '/dns/lookup', label: 'DNS Lookup' },
-  { href: '/dns/analyze', label: 'DNS Health' },
-  { href: '/email/analyze', label: 'Email Headers' },
+  { href: '/jobs', label: 'Browse jobs' },
+  { href: '/talent', label: 'For employers' },
+  { href: '/tools', label: 'Free tools' },
   { href: '/docs', label: 'Docs' },
   { href: '/pricing', label: 'Pricing' },
-  { href: '/talent', label: 'Talent' },
   { href: '/about', label: 'About' },
 ];
+
+/**
+ * The account area to send a signed-in user to, by role.
+ *
+ * The role is read from the session the server resolved, not from anything the
+ * browser sends, so the link cannot be used to land on a dashboard the account
+ * has no access to. A user with no recognised role falls back to the job board
+ * rather than to a portal that would immediately refuse them.
+ */
+function accountHrefFor(role: string | undefined): string {
+  if (role === 'candidate') return '/candidate';
+  if (role === 'employer') return '/employer';
+  if (role === 'admin') return '/admin';
+  return '/jobs';
+}
 
 export function SiteHeader({
   user,
 }: {
-  user?: { name: string; email: string } | null;
+  user?: { name: string; email: string; role?: string } | null;
 }): React.ReactElement {
   const [open, setOpen] = useState(false);
   const authenticated = Boolean(user);
+  const accountHref = accountHrefFor(user?.role);
 
   return (
     <header className="sticky top-0 z-50 border-b border-line bg-navy-surface/95 backdrop-blur">
@@ -41,10 +56,10 @@ export function SiteHeader({
           {authenticated ? (
             <>
               <Link
-                href="/account"
+                href={accountHref}
                 className="rounded-md border border-line px-3 py-1.5 text-sm font-medium text-slate-300 hover:border-accent hover:text-accent"
               >
-                Account
+                Dashboard
               </Link>
               {/* POST-only route handler; never a rendered logout page. */}
               <form method="post" action="/logout">
@@ -109,11 +124,11 @@ export function SiteHeader({
             {authenticated ? (
               <>
                 <Link
-                  href="/account"
+                  href={accountHref}
                   onClick={() => setOpen(false)}
                   className="rounded-md px-3 py-2 text-sm font-medium text-slate-300 hover:bg-paper hover:text-accent"
                 >
-                  Account
+                  Dashboard
                 </Link>
                 <form method="post" action="/logout" className="px-0">
                   <button

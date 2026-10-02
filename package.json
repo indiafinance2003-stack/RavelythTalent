@@ -17,6 +17,7 @@
     "@node-rs/argon2": "^2.2.1",
     "drizzle-orm": "^0.45.2",
     "next": "^15.0.0",
+    "nodemailer": "^10.0.13",
     "postgres": "^3.4.9",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -24,7 +25,9 @@
     "zod": "^3.22.4"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "@types/node": "^20.10.5",
+    "@types/nodemailer": "^8.0.2",
     "@types/react": "^18.2.45",
     "@types/react-dom": "^18.2.18",
     "@typescript-eslint/eslint-plugin": "^6.15.0",

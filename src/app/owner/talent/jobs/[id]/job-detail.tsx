@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -232,7 +232,7 @@ export function TalentJobDetailClient({ jobId }: JobDetailProps) {
       <div className="rounded-xl border border-line bg-navy-surface p-6">
         <h2 className="text-base font-semibold text-ink">Pipeline actions</h2>
         <p className="mt-1 text-xs text-slate-400">
-          Publishing makes the role visible on /talent/jobs. Every transition is re-validated on the server.
+          This record is managed in the agency console. Every transition is re-validated on the server.
         </p>
         {transitions.length === 0 ? (
           <p className="mt-4 text-sm text-slate-400">No transitions available for this status.</p>

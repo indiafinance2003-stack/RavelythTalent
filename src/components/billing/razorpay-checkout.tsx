@@ -3,27 +3,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePaymentSession } from '@/lib/billing/use-payment-session';
-
-interface RazorpayPaymentResponse {
-  razorpay_payment_id: string;
-  razorpay_order_id: string;
-  razorpay_signature: string;
-}
-
-interface RazorpayModal {
-  open(): void;
-  on(event: string, callback: () => void): void;
-}
-
-interface RazorpayConstructor {
-  new (options: Record<string, unknown>): RazorpayModal;
-}
-
-declare global {
-  interface Window {
-    Razorpay?: RazorpayConstructor;
-  }
-}
+import {
+  loadRazorpayScript,
+  type RazorpayPaymentResponse,
+} from '@/lib/billing/razorpay-sdk';
 
 interface RazorpayCheckoutProps {
   sessionId: string;
@@ -175,30 +158,4 @@ export function RazorpayCheckout({
       ) : null}
     </div>
   );
-}
-
-let scriptPromise: Promise<void> | null = null;
-
-function loadRazorpayScript(): Promise<void> {
-  if (typeof window !== 'undefined' && window.Razorpay) {
-    return Promise.resolve();
-  }
-  if (scriptPromise) return scriptPromise;
-
-  scriptPromise = new Promise<void>((resolve, reject) => {
-    const existing = document.querySelector<HTMLScriptElement>('script[data-razorpay-checkout]');
-    if (existing) {
-      existing.addEventListener('load', () => resolve());
-      existing.addEventListener('error', () => reject(new Error('script load failed')));
-      return;
-    }
-    const script = document.createElement('script');
-    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-    script.async = true;
-    script.dataset.razorpayCheckout = 'true';
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error('script load failed'));
-    document.head.appendChild(script);
-  });
-  return scriptPromise;
 }

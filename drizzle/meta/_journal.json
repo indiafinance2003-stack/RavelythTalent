@@ -57,6 +57,27 @@
       "when": 1789970694827,
       "tag": "0007_password_reset_tokens",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790879025952,
+      "tag": "0008_ravelyth_talent_job_portal",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790921399235,
+      "tag": "0009_recruitment_agency_clients",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790922924035,
+      "tag": "0010_premium_order_package_fk",
+      "breakpoints": true
     }
   ]
 }

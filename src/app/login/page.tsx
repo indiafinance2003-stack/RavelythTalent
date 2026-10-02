@@ -1,32 +1,51 @@
+import Link from 'next/link';
+import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
-import Link from 'next/link';
-import { LoginForm } from '@/components/auth/login-form';
-import { getSessionUser } from '@/lib/auth/session';
+import { currentPortalUser } from '@/lib/portal/auth-context';
+import { PortalLoginForm } from '@/components/portal/auth/portal-login-form';
+import { LoadingState } from '@/components/portal/ui';
 
 export const metadata: Metadata = {
-  title: 'Sign In',
-  description: 'Sign in to your Ravelyth account.',
-  robots: { index: false, follow: false },
+  title: 'Sign in — Ravelyth Talent',
+  description: 'Sign in to your Ravelyth Talent candidate, employer or agency account.',
+  robots: { index: false, follow: true },
+  alternates: { canonical: '/login' },
 };
 
+/**
+ * Sign in.
+ *
+ * Uses the portal login endpoint, which works for every account role because it
+ * looks the user up by email rather than assuming a role. The destination is
+ * chosen from the role the SERVER returned, never from anything the browser
+ * claims, so there is no way to land on a dashboard the account cannot use.
+ */
 export default async function LoginPage(): Promise<React.ReactElement> {
-  // Already signed in visitors go straight to their account.
-  if (await getSessionUser()) {
-    redirect('/account');
+  try {
+    const user = await currentPortalUser();
+    if (user) {
+      redirect(user.role === 'employer' ? '/employer' : user.role === 'admin' ? '/admin' : '/candidate');
+    }
+  } catch {
+    // Not signed in.
   }
 
   return (
-    <div className="mx-auto max-w-md px-4 py-16">
+    <div className="mx-auto max-w-md px-4 py-12">
       <h1 className="text-3xl font-semibold tracking-tight text-ink">Sign in</h1>
       <p className="mt-2 text-sm text-muted">
-        Sign in to save DNS analyses to your account. Public tools remain available without signing in.
+        Sign in to your candidate, employer or recruitment agency account.
       </p>
+
       <div className="mt-8 rounded-xl border border-line bg-navy-surface p-6">
-        <LoginForm />
+        <Suspense fallback={<LoadingState label="Loading…" />}>
+          <PortalLoginForm />
+        </Suspense>
       </div>
-      <p className="mt-4 text-center text-sm text-muted">
-        <Link href="/forgot-password" className="font-medium text-accent hover:text-accent-strong">
+
+      <p className="mt-6 text-center text-sm text-muted">
+        <Link href="/forgot-password" className="underline">
           Forgot password?
         </Link>
       </p>
