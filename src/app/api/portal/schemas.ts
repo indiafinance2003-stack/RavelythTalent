@@ -156,6 +156,14 @@ export const jobCreateSchema = z
     educationRequirements: z.string().max(500).nullish(),
     skills: z.array(z.string().min(1).max(60)).max(50).optional(),
     applicationDeadline: z.string().datetime().nullish(),
+    /**
+     * Client company id, supplied ONLY by a recruitment agency posting on a
+     * client's behalf.
+     *
+     * This is a REQUEST, never a grant: the service checks it against the
+     * agency's active client links and refuses an unauthorised agency outright.
+     */
+    postedForCompanyId: z.string().uuid().nullish(),
   })
   .strict()
   .refine(

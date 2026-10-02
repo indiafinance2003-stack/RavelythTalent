@@ -64,6 +64,13 @@
       "when": 1790879025952,
       "tag": "0008_ravelyth_talent_job_portal",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790921399235,
+      "tag": "0009_recruitment_agency_clients",
+      "breakpoints": true
     }
   ]
 }

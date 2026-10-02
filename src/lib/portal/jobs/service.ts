@@ -1,4 +1,4 @@
-import 'server-only';
+﻿import 'server-only';
 import { and, desc, eq } from 'drizzle-orm';
 import { config } from '@/lib/config';
 import { dbFromRequest } from '@/lib/db/request';
@@ -13,6 +13,7 @@ import {
 import { AppError, AppErrorCode } from '@/lib/errors/app-error';
 import { recordPortalAudit } from '@/lib/portal/audit';
 import { consumeCreditWith, refundCreditForJob } from '@/lib/portal/credits';
+import { requireAgencyClientAccess } from '@/lib/portal/agencies';
 import {
   assertTransition,
   changedMaterialFields,
@@ -22,7 +23,7 @@ import {
 /**
  * Employer/admin job posting service.
  *
- * The approval workflow is the security-critical part (see §8):
+ * The approval workflow is the security-critical part (see Â§8):
  *  - when `JOB_APPROVAL_REQUIRED` is on (the default), an employer submitting a
  *    job lands in 'pending_approval' and CANNOT publish it; only an admin can;
  *  - the transition table in `lifecycle.ts` is the single source of truth, so a
@@ -53,6 +54,14 @@ export interface JobInput {
   educationRequirements?: string | null;
   skills?: string[];
   applicationDeadline?: Date | null;
+  /**
+   * Client company, ONLY when a recruitment agency posts on its behalf.
+   *
+   * Left null for a direct employer. When present, the service verifies the
+   * agency is a recruitment agency with an ACTIVE client link; an unauthorised
+   * agency is refused rather than silently posting as itself.
+   */
+  postedForCompanyId?: string | null;
 }
 
 /** Normalises a skill list to the lowercase form stored and searched. */
@@ -100,6 +109,16 @@ export async function createJob(input: JobInput): Promise<JobRow> {
     );
   }
 
+  // Agency posting: resolve and AUTHORISE the client before anything is written.
+  // An unauthorised agency must fail loudly rather than quietly posting a
+  // vacancy that claims to be its client's.
+  const clientForPosting = input.postedForCompanyId
+    ? await requireAgencyClientAccess({
+        agencyCompanyId: input.companyId,
+        clientCompanyId: input.postedForCompanyId,
+      })
+    : null;
+
   const [row] = await db
     .insert(jobs)
     .values({
@@ -123,6 +142,9 @@ export async function createJob(input: JobInput): Promise<JobRow> {
       educationRequirements: input.educationRequirements?.trim() ?? null,
       skills: normalizeSkills(input.skills),
       applicationDeadline: input.applicationDeadline ?? null,
+      // Provenance of the vacancy. Billing and tenant scoping still belong to
+      // companies.companyId (the agency); this records whose vacancy it is.
+      postedForCompanyId: clientForPosting?.id ?? null,
       status: 'draft',
     } satisfies NewJobRow)
     .returning();
@@ -131,7 +153,12 @@ export async function createJob(input: JobInput): Promise<JobRow> {
     action: 'job_created',
     actorUserId: input.createdByUserId,
     description: `Job draft created: ${row.title}`,
-    metadata: { jobId: row.id, companyId: input.companyId },
+    metadata: {
+      jobId: row.id,
+      companyId: input.companyId,
+      // Recorded so an auditor can see a vacancy was published FOR another company.
+      postedForCompanyId: clientForPosting?.id ?? null,
+    },
   });
 
   return row;

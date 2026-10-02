@@ -60,14 +60,29 @@ export class PortalFixtures {
     return { userId, companyId };
   }
 
-  async company(name = 'Acme'): Promise<string> {
+  async company(name = 'Acme', overrides: Partial<typeof companies.$inferInsert> = {}): Promise<string> {
     const [row] = await this.db
       .insert(companies)
-      .values({ name, slug: `${name.toLowerCase()}-${crypto.randomUUID().slice(0, 8)}` })
+      .values({ name, slug: `${name.toLowerCase()}-${crypto.randomUUID().slice(0, 8)}`, ...overrides })
       .returning({ id: companies.id });
+
     return row.id;
   }
 
+
+  /** An employer user bound to a company created as a recruitment agency. */
+  async agencyWithCompany(name = 'Acme Staffing'): Promise<{
+    userId: string;
+    companyId: string;
+  }> {
+    const userId = await this.user('employer', name);
+    const companyId = await this.company(name, {
+      companyType: 'recruitment_agency',
+      verificationStatus: 'verified',
+    });
+    await this.db.insert(employerProfiles).values({ userId, companyId });
+    return { userId, companyId };
+  }
   /**
    * Creates a job. When `overrides.companyId` is supplied the caller's company
    * is reused and no extra employer/company rows are created; otherwise a fresh

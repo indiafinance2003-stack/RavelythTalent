@@ -1,11 +1,11 @@
-import 'server-only';
+﻿import 'server-only';
 import { and, desc, eq } from 'drizzle-orm';
 import type { SQL } from 'drizzle-orm';
 import { dbFromRequest } from '@/lib/db/request';
 import { auditLog, type AuditLogRow } from '@/lib/db/schema';
 
 /**
- * Audit logging for Ravelyth Talent (see §21 of the brief).
+ * Audit logging for Ravelyth Talent (see Â§21 of the brief).
  *
  * The existing `audit_log` table and Control audit helper are reused rather
  * than duplicated, so audit history stays in one place.
@@ -29,6 +29,10 @@ export const PORTAL_AUDIT_ACTIONS = [
   'user_suspended',
   'user_reinstated',
   'user_password_changed',
+  // Recruitment agency authorisation: who may publish for whom.
+  'agency_client_linked',
+  'agency_client_revoked',
+  'company_type_changed',
   'email_verified',
   'verification_email_sent',
   // Company management
