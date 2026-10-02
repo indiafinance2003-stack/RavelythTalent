@@ -275,10 +275,21 @@ export async function markOrderPaidAndGrantCredits(input: {
 }
 
 /**
- * Records a webhook event and reports whether it is new.
+ * Claims a webhook event for processing and reports whether this delivery owns it.
  *
- * Returns false when the event was already recorded, which is how a replayed
- * delivery is stopped from having any effect.
+ * The row is inserted as 'processing', NOT 'processed'. Marking it done up front
+ * would be fatal: if the handler then throws or the process dies, the gateway's
+ * retry would hit the unique index, be told it was a duplicate, and the captured
+ * payment would never grant credits. The claim is only a lease.
+ *
+ * Only a COMPLETED event is refused. Anything else ('processing' from a crash,
+ * 'failed' from a thrown handler) is re-admitted, which is what makes a transient
+ * failure recoverable instead of losing the customer's money.
+ *
+ * Re-admitting an in-flight 'processing' row is safe because the side effects are
+ * idempotent in their own right: crediting is guarded by the order's status and a
+ * unique index on the ledger's order_id, so a duplicate delivery does no damage.
+ * This table stops replays after completion; it is not the double-spend guard.
  */
 export async function claimWebhookEvent(input: {
   provider: string;
@@ -294,16 +305,49 @@ export async function claimWebhookEvent(input: {
       provider: input.provider,
       eventId: input.eventId,
       eventType: input.eventType,
-      status: 'processed',
+      status: 'processing',
       // Stored for troubleshooting only; never returned to a client and never
       // contains credentials.
       payloadJson: input.payload ?? {},
-      processedAt: new Date(),
     })
     .onConflictDoNothing()
     .returning({ id: webhookEvents.id });
 
-  return { isNew: inserted.length > 0 };
+  if (inserted.length > 0) return { isNew: true };
+
+  // A row already exists. Only a COMPLETED event is a genuine replay.
+  const [existing] = await db
+    .select({ status: webhookEvents.status })
+    .from(webhookEvents)
+    .where(
+      and(eq(webhookEvents.provider, input.provider), eq(webhookEvents.eventId, input.eventId))
+    )
+    .limit(1);
+
+  if (existing && existing.status !== 'processed') {
+    // Re-arm the lease so a crashed or failed attempt can be retried.
+    await db
+      .update(webhookEvents)
+      .set({ status: 'processing', error: null })
+      .where(
+        and(eq(webhookEvents.provider, input.provider), eq(webhookEvents.eventId, input.eventId))
+      );
+    return { isNew: true };
+  }
+
+  return { isNew: false };
+}
+
+/**
+ * Marks a webhook event as fully handled. Called only AFTER the side effects
+ * have committed, so a crash between the two leaves the event retryable.
+ */
+export async function completeWebhookEvent(eventId: string): Promise<void> {
+  const { db } = dbFromRequest();
+  await db
+    .update(webhookEvents)
+    .set({ status: 'processed', processedAt: new Date(), error: null })
+    .where(eq(webhookEvents.eventId, eventId));
 }
 
 /** Marks a webhook event as failed so it can be investigated. */

@@ -5,6 +5,7 @@ import {
 } from '@/lib/billing/providers';
 import {
   claimWebhookEvent,
+  completeWebhookEvent,
   findOrderByProviderOrderId,
   markOrderPaidAndGrantCredits,
   markWebhookFailed,
@@ -93,6 +94,8 @@ export async function POST(req: NextRequest): Promise<Response> {
       const order = await findOrderByProviderOrderId(providerOrderId);
       if (!order) {
         logger.warn('Payment webhook referenced an unknown order', { eventId, providerOrderId });
+        // Nothing to apply, but the attempt itself succeeded: do not retry forever.
+        await completeWebhookEvent(eventId);
         return NextResponse.json({ success: true });
       }
 
@@ -110,6 +113,10 @@ export async function POST(req: NextRequest): Promise<Response> {
         grantedCredits: result.grantedCredits,
       });
     }
+
+    // Marked done ONLY now, after the side effects have committed. A crash
+    // before this point leaves the event retryable rather than silently lost.
+    await completeWebhookEvent(eventId);
 
     // Unknown event types are acknowledged with no side effects.
     return NextResponse.json({ success: true });

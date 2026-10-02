@@ -13,8 +13,10 @@ import { getCreditBalance } from '@/lib/portal/credits';
 import { attachProviderOrderId } from '@/lib/portal/payments';
 import {
   claimWebhookEvent,
+  completeWebhookEvent,
   findOrderByProviderOrderId,
   markOrderPaidAndGrantCredits,
+  markWebhookFailed,
 } from '@/lib/portal/payments';
 import { jobCreditLedger, webhookEvents } from '@/lib/db/portal-schema';
 import { razorpayWebhookSignature } from '@/lib/billing/providers/razorpay';
@@ -132,6 +134,8 @@ describe('payment webhook security (real database)', () => {
         providerPaymentId: 'pay_replay',
         providerOrderId,
       });
+      // Completion is what makes the next delivery a replay.
+      await completeWebhookEvent(eventId);
       return 'processed';
     };
 
@@ -179,5 +183,99 @@ describe('payment webhook security (real database)', () => {
 
     expect(await findOrderByProviderOrderId('order_does_not_exist')).toBeNull();
     expect((await getCreditBalance(companyId)).total).toBe(0);
+  });
+
+  it('leaves a claimed event retryable until it is explicitly completed', async () => {
+    await truncateAllTables(db);
+    const { orderId, providerOrderId, companyId } = await paidFlowSetup();
+
+    const claim = { provider: 'razorpay', eventId: 'evt_retry', eventType: 'payment.captured' };
+
+    // First delivery claims the event, then the process dies before completion.
+    expect(await claimWebhookEvent(claim)).toEqual({ isNew: true });
+    // No credits yet: nothing was committed.
+    expect((await getCreditBalance(companyId)).total).toBe(0);
+
+    // The gateway redelivers. Because the first attempt never completed, the
+    // retry is admitted rather than discarded as a duplicate.
+    expect(await claimWebhookEvent(claim)).toEqual({ isNew: true });
+
+    await markOrderPaidAndGrantCredits({ orderId, providerPaymentId: 'pay_retry', providerOrderId });
+    await completeWebhookEvent('evt_retry');
+
+    // Once completed, further deliveries are genuinely replays.
+    expect(await claimWebhookEvent(claim)).toEqual({ isNew: false });
+    expect((await getCreditBalance(companyId)).total).toBe(5);
+  });
+
+  it('admits a retry after a processing failure and grants credits exactly once', async () => {
+    await truncateAllTables(db);
+    const { orderId, providerOrderId, companyId } = await paidFlowSetup();
+    const claim = { provider: 'razorpay', eventId: 'evt_failed_then_retried', eventType: 'payment.captured' };
+
+    // Attempt one claims, then throws (database blip / timeout).
+    await claimWebhookEvent(claim);
+    await markWebhookFailed('evt_failed_then_retried', 'temporary database error');
+
+    // The failed row must NOT be treated as done, or the captured payment would
+    // be lost forever.
+    expect(await claimWebhookEvent(claim)).toEqual({ isNew: true });
+
+    await markOrderPaidAndGrantCredits({
+      orderId,
+      providerPaymentId: 'pay_retry_after_fail',
+      providerOrderId,
+    });
+    await completeWebhookEvent('evt_failed_then_retried');
+
+    // And the retry itself cannot be replayed into a second credit.
+    expect(await claimWebhookEvent(claim)).toEqual({ isNew: false });
+    expect((await getCreditBalance(companyId)).total).toBe(5);
+    expect(await db.select().from(jobCreditLedger)).toHaveLength(1);
+  });
+
+  it('records the failure reason for troubleshooting', async () => {
+    await truncateAllTables(db);
+    await claimWebhookEvent({
+      provider: 'razorpay',
+      eventId: 'evt_error_reason',
+      eventType: 'payment.captured',
+    });
+
+    await markWebhookFailed('evt_error_reason', 'boom');
+
+    const [row] = await db.select().from(webhookEvents);
+    expect(row.status).toBe('failed');
+    expect(row.error).toBe('boom');
+    expect(row.processedAt).toBeNull();
+  });
+
+  it('completes an event and records the completion time', async () => {
+    await truncateAllTables(db);
+    await claimWebhookEvent({
+      provider: 'razorpay',
+      eventId: 'evt_complete',
+      eventType: 'payment.captured',
+    });
+
+    await completeWebhookEvent('evt_complete');
+
+    const [row] = await db.select().from(webhookEvents);
+    expect(row.status).toBe('processed');
+    expect(row.processedAt).not.toBeNull();
+    expect(row.error).toBeNull();
+  });
+
+  it('scopes claims to the provider so two providers may share an event id', async () => {
+    await truncateAllTables(db);
+
+    expect(
+      await claimWebhookEvent({ provider: 'razorpay', eventId: 'shared_id', eventType: 'x' })
+    ).toEqual({ isNew: true });
+    // A different gateway using the same id is a genuinely different event.
+    expect(
+      await claimWebhookEvent({ provider: 'stripe', eventId: 'shared_id', eventType: 'x' })
+    ).toEqual({ isNew: true });
+    expect(await db.select().from(webhookEvents)).toHaveLength(2);
   });
 });

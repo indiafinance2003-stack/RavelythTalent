@@ -9,6 +9,7 @@ import {
 import { PortalFixtures, expectUniqueViolation } from '../support/fixtures';
 import {
   claimWebhookEvent,
+  completeWebhookEvent,
   createOrder,
   markOrderPaidAndGrantCredits,
 } from '@/lib/portal/payments';
@@ -254,7 +255,18 @@ describe('orders and job credits (real transactions)', () => {
     });
     expect(first.isNew).toBe(true);
 
-    // The gateway redelivering the same event must be recognised as a replay.
+    // Until the work is committed the lease is re-armed, so a crash cannot
+    // strand a captured payment.
+    expect(
+      (await claimWebhookEvent({
+        provider: 'razorpay',
+        eventId: 'evt_1',
+        eventType: 'payment.captured',
+      })).isNew
+    ).toBe(true);
+
+    // Once completed, redelivery is recognised as a replay.
+    await completeWebhookEvent('evt_1');
     const replay = await claimWebhookEvent({
       provider: 'razorpay',
       eventId: 'evt_1',
@@ -275,7 +287,8 @@ describe('orders and job credits (real transactions)', () => {
     const { companyId, userId, packageId } = await setup();
     const order = await createOrder({ companyId, userId, packageId, nonRefundableAccepted: true });
 
-    // Mirrors the real webhook route: claim the event, and only act when new.
+    // Mirrors the real webhook route: claim the event, act only when new, and
+    // mark it complete once the side effects have committed.
     const handle = async (eventId: string): Promise<void> => {
       const claim = await claimWebhookEvent({
         provider: 'razorpay',
@@ -284,6 +297,7 @@ describe('orders and job credits (real transactions)', () => {
       });
       if (!claim.isNew) return; // replay: no side effects at all
       await markOrderPaidAndGrantCredits({ orderId: order.id, providerPaymentId: 'pay_hook_1' });
+      await completeWebhookEvent(eventId);
     };
 
     await handle('evt_capture_1');
