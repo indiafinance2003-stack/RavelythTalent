@@ -5,6 +5,13 @@ import { useState } from 'react';
 import { portalPost } from '@/lib/portal-client/client';
 import { formatApiError } from '@/lib/client/api';
 import { useAsync } from '@/lib/portal-client/use-async';
+import { useSession } from '@/lib/portal-client/use-session';
+import { usePortalCheckout } from '@/components/portal/checkout/use-portal-checkout';
+import {
+  CheckoutStatus,
+  portalLabels,
+  toStartedCheckout,
+} from '@/components/portal/checkout/checkout-status';
 import { portalGet } from '@/lib/portal-client/client';
 import type { CreditBalance, CreditLedgerEntry, JobPackage, OrderDTO } from '@/lib/portal-client/types';
 import { ORDER_STATUS_LABELS, formatDate, formatMoney } from '@/lib/portal-client/format';
@@ -30,6 +37,9 @@ import {
  * on this page can mark an order paid, and the UI says so plainly.
  */
 export function PackagesPage(): React.ReactElement {
+  const { user } = useSession();
+  const checkout = usePortalCheckout();
+
   const credits = useAsync(
     () =>
       portalGet<{ balance: CreditBalance; packages: JobPackage[]; ledger: CreditLedgerEntry[] }>(
@@ -43,12 +53,29 @@ export function PackagesPage(): React.ReactElement {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [pay, setPay] = useState<{ orderNumber: string; amountMinor: number; providerOrderId: string } | null>(
-    null
-  );
 
   const packages = credits.data?.packages ?? [];
   const balance = credits.data?.balance;
+
+  /**
+   * Starts a REAL purchase.
+   *
+   * The request body carries only the package id and the terms acceptance. The
+   * amount is not sent at all — the server reads it from the package row, so a
+   * tampered request cannot change what is charged. The values this returns are
+   * the server's, and the provider window is opened with them.
+   */
+  async function startPurchase(pkg: JobPackage) {
+    const result = await portalPost<{
+      order: { orderNumber: string; amountMinor: number; currency: string };
+      providerOrderId: string;
+      providerKeyId: string | null;
+    }>('/api/portal/employer/orders', {
+      packageId: pkg.id,
+      nonRefundableAccepted: true,
+    });
+    return toStartedCheckout(result);
+  }
 
   async function buy(pkg: JobPackage): Promise<void> {
     setError(null);
@@ -63,29 +90,21 @@ export function PackagesPage(): React.ReactElement {
 
     setBusy(pkg.id);
     try {
-      const result = await portalPost<{
-        order: { orderNumber: string; amountMinor: number };
-        providerOrderId: string;
-        providerKeyId: string | null;
-      }>('/api/portal/employer/orders', {
-        packageId: pkg.id,
-        nonRefundableAccepted: true,
-      });
-
-      setPay({
-        orderNumber: result.order.orderNumber,
-        amountMinor: result.order.amountMinor,
-        providerOrderId: result.providerOrderId,
-      });
+      await checkout.pay(() => startPurchase(pkg), portalLabels(
+        `Job credits: ${pkg.name}`,
+        { name: user?.name ?? '', email: user?.email ?? '' }
+      ));
+      // The order now exists, so the list and the balance are both stale.
       await orders.reload();
       await credits.reload();
     } catch (caught) {
-      // A 503 means payments are not configured. Say that, do not fake progress.
+      // A 503 means payments are not configured. Say that; do not fake progress.
       setError(formatApiError(caught));
     } finally {
       setBusy(null);
     }
   }
+
 
   return (
     <div className="space-y-6">
@@ -102,18 +121,22 @@ export function PackagesPage(): React.ReactElement {
 
       {error ? <Alert kind="error">{error}</Alert> : null}
       {message ? <Alert kind="success">{message}</Alert> : null}
-      {pay ? (
-        <Alert kind="info">
-          <p>
-            Order <strong>{pay.orderNumber}</strong> was created for {formatMoney(pay.amountMinor)}.
-            Complete the payment in the checkout window.
-          </p>
-          <p className="mt-2 text-xs">
-            Gateway reference <code>{pay.providerOrderId}</code>. Credits are granted only when the
-            gateway&apos;s signed webhook confirms payment — refreshing this page will not mark it paid.
-          </p>
-        </Alert>
-      ) : null}
+
+      {/* The single source of truth for what the payment is doing. Every state
+          the provider can produce is rendered here, and success is only ever
+          shown once the server has confirmed it. */}
+      <CheckoutStatus
+        checkout={checkout}
+        orderNumber={checkout.current?.orderNumber ?? null}
+        onRetry={() => {
+          checkout.reset();
+          // A retry may have granted credits, so both lists are re-read rather
+          // than assumed unchanged.
+          void orders.reload();
+          void credits.reload();
+        }}
+      />
+
 
       {credits.loading ? <LoadingState label="Loading packages…" /> : null}
       {credits.error ? <ErrorState message={credits.error} onRetry={credits.reload} /> : null}
@@ -161,10 +184,13 @@ export function PackagesPage(): React.ReactElement {
               ) : null}
               <Button
                 onClick={() => buy(pkg)}
-                loading={busy === pkg.id}
+                loading={busy === pkg.id || checkout.phase === 'starting'}
+                disabled={checkout.phase === 'awaiting' || checkout.phase === 'confirming'}
                 className="mt-4 w-full"
               >
-                Buy this package
+                {checkout.phase === 'awaiting' || checkout.phase === 'confirming'
+                  ? 'Payment in progress…'
+                  : `Buy ${formatMoney(pkg.priceMinor, pkg.currency)}`}
               </Button>
             </div>
           ))}

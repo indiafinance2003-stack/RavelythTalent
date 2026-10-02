@@ -1,10 +1,17 @@
-﻿'use client';
+'use client';
 
 import { useState } from 'react';
 import Link from 'next/link';
 import { portalGet, portalPost } from '@/lib/portal-client/client';
 import { formatApiError } from '@/lib/client/api';
 import { useAsync } from '@/lib/portal-client/use-async';
+import { useSession } from '@/lib/portal-client/use-session';
+import { usePortalCheckout } from '@/components/portal/checkout/use-portal-checkout';
+import {
+  CheckoutStatus,
+  portalLabels,
+  toStartedCheckout,
+} from '@/components/portal/checkout/checkout-status';
 import type { CandidateSubscription, PremiumPlan } from '@/lib/portal-client/types';
 import { CONSENT_LABELS, formatDate, formatMoney, titleCase } from '@/lib/portal-client/format';
 import {
@@ -31,6 +38,9 @@ import {
  * premium costs.
  */
 export function CandidatePremium(): React.ReactElement {
+  const { user } = useSession();
+  const checkout = usePortalCheckout();
+
   const premium = useAsync(
     () =>
       portalGet<{
@@ -45,30 +55,37 @@ export function CandidatePremium(): React.ReactElement {
   const [cancelling, setCancelling] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [pay, setPay] = useState<{
-    orderNumber: string;
-    amountMinor: number;
-    providerOrderId: string;
-    providerKeyId: string | null;
-  } | null>(null);
+
+  /**
+   * Starts a REAL premium purchase.
+   *
+   * Only the plan id is sent. The price is never sent and is never read from
+   * the plan card on screen: the server quotes it from the plan row, so nothing
+   * in the browser can influence what is charged or what premium is granted.
+   */
+  async function startPurchase(plan: PremiumPlan) {
+    const result = await portalPost<{
+      order: { orderNumber: string; amountMinor: number; currency: string };
+      providerOrderId: string;
+      providerKeyId: string | null;
+    }>('/api/portal/candidate/premium/checkout', { planId: plan.id });
+    return toStartedCheckout(result);
+  }
 
   async function buy(plan: PremiumPlan): Promise<void> {
     setError(null);
     setMessage(null);
     setBuying(plan.id);
     try {
-      const result = await portalPost<{
-        order: { orderNumber: string; amountMinor: number };
-        providerOrderId: string;
-        providerKeyId: string | null;
-      }>('/api/portal/candidate/premium/checkout', { planId: plan.id });
-
-      setPay({
-        orderNumber: result.order.orderNumber,
-        amountMinor: result.order.amountMinor,
-        providerOrderId: result.providerOrderId,
-        providerKeyId: result.providerKeyId,
-      });
+      await checkout.pay(
+        () => startPurchase(plan),
+        portalLabels(`Ravelyth Talent Premium: ${plan.name}`, {
+          name: user?.name ?? '',
+          email: user?.email ?? '',
+        })
+      );
+      // The order now exists, so the subscription panel is stale. A confirmed
+      // payment will have activated premium by the time this resolves.
       await premium.reload();
     } catch (caught) {
       // A 503 here means payments are not configured; report it honestly rather
@@ -115,19 +132,16 @@ export function CandidatePremium(): React.ReactElement {
       {error ? <Alert kind="error">{error}</Alert> : null}
       {message ? <Alert kind="success">{message}</Alert> : null}
 
-      {pay ? (
-        <Alert kind="info">
-          <p>
-            Order <strong>{pay.orderNumber}</strong> was created for{' '}
-            {formatMoney(pay.amountMinor)}. Complete the payment in the checkout window to activate
-            premium.
-          </p>
-          <p className="mt-2 text-xs">
-            Gateway order reference: <code>{pay.providerOrderId}</code>. Payment is confirmed by the
-            gateway&apos;s signed webhook; this page cannot mark an order paid.
-          </p>
-        </Alert>
-      ) : null}
+      <CheckoutStatus
+        checkout={checkout}
+        orderNumber={checkout.current?.orderNumber ?? null}
+        onRetry={() => {
+          checkout.reset();
+          void premium.reload();
+        }}
+      />
+
+
 
       <Card>
         <CardHeader title="Your subscription" />
@@ -228,10 +242,15 @@ export function CandidatePremium(): React.ReactElement {
               ) : null}
               <Button
                 onClick={() => buy(plan)}
-                loading={buying === plan.id}
+                loading={buying === plan.id || checkout.phase === 'starting'}
+                disabled={checkout.phase === 'awaiting' || checkout.phase === 'confirming'}
                 className="mt-4 w-full"
               >
-                {subscription ? 'Switch to this plan' : 'Buy this plan'}
+                {checkout.phase === 'awaiting' || checkout.phase === 'confirming'
+                  ? 'Payment in progress…'
+                  : subscription
+                    ? 'Switch to this plan'
+                    : 'Buy this plan'}
               </Button>
             </div>
           ))}
