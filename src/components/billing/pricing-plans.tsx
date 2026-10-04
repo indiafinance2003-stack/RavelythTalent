@@ -4,18 +4,13 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Sparkles } from "lucide-react";
 import { formatPaise } from "@/lib/utils";
+import { openRazorpayCheckout } from "./razorpay-checkout";
 import {
   Alert,
   Badge,
   Card,
 } from "@/components/ui/primitives";
 import type { PublicPlan } from "@/lib/billing/plans";
-
-declare global {
-  interface Window {
-    Razorpay?: new (options: Record<string, unknown>) => { open: () => void };
-  }
-}
 
 export type PlanPrice = {
   monthlyPaise: number;
@@ -67,11 +62,23 @@ export function PricingPlans({
           planCode: plan.code,
           billingPeriod: period,
           companyId,
+          ...(plan.promotion?.billingPeriod === period
+            ? { promotionCode: plan.promotion.code }
+            : {}),
         }),
       });
       const json = (await response.json()) as {
         ok: boolean;
-        data?: Record<string, string | number | null>;
+        data?: {
+          keyId: string | number | null;
+          orderId: string | number | null;
+          amount: string | number | null;
+          currency: string | number | null;
+          planCode: string;
+          planName: string;
+          billingPeriod: "monthly" | "yearly";
+          companyId: string | null;
+        };
         error?: { message?: string };
       };
 
@@ -80,12 +87,16 @@ export function PricingPlans({
         return;
       }
 
-      await openRazorpay(json.data, () => {
-        router.push(
-          audience === "employer" ? "/recruiter/billing" : "/dashboard/billing",
-        );
-        router.refresh();
-      });
+      await openRazorpayCheckout(
+        json.data,
+        () => {
+          router.push(
+            audience === "employer" ? "/recruiter/billing" : "/dashboard/billing",
+          );
+          router.refresh();
+        },
+        setError,
+      );
     } catch {
       setError("Could not start the payment. Please try again.");
     } finally {
@@ -241,53 +252,4 @@ export function PricingPlans({
       </div>
     </div>
   );
-}
-
-/** Loads Razorpay Checkout and resolves once the payment is verified. */
-async function openRazorpay(
-  order: Record<string, string | number | null>,
-  onDone: () => void,
-): Promise<void> {
-  if (!document.getElementById("razorpay-checkout-script")) {
-    await new Promise<void>((resolve, reject) => {
-      const script = document.createElement("script");
-      script.id = "razorpay-checkout-script";
-      script.src = "https://checkout.razorpay.com/v1/checkout.js";
-      script.onload = () => resolve();
-      script.onerror = () => reject(new Error("Could not load Razorpay checkout."));
-      document.body.appendChild(script);
-    });
-  }
-
-  const Razorpay = window.Razorpay;
-  if (!Razorpay) throw new Error("Razorpay checkout unavailable.");
-
-  const instance = new Razorpay({
-    key: String(order.keyId),
-    amount: Number(order.amount),
-    currency: String(order.currency),
-    name: "Ravelyth Talent",
-    description: String(order.planName),
-    order_id: String(order.orderId),
-    prefill: {},
-    notes: {},
-    theme: { color: "#1F6FEB" },
-    handler: async (response: Record<string, string>) => {
-      const verify = await fetch("/api/billing/verify", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          razorpay_order_id: response.razorpay_order_id,
-          razorpay_payment_id: response.razorpay_payment_id,
-          razorpay_signature: response.razorpay_signature,
-        }),
-      });
-      if (verify.ok) onDone();
-    },
-    modal: {
-      ondismiss: () => undefined,
-    },
-  });
-
-  instance.open();
 }

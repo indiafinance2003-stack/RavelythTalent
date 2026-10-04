@@ -277,6 +277,7 @@ export const addonPurchases = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
+    uniqueIndex("addon_purchases_payment_id_key").on(t.paymentId),
     index("addon_purchases_company_idx").on(t.companyId),
     index("addon_purchases_job_idx").on(t.jobId),
   ],

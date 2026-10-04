@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "addon_purchases_payment_id_key" ON "addon_purchases" USING btree ("payment_id");

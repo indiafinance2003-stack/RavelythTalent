@@ -202,3 +202,9 @@ tokens, skill links, application history).
   "tax not applicable" line. **[OWNER ACTION]** set the real GSTIN and rate.
 - **Add-ons** are seeded **inactive with `price_paise = NULL`** and cannot be
   purchased until an admin sets a price and activates them.
+- Active add-ons are purchased as one-time Razorpay orders. Purchases retain a
+  configured duration, are idempotent per payment, and receive their own
+  numbered invoice. Per-job add-ons are limited to published jobs owned by the
+  approved company. No add-on price or active offering is seeded.
+- The checkout uses an active promotion's stored paise price only after the
+  server validates its plan, billing period, active flag, and date window.

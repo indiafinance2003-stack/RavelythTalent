@@ -1,6 +1,7 @@
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
+  addons,
   companies,
   invoices,
   payments,
@@ -13,10 +14,12 @@ import { getSiteSettings } from "@/lib/settings";
 import { getEmailBrand, queueRenderedEmail } from "@/lib/email/send";
 import {
   invoiceDeliveryEmail,
+  paymentFailedEmail,
   paymentSuccessEmail,
   subscriptionActivatedEmail,
 } from "@/lib/email/templates/billing";
 import { appUrl } from "@/lib/email/urls";
+import { formatPaise } from "@/lib/utils";
 import { ensureBucket } from "@/lib/storage";
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -352,7 +355,7 @@ export async function recordFailedPayment(params: {
 }): Promise<void> {
   const existing = (
     await db
-      .select({ id: payments.id })
+      .select()
       .from(payments)
       .where(eq(payments.orderId, params.orderId))
       .limit(1)
@@ -363,6 +366,9 @@ export async function recordFailedPayment(params: {
       .update(payments)
       .set({ status: "failed", failureReason: params.reason ?? null, updatedAt: new Date() })
       .where(eq(payments.id, existing.id));
+    if (existing.status !== "failed") {
+      await sendPaymentFailureEmail(existing, params.reason ?? null);
+    }
     return;
   }
 
@@ -374,6 +380,45 @@ export async function recordFailedPayment(params: {
     status: "failed",
     failureReason: params.reason ?? null,
   });
+}
+
+async function sendPaymentFailureEmail(
+  payment: typeof payments.$inferSelect,
+  reason: string | null,
+): Promise<void> {
+  const [user, plan, addon] = await Promise.all([
+    db.select({ email: users.email, fullName: users.fullName })
+      .from(users).where(eq(users.id, payment.userId)).limit(1),
+    payment.planId
+      ? db.select({ name: plans.name }).from(plans).where(eq(plans.id, payment.planId)).limit(1)
+      : Promise.resolve([]),
+    payment.addonId
+      ? db.select({ name: addons.name }).from(addons).where(eq(addons.id, payment.addonId)).limit(1)
+      : Promise.resolve([]),
+  ]);
+  const recipient = user[0];
+  if (!recipient) return;
+  const label = plan[0]?.name ?? addon[0]?.name ?? "your purchase";
+
+  try {
+    const brand = await getEmailBrand();
+    await queueRenderedEmail({
+      to: recipient.email,
+      toName: recipient.fullName,
+      templateKey: "payment_failure",
+      rendered: paymentFailedEmail({
+        name: recipient.fullName.split(" ")[0] ?? "there",
+        planName: label,
+        amount: formatPaise(payment.amountPaise),
+        reason,
+        retryUrl: appUrl(payment.purpose === "addon" ? "/recruiter/add-ons" : "/pricing"),
+        brand,
+      }),
+      metadata: { paymentId: payment.id },
+    });
+  } catch (error) {
+    console.error("[billing] could not queue payment failure email:", error);
+  }
 }
 
 export async function companyNameFor(companyId: string): Promise<string> {

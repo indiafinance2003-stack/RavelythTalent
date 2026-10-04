@@ -64,7 +64,7 @@ Legend: `[x]` done · `[~]` partially done / needs owner input · `[ ]` not star
 - [x] Recruiter job submission and applicant status pipeline
 - [x] Company and job moderation decisions audited in `audit_logs`
 
-## Phase 4 — Plans, Razorpay, subscriptions, entitlements, invoices [~]
+## Phase 4 — Plans, Razorpay, subscriptions, entitlements, invoices ✅
 - [x] Plans + plan_features + promotions (candidate launch offer ₹1,999/yr) — seeded in Phase 1
 - [x] Pricing page (`/pricing`: candidate/employer tabs, monthly/yearly toggle, promotion banner)
 - [x] Razorpay Orders create `/api/billing/order` → Checkout → verify `/api/billing/verify` (HMAC signature)
@@ -75,7 +75,8 @@ Legend: `[x]` done · `[~]` partially done / needs owner input · `[ ]` not star
 - [x] Billing emails: payment success, activated, invoice delivery (payment_success/subscription_activated/invoice)
 - [x] Billing history pages: `/dashboard/billing` + `/recruiter/billing` (company-scoped via `?company=`)
 - [x] Invoice PDF download `/api/files/invoices/[id]` (owner/company-member/admin only)
-- [ ] Add-ons admin configuration and purchase flow (schema + seeds exist)
+- [x] Add-ons admin configuration and purchase flow with company/job scope,
+      idempotent activation, invoice and email delivery
 - [ ] Plan/promotion admin CRUD (deferred to Phase 5 admin panel)
 
 ## Phase 5 — Admin panel, interviews, search, reports and public pages (PENDING)
@@ -114,6 +115,5 @@ Legend: `[x]` done · `[~]` partially done / needs owner input · `[ ]` not star
 ## Notes / decisions
 See `ASSUMPTIONS.md` for every decision taken while working autonomously.
 
-Next: finish Phase 4 add-on purchase checkout and admin plan/promotion CRUD, then
-finish Phase 5 in order. Phases 1-3 are complete; baseline typecheck, lint and
-build are green.
+Next: Phase 5 admin panel (including plan/promotion CRUD), interviews, candidate
+search and reports. Phases 1-4 are complete; typecheck, lint and build are green.

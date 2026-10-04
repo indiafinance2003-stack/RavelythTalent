@@ -8,6 +8,7 @@ import { requireApiVerifiedUser } from "@/lib/auth/current-user";
 import { AppError } from "@/lib/errors";
 import { verifyCheckoutSignature } from "@/lib/billing/razorpay";
 import { activateSubscription } from "@/lib/billing/activate";
+import { activateAddonPayment } from "@/lib/billing/addons";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -50,6 +51,19 @@ export const POST = handleApi(async (request: Request) => {
 
   if (!payment || payment.userId !== user.id) {
     throw new AppError("Order not found.", 404, "order_not_found");
+  }
+  if (payment.purpose === "addon") {
+    const result = await activateAddonPayment({
+      orderId: payment.orderId,
+      paymentId: body.razorpay_payment_id,
+      amountPaise: payment.amountPaise,
+      signatureVerified: true,
+    });
+    return jsonOk({
+      verified: true,
+      alreadyProcessed: result.alreadyProcessed,
+      purchaseId: result.purchaseId,
+    });
   }
   if (!payment.planId) {
     throw new AppError("Order has no plan attached.", 400, "order_without_plan");

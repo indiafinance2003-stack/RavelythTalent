@@ -8,6 +8,7 @@ import {
   FileText,
   LayoutDashboard,
   LogOut,
+  Sparkles,
   UsersRound,
 } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/current-user";
@@ -23,6 +24,7 @@ const NAV = [
   { href: "/recruiter/applications", label: "Applicants", icon: UsersRound },
   { href: "/recruiter/company", label: "Company", icon: Building2 },
   { href: "/recruiter/billing", label: "Billing", icon: CreditCard },
+  { href: "/recruiter/add-ons", label: "Add-ons", icon: Sparkles },
 ];
 
 /** Shared shell for every `/recruiter/*` route (route group `(recruiter)`). */

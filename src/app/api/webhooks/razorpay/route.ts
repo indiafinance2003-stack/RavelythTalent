@@ -4,6 +4,7 @@ import { payments, webhookEvents } from "@/lib/db/schema";
 import { jsonOk } from "@/lib/http";
 import { verifyWebhookSignature } from "@/lib/billing/razorpay";
 import { activateSubscription, recordFailedPayment } from "@/lib/billing/activate";
+import { activateAddonPayment } from "@/lib/billing/addons";
 import { AppError } from "@/lib/errors";
 
 export const runtime = "nodejs";
@@ -18,6 +19,7 @@ type RazorpayEvent = {
         id?: string;
         order_id?: string;
         amount?: number;
+        currency?: string;
         method?: string;
         notes?: Record<string, string>;
       };
@@ -111,7 +113,22 @@ async function handleCaptured(event: RazorpayEvent): Promise<void> {
   const payment = (
     await db.select().from(payments).where(eq(payments.orderId, orderId)).limit(1)
   ).at(0);
-  if (!payment || !payment.planId) return;
+  if (!payment) return;
+
+  if (payment.purpose === "addon") {
+    if (typeof entity.amount !== "number" || entity.currency !== "INR") {
+      throw new AppError("Captured add-on payment has invalid amount or currency.", 400, "invalid_payment");
+    }
+    await activateAddonPayment({
+      orderId,
+      paymentId: entity.id,
+      amountPaise: entity.amount,
+      method: entity.method ?? null,
+      signatureVerified: true,
+    });
+    return;
+  }
+  if (!payment.planId) return;
 
   const notes = (entity.notes ?? {}) as {
     planId?: string;
