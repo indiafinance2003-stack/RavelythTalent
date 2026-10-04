@@ -2,12 +2,6 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { InfoPage, InfoSection } from '@/components/layout/info-page';
 import {
-  formatPlanPrice,
-  isPlanPurchasable,
-  managedSupportPlan,
-  planCatalog,
-} from '@/lib/plans/catalog';
-import {
   RECRUITER_PLAN_SEED,
   formatAmountMinor,
 } from '@/lib/portal/recruiter-plans/catalog';
@@ -17,7 +11,7 @@ import { listRecruiterPlans, type RecruiterPlanDTO } from '@/lib/portal/recruite
 export const metadata: Metadata = {
   title: 'Pricing',
   description:
-    'Ravelyth Talent pricing: recruiter plans from ₹3,999/month with monthly job-post allowances, plus Ravelyth Managed Support at ₹599/month. Free diagnostic tools for everyone.',
+    'Ravelyth Talent pricing: recruiter plans from ₹3,999/month with monthly job-post allowances, and candidate Premium for resume builder and profile upgrades. Browsing and applying to jobs is free.',
   alternates: { canonical: '/pricing' },
 };
 
@@ -57,15 +51,12 @@ async function loadRecruiterPlans(): Promise<RecruiterPlanDTO[]> {
 }
 
 export default async function Page(): Promise<React.ReactElement> {
-  const plans = planCatalog();
-  const supportPlan = managedSupportPlan();
-  const purchasable = isPlanPurchasable(supportPlan);
   const recruiterPlans = await loadRecruiterPlans();
 
   return (
     <InfoPage
       title="Pricing"
-      intro="The diagnostic tools and Knowledge Base are free for everyone. Recruiter plans bundle a monthly job-post allowance with the hiring tools, and Managed Support adds a human-backed ticket queue for DNS, email, WordPress and basic VPS work."
+      intro="Browsing jobs, creating a candidate account and applying are free. Recruiter plans bundle a monthly job-post allowance with the hiring tools, and Candidate Premium unlocks the structured resume builder."
     >
       <InfoSection title="Recruiter plans" id="recruiter-plans">
         <p className="text-muted">
@@ -118,89 +109,80 @@ export default async function Page(): Promise<React.ReactElement> {
         </div>
       </InfoSection>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        {plans.map((plan) => (
-          <section key={plan.id} className="rounded-xl border border-line bg-navy-surface p-6">
-            <h2 className="text-xl font-semibold text-ink">{plan.name}</h2>
-            <p className="mt-1 text-sm text-slate-400">{plan.summary}</p>
-            <p className="mt-4 text-3xl font-semibold tracking-tight text-ink">
-              {formatPlanPrice(plan.price)}
+      <InfoSection title="Candidates" id="candidates">
+        <p>
+          Creating an account, building your profile, and applying to jobs is free for every candidate. You
+          never need a plan to be considered for a role.
+        </p>
+        <div className="mt-6 grid gap-6 sm:grid-cols-2">
+          <section className="rounded-xl border border-line bg-navy-surface p-6">
+            <h2 className="text-xl font-semibold text-ink">Free</h2>
+            <p className="mt-1 text-sm text-slate-400">
+              Everything you need to apply and track your applications.
             </p>
+            <p className="mt-4 text-3xl font-semibold tracking-tight text-ink">Free</p>
             <ul className="mt-4 list-disc space-y-1.5 pl-5 text-sm text-slate-300">
-              {plan.features.map((feature) => (
-                <li key={feature}>{feature}</li>
-              ))}
+              <li>One maintained candidate profile</li>
+              <li>Upload and manage resumes</li>
+              <li>Apply to jobs and track every application</li>
+              <li>Job alerts and email notifications</li>
+              <li>Save jobs and manage your preferences</li>
             </ul>
             <div className="mt-5">
-              {plan.entitlement.managedSupport ? (
-                purchasable ? (
-                  <Link
-                    href="/account/billing"
-                    className="inline-block rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-strong"
-                  >
-                    Subscribe
-                  </Link>
-                ) : (
-                  <Link
-                    href="/support/request"
-                    className="inline-block rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-strong"
-                  >
-                    Request Managed Support
-                  </Link>
-                )
-              ) : (
-                <span className="inline-block rounded-md border border-line px-4 py-2 text-sm font-medium text-slate-400">
-                  Free — no account needed
-                </span>
-              )}
+              <Link
+                href="/register?type=candidate"
+                className="inline-block rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-strong"
+              >
+                Create a free account
+              </Link>
             </div>
           </section>
-        ))}
-      </div>
 
-      <InfoSection title="What Managed Support does not include" id="boundaries">
-        <ul className="list-disc space-y-2 pl-5">
-          {supportPlan.boundaries.map((boundary) => (
-            <li key={boundary}>{boundary}</li>
-          ))}
-        </ul>
+          <section className="rounded-xl border border-accent bg-navy-surface p-6">
+            <h2 className="text-xl font-semibold text-ink">Candidate Premium</h2>
+            <p className="mt-1 text-sm text-slate-400">
+              For candidates who want the structured resume builder and a stronger presentation.
+            </p>
+            <ul className="mt-4 list-disc space-y-1.5 pl-5 text-sm text-slate-300">
+              <li>Structured resume builder with editable documents</li>
+              <li>Professional resume templates</li>
+              <li>Multiple resume versions with history</li>
+              <li>Resume PDF generation and download</li>
+            </ul>
+            <div className="mt-5">
+              <Link
+                href="/candidate/premium"
+                className="inline-block rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-strong"
+              >
+                View Premium
+              </Link>
+            </div>
+          </section>
+        </div>
+      </InfoSection>
+
+      <InfoSection title="Job credits" id="credits">
+        <p>
+          When the monthly allowance in your recruiter plan is used up, you can buy prepaid job credits
+          without waiting for a renewal. Credits are consumed as you submit postings for review.
+        </p>
+        <p className="mt-3">
+          <Link href="/employer/credits" className="font-medium text-accent hover:text-accent-strong">
+            Buy job credits
+          </Link>
+        </p>
       </InfoSection>
 
       <InfoSection title="Billing status" id="billing-status">
         <p>
-          {purchasable ? (
-            <>Online subscription and payment are available through this website.</>
-          ) : (
-            <>
-              <span className="font-medium text-ink">Online billing is not connected yet.</span> No payment can
-              currently be taken through this website, and no subscription is created or charged automatically.
-              Use the{' '}
-              <Link href="/support/request" className="font-medium text-accent hover:text-accent-strong">
-                support request form
-              </Link>{' '}
-              and we will arrange Managed Support directly and transparently.
-            </>
-          )}
+          Payments are taken through this website and verified server-side. A subscription, order or
+          invoice appears in your portal only after a real payment record exists — Ravelyth Talent never
+          creates a placeholder or simulated invoice.
         </p>
         <p className="text-sm text-slate-400">
-          When billing is enabled, subscriptions will appear in your portal with plan status, billing period and
-          invoices — created only from real payment records.
+          Invoices show the billing entity details and GST where applicable, and are available as PDF from
+          your employer portal.
         </p>
-      </InfoSection>
-
-      <InfoSection title="Links" id="links">
-        <ul className="list-disc space-y-1 pl-5">
-          <li>
-            <Link href="/services" className="font-medium text-accent hover:text-accent-strong">
-              Managed services and scope
-            </Link>
-          </li>
-          <li>
-            <Link href="/docs" className="font-medium text-accent hover:text-accent-strong">
-              Knowledge Base
-            </Link>
-          </li>
-        </ul>
       </InfoSection>
     </InfoPage>
   );

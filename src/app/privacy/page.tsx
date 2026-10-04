@@ -3,7 +3,8 @@ import { InfoPage, InfoSection } from '@/components/layout/info-page';
 
 export const metadata: Metadata = {
   title: 'Privacy Policy',
-  description: 'What Ravelyth stores, what it does not store, and how accounts and diagnostics data are handled.',
+  description:
+    'What Ravelyth Talent stores, what it does not store, and how account, resume and application data are handled.',
   alternates: { canonical: '/privacy' },
 };
 
@@ -11,67 +12,59 @@ export default function Page(): React.ReactElement {
   return (
     <InfoPage
       title="Privacy policy"
-      intro="This page describes what Ravelyth actually does with data. It is intentionally specific: anything not listed here is not collected."
+      intro="This page describes what Ravelyth Talent actually does with data. It is intentionally specific: anything not listed here is not collected."
     >
-      <InfoSection title="Anonymous diagnostic requests" id="diagnostics">
+      <InfoSection title="What we collect" id="collect">
         <p>
-          DNS lookups, DNS health checks, SPF/DKIM/DMARC checks, PTR lookups, resolver comparisons, and email
-          header analysis all work without an account. The inputs you submit and the results produced are processed
-          for your request in memory and are not persisted to a database. What you look up is not attached to any
-          identity.
+          When you create an account we store your name, email address, a cryptographic hash of your password
+          (Argon2id), the account creation time and the time of your most recent sign-in. Passwords are never
+          stored in plaintext and never appear in logs.
+        </p>
+        <p>
+          When you apply to a job we store the application, the resume you attached, and the status history of
+          that application. When you build a profile or a resume we store what you entered.
         </p>
       </InfoSection>
-      <InfoSection title="Email headers" id="headers">
+      <InfoSection title="Consent" id="consent">
         <p>
-          Raw email headers you paste are parsed for the single request you submit and are never stored, logged, or
-          saved to any account. There is no email header history feature, and account users cannot save email
-          analyses — only structured DNS results are saveable.
+          Consent is recorded separately for each purpose — job applications, resume storage, and marketing. You
+          can withdraw any one of them later without affecting the others. Marketing is strictly opt-in and is
+          never pre-ticked.
         </p>
       </InfoSection>
-      <InfoSection title="Account data" id="accounts">
+      <InfoSection title="Who can see your data" id="sharing">
         <p>
-          If you create an optional account, Ravelyth stores your name, email address, a cryptographic hash of
-          your password (Argon2id), the account creation time, and the time of your most recent sign-in. Passwords
-          are never stored in plaintext and never appear in logs.
+          Your resume is private by default. An employer can read a resume only after you have applied to one of
+          their roles with it. Recruiters can browse candidate profiles within the entitlement their plan grants,
+          and recruitment agencies act on behalf of the client company they are authorised for.
         </p>
       </InfoSection>
       <InfoSection title="Sign-in sessions" id="sessions">
         <p>
           Signing in creates a server-side session: a cryptographically random token is stored in an HttpOnly
           cookie and only a hash of that token is stored server-side. Sessions expire after seven days and expired
-          sessions are removed. Signing out invalidates the session server-side and clears the cookie. Ravelyth
-          does not use localStorage for authentication.
-        </p>
-      </InfoSection>
-      <InfoSection title="Saved analyses" id="saved">
-        <p>
-          When you explicitly choose “Save analysis” for a DNS lookup, Ravelyth stores the structured result
-          (domain, record type, status, records, query time) in your account. Saved analyses are visible only to
-          you and are deleted when you delete them or when you request account deletion. Saving never happens
-          automatically.
-        </p>
-      </InfoSection>
-      <InfoSection title="Rate limiting and abuse prevention" id="rate-limiting">
-        <p>
-          To keep the service available, Ravelyth applies in-memory rate limits per client over rolling windows,
-          with stricter limits on login and registration. These counters live in application memory; they are not
-          exported to third parties. Private and non-public network targets are refused and cannot be scanned
-          through the tools.
+          sessions are removed. Signing out invalidates the session server-side and clears the cookie.
         </p>
       </InfoSection>
       <InfoSection title="Cookies" id="cookies">
         <p>
-          Ravelyth sets exactly one cookie: the session cookie described above. It contains no personal data, no
-          database identifiers beyond the opaque session token, and is not used for advertising or tracking.
-          Visitors without an account receive no cookies from Ravelyth.
+          Ravelyth Talent sets exactly one cookie: the session cookie described above. It contains no personal
+          data and is not used for advertising or tracking. Visitors without an account receive no cookies.
         </p>
       </InfoSection>
-      <InfoSection title="What Ravelyth does not do" id="not">
+      <InfoSection title="Rate limiting and abuse prevention" id="rate-limiting">
+        <p>
+          To keep the service available we apply rate limits per client over rolling windows, with stricter limits
+          on login and registration. These counters live in application memory and are not exported to third
+          parties.
+        </p>
+      </InfoSection>
+      <InfoSection title="What Ravelyth Talent does not do" id="not">
         <ul className="list-disc space-y-2 pl-5">
           <li>No third-party analytics or advertising scripts.</li>
-          <li>No sale or sharing of user data.</li>
-          <li>No profiling of visitors or lookups.</li>
-          <li>No storage of email headers, ever.</li>
+          <li>No sale or sharing of your data.</li>
+          <li>No profiling of visitors or candidates.</li>
+          <li>No paid placement of candidates in search results.</li>
         </ul>
       </InfoSection>
     </InfoPage>

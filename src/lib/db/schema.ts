@@ -14,12 +14,12 @@ import {
  * Users. Email is stored normalized (lowercase, trimmed) and unique at the
  * database level. Passwords are only ever stored as Argon2id hashes.
  *
- * `role` supports the Ravelyth Talent portal roles in addition to the original
- * DNS-tools roles:
+ * `role` supports the Ravelyth Talent portal roles alongside the platform
+ * administration roles:
  *   - 'candidate' — job seeker on Ravelyth Talent
  *   - 'employer'  — company user on Ravelyth Talent
  *   - 'staff'/'owner' — platform administrators
- *   - 'customer'  — original DNS tools account (retained, not a portal role)
+ *   - 'customer'  — legacy account role, retained for existing rows only
  *
  * Roles are NEVER client-settable: they are assigned by the registration
  * handler (candidate/employer only) or by a server-side admin/owner action.
@@ -179,7 +179,7 @@ export const supportTickets = pgTable(
     origin: text('origin').notNull().default('managed_support'),
     // Operational classification of who is expected to resolve the issue.
     responsibility: text('responsibility').notNull().default('unassigned'),
-    // Public service catalogue slug the ticket belongs to (dns-management…).
+    // Legacy service catalogue slug the ticket belongs to.
     serviceSlug: text('service_slug'),
     // Which entitlement check authorised creation (audit trail only).
     entitlementSource: text('entitlement_source'),
@@ -1024,9 +1024,7 @@ export const checkoutSessions = pgTable(
  * --------------------------------------------------------------------------- */
 
 export const FEEDBACK_CATEGORIES = [
-  'tools',
-  'dns',
-  'email',
+  'jobs',
   'account',
   'billing',
   'support',

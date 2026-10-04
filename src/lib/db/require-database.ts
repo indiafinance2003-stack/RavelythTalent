@@ -40,7 +40,7 @@ export function getTestDatabase(): Database | undefined {
  * Returns the database connection or throws a user-safe 503 AppError when
  * PostgreSQL is not configured. API routes use this so that account features
  * degrade with a clear message instead of an internal error, while public
- * DNS/email tools remain fully functional without a database.
+ * job-board pages remain readable without a database.
  */
 export function requireDatabase(): Database {
   const testDatabase = getTestDatabase();

@@ -1887,9 +1887,8 @@ export const agencySubmissionEvents = pgTable(
  * ==========================================================================
  *
  * These are the Ravelyth Talent billing documents. They are deliberately
- * separate from the older `invoices` table (which belongs to the Managed
- * Support product) so a portal purchase can never appear in — or be constrained
- * by — the DNS-tools billing model.
+ * separate from the older `invoices` table so a portal purchase can never
+ * appear in — or be constrained by — a different billing model.
  */
 
 export const PORTAL_INVOICE_STATUSES = ['issued', 'paid', 'void'] as const;

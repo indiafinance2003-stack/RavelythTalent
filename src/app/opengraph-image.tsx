@@ -1,6 +1,6 @@
 import { ImageResponse } from 'next/og';
 
-export const alt = 'Ravelyth — DNS and email diagnostics';
+export const alt = 'Ravelyth Talent — connecting great people with great opportunities';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
@@ -51,7 +51,7 @@ export default function OpengraphImage() {
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', marginLeft: 24 }}>
             <div style={{ fontSize: 52, fontWeight: 700, color: '#F8FAFC', lineHeight: 1.1 }}>Ravelyth</div>
-            <div style={{ fontSize: 26, color: '#38BDF8', marginTop: 8 }}>Free DNS and email diagnostics</div>
+            <div style={{ fontSize: 26, color: '#38BDF8', marginTop: 8 }}>Connecting great people with great opportunities</div>
           </div>
         </div>
         <div
@@ -66,14 +66,14 @@ export default function OpengraphImage() {
             lineHeight: 1.15,
           }}
         >
-          <div>DNS &amp; Email Diagnostics,</div>
-          <div>Made Clear.</div>
+          <div>Great Roles, Real People,</div>
+          <div>Stronger Futures.</div>
         </div>
         <div style={{ fontSize: 28, color: '#94A3B8', marginTop: 20 }}>
-          Inspect DNS records, nameservers, SPF, DKIM, DMARC, DNSSEC-related data and raw email headers.
+          Browse live vacancies, build a profile and resume, apply in one click, and hire with recruiter plans.
         </div>
         <div style={{ fontSize: 22, color: '#60A5FA', marginTop: 28 }}>
-          ravelyth.in · No account required · No simulated results
+          Right People | Better Opportunities | Stronger Tomorrow
         </div>
       </div>
     ),

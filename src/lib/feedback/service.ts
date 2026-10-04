@@ -35,9 +35,7 @@ export interface FeedbackDTO {
 }
 
 export const FEEDBACK_CATEGORY_LABELS: Record<FeedbackCategory, string> = {
-  tools: 'Diagnostic tools',
-  dns: 'DNS tools',
-  email: 'Email tools',
+  jobs: 'Jobs and applications',
   account: 'Account & portal',
   billing: 'Billing & subscriptions',
   support: 'Support experience',

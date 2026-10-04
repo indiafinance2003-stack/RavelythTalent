@@ -378,10 +378,11 @@ export function PortalRegisterForm(): React.ReactElement {
         </Link>
       </p>
       <p className="text-center text-xs text-slate-500">
-        Need an account only for the DNS tools?{' '}
-        <Link href="/register/account" className="underline hover:text-slate-400">
-          Create a tools account
+        Employers and recruitment agencies can{' '}
+        <Link href="/register?type=employer" className="underline hover:text-slate-400">
+          create an employer account
         </Link>
+        .
       </p>
     </form>
   );

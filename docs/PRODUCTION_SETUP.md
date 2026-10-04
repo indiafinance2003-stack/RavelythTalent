@@ -38,7 +38,7 @@ the owner role at sign-in (owner bootstrap). Leave it empty in shared or
 multi-tenant deployments. The account signs in normally and is then treated as
 owner.
 
-## 4. Managed Support billing (Razorpay)
+## 4. Payments (Razorpay)
 
 Checkout is deliberately refused until every credential below is present. Do not
 advertise checkout before this section is complete.
@@ -51,15 +51,15 @@ advertise checkout before this section is complete.
      signature `HMAC-SHA256(orderId|paymentId)`)
    - `RAZORPAY_WEBHOOK_SECRET` (used to verify the webhook signature over the raw
      body)
-3. Set the Managed Support price (integer minor units) in
-   `MANAGED_SUPPORT_PRICE_MINOR`, plus `MANAGED_SUPPORT_CURRENCY` and
-   `MANAGED_SUPPORT_BILLING_INTERVAL`. Quarterly/yearly prices remain unset until
-   they are formally decided; unset stays "not offered", never an invented number.
+3. Prices are not read from the environment for Ravelyth Talent. Recruiter plans
+   live in the `recruiter_plans` tables and candidate Premium plans in
+   `candidate_premium_plans`; edit them in the database (or seed them) so the
+   public pricing page, checkout and invoices all read one source of truth.
 4. In the Razorpay dashboard, register a webhook on the checkout environment
    pointing at:
 
    ```
-   https://<APP_URL>/api/billing/webhooks/razorpay
+   https://<APP_URL>/api/portal/payments/webhook
    ```
 
    with **exactly** these events: `payment.captured`, `payment.failed`,
@@ -73,11 +73,10 @@ advertise checkout before this section is complete.
   the session is claimed with a pending-only conditional update, so out-of-order
   or duplicate deliveries cannot double-activate or double-invoice.
 - `payment.failed` → marks the session `failed` (pending-only).
-- `refund.processed` → marks the session `refunded` and switches the
-  subscription to `canceled`, which deactivates Managed Support entitlement.
-  Redeliveries are no-ops.
-- A webhook whose order/payment id matches no session is acknowledged and
-  logged; the operator should investigate logs if it was not spurious.
+- `refund.processed` → marks the order `refunded` and switches the
+  subscription to `canceled`. Redeliveries are no-ops.
+- A webhook whose order/payment id matches no order is acknowledged and logged;
+  the operator should investigate logs if it was not spurious.
 
 ### 4.2 Required manual test checklist (test-mode credentials first)
 
@@ -97,10 +96,9 @@ advertise checkout before this section is complete.
 ### 4.3 Monitoring note
 
 The application does not run automated reconciliation, dunning, or card
-recovery. The operator should monitor the payment provider dashboard; the only
-dunning state the app models is `past_due` with a configurable grace period
-(`BILLING_GRACE_PERIOD_DAYS`, `0` = undecided), which currently revokes
-entitlement rather than silently keeping support open.
+recovery. The operator should monitor the payment provider dashboard and revoke
+entitlement explicitly when a subscription is cancelled or a payment is
+reversed.
 
 ## 5. Transactional email
 
@@ -124,7 +122,7 @@ are in-app records only.
 - [ ] `DATABASE_URL` set and `npm run db:migrate` applied.
 - [ ] `APP_URL` correct; `TRUST_PROXY_HEADERS` matches the proxy arrangement.
 - [ ] `OWNER_EMAIL` set for the operator account.
-- [ ] Managed Support price finalized in env (it is the single source of truth).
+- [ ] Recruiter plans and candidate Premium plans seeded in the database.
 - [ ] Razorpay key credentials + webhook secret present and webhook events
       registered with the exact event list above.
 - [ ] Test checklist in 4.2 passed in test mode, then switch to live mode.

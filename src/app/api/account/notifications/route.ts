@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { handleApi } from '@/lib/errors/api-handler';
-import { requireSupportUser, withSupportErrors } from '@/lib/support/api';
+import { requireNotificationUser, withNotificationErrors } from '@/lib/notifications/api';
 import {
   countUnreadNotifications,
   listNotifications,
@@ -11,8 +11,8 @@ import {
 export async function GET(req: NextRequest): Promise<Response> {
   return handleApi(
     req,
-    withSupportErrors(async () => {
-      const user = await requireSupportUser();
+    withNotificationErrors(async () => {
+      const user = await requireNotificationUser();
       const unreadOnly = req.nextUrl.searchParams.get('unread') === 'true';
       const limitParam = req.nextUrl.searchParams.get('limit');
       const limit = limitParam ? Number.parseInt(limitParam, 10) : 50;

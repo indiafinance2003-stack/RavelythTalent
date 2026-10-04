@@ -14,9 +14,9 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    // The root is the Ravelyth Talent job portal; the DNS and email tools are a
-    // secondary product that now lives at /tools, and each of its pages sets its
-    // own title, so the default describes what a visitor actually lands on.
+    // Ravelyth Talent is the only public product; every page sets its own title
+    // through this template, and the default describes the job portal a visitor
+    // actually lands on.
     default: 'Ravelyth Talent — Find your next role',
     template: '%s | Ravelyth Talent',
   },

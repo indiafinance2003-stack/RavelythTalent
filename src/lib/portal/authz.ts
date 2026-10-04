@@ -21,8 +21,8 @@ export type PortalRole = (typeof PORTAL_ROLES)[number];
 /**
  * Roles considered platform administrators.
  *
- * 'owner' and 'staff' are the pre-existing DNS-tools admin roles and are kept
- * so the current admin system continues to work; 'admin' is the portal role.
+ * 'admin' is the Ravelyth Talent portal role; 'owner' and 'staff' are the
+ * operator roles the admin console also accepts.
  */
 export const ADMIN_ROLES = ['owner', 'staff', 'admin'] as const;
 

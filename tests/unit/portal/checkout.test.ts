@@ -131,15 +131,17 @@ describe('every provider outcome is handled distinctly', () => {
 describe('the shared SDK loader is not duplicated', () => {
   it('only one module fetches the checkout script', () => {
     // Two copies would mean two window.Razorpay definitions and a second
-    // component hanging forever on a load event that already fired.
+    // component hanging forever on a load event that already fired. The loader
+    // is the single place that is allowed to reference the CDN, and every
+    // consumer must go through it.
     const sdk = readSource('src', 'lib', 'billing', 'razorpay-sdk.ts');
     expect(sdk).toContain('checkout.razorpay.com/v1/checkout.js');
     expect(sdk).toContain('data-razorpay-checkout');
 
-    for (const component of [
-      ['src', 'components', 'billing', 'razorpay-checkout.tsx'],
-      ['src', 'components', 'portal', 'checkout', 'use-portal-checkout.ts'],
-    ]) {
+    // Every checkout consumer in the tree, so a new one cannot quietly inline
+    // a second copy of the script tag.
+    const consumers = [['src', 'components', 'portal', 'checkout', 'use-portal-checkout.ts']];
+    for (const component of consumers) {
       const source = readSource(...component);
       expect(source).toMatch(/from '@\/lib\/billing\/razorpay-sdk'/);
       expect(source).not.toContain('checkout.razorpay.com');

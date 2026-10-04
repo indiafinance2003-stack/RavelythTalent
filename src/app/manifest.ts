@@ -2,10 +2,10 @@ import type { MetadataRoute } from 'next';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Ravelyth',
-    short_name: 'Ravelyth',
+    name: 'Ravelyth Talent',
+    short_name: 'Ravelyth Talent',
     description:
-      'Free DNS and email diagnostic tools for DNS lookup, SPF, DKIM, DMARC, nameservers, DNS health, PTR records and email header analysis.',
+      'Ravelyth Talent connects great people with great opportunities. Browse live jobs, build a profile and resume, apply in one click, and hire with recruiter plans.',
     start_url: '/',
     display: 'standalone',
     background_color: '#0b1220',

@@ -42,7 +42,7 @@ on every authenticated call, and its existing sessions stop resolving.
 | `employer` | Company user on Ravelyth Talent |
 | `admin` | Platform administrator |
 | `staff`, `owner` | Pre-existing admin roles, treated as administrators |
-| `customer` | Pre-existing DNS-tools account, not a portal role |
+| `customer` | Legacy account role, not a portal role |
 
 ## Public endpoints
 

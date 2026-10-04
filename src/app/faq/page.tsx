@@ -3,55 +3,56 @@ import { InfoPage, InfoSection } from '@/components/layout/info-page';
 
 export const metadata: Metadata = {
   title: 'FAQ',
-  description: 'Answers about how Ravelyth works: data sources, accounts, rate limits, and the limits of DNS diagnostics.',
+  description:
+    'Answers about how Ravelyth Talent works: accounts, applications, hiring, pricing and data protection.',
   alternates: { canonical: '/faq' },
 };
 
 const faqs = [
   {
-    question: 'Where do the DNS results come from?',
+    question: 'Is it free to look for a job?',
     answer:
-      'Live queries performed by Ravelyth through standard DNS resolver APIs when you submit a request. Results are not simulated, cached from another provider, or generated from sample data.',
+      'Yes. Creating an account, maintaining your profile, and applying to jobs are free for every candidate. You never need a plan to be considered for a role.',
   },
   {
-    question: 'Do I need an account to use the tools?',
+    question: 'How do I apply for a job?',
     answer:
-      'No. Every DNS and email diagnostic is available without an account. An optional free account lets you save DNS lookup results for later.',
+      'Sign in and open the role on the job board. Applying records your profile and the resume you choose against that specific job, and you can then follow its progress from your candidate dashboard.',
   },
   {
-    question: 'What do you store about my lookups?',
+    question: 'Can an employer see my resume before I apply?',
     answer:
-      'Anonymous lookups are not persisted. If you are signed in and explicitly choose “Save analysis”, the structured DNS result (record type, status, records, query time) is saved to your account. Raw email headers are never stored.',
+      'No. Resumes are private by default. An employer can only read a resume once you have applied to one of their roles with it, and consent for that purpose is separate from the others.',
   },
   {
-    question: 'Why does the TTL column show “—”?',
+    question: 'Can I withdraw my consent?',
     answer:
-      'TTLs are displayed only when the DNS resolver actually returns them for a record. A dash means no TTL was provided for that record; Ravelyth never estimates or fabricates one.',
+      'Yes. Each purpose is recorded separately, so you can withdraw one without affecting the others. Withdrawing consent for job applications means you can no longer apply through the platform until it is restored.',
   },
   {
-    question: 'Does DNS Health test worldwide DNS propagation?',
+    question: 'How does job posting work?',
     answer:
-      'No. DNS Health shows what one resolver observed for your domain at the time of the check, with findings labeled Pass, Info, Warning, or Error. It does not measure how servers in other regions would answer.',
+      'Employers buy job credits or use the allowance included in their recruiter plan, then submit a vacancy. Every submission is reviewed before it is published, so candidates only browse checked listings.',
   },
   {
-    question: 'Does Ravelyth verify DKIM signatures or DNSSEC chains?',
+    question: 'What do recruiter plans include?',
     answer:
-      'No. DKIM signature verification requires the original message bytes and is out of scope. DNSSEC inspection reports whether DS, DNSKEY, or RRSIG records are observed; it does not validate a chain of trust. Both limits are stated in the tools themselves.',
+      'A monthly job-post allowance, a company profile, application management, and notifications. When the allowance is used up you can buy prepaid job credits or upgrade your plan at any time.',
   },
   {
-    question: 'Why was my request rate limited?',
+    question: 'Why do I need to verify my email address?',
     answer:
-      'Rate limits protect the service from abuse and keep lookups fast for everyone. In-memory limits apply per client over a rolling window, with stricter limits on login and registration attempts.',
+      'Applying to a job requires a verified address, so employers are not filling their pipeline with unreachable people. The verification link is sent as soon as you register.',
   },
   {
-    question: 'Why can I not look up private IP addresses or localhost?',
+    question: 'How is my personal data handled?',
     answer:
-      'For security. Names and IP targets that resolve to private, loopback, link-local, or otherwise non-public ranges are rejected so the tools cannot be used to probe internal networks.',
+      'Passwords are stored only as Argon2id hashes and are never logged. Sessions are server-side with an HttpOnly cookie. Ravelyth Talent does not sell or share your data.',
   },
   {
-    question: 'Are the reported Authentication-Results in email headers trustworthy?',
+    question: 'I found a problem or inappropriate content. What should I do?',
     answer:
-      'They are claims made by the servers that handled the message. Ravelyth shows them as reported and clearly separates that from what it independently parses. It does not independently authenticate a message from headers alone.',
+      'Use the report form on the job or company, or the contact page. Reports go directly to the moderation team and every action taken is recorded in an audit trail.',
   },
 ];
 
@@ -69,7 +70,7 @@ export default function Page(): React.ReactElement {
   return (
     <InfoPage
       title="Frequently asked questions"
-      intro="How Ravelyth works, what it stores, and what DNS diagnostics can honestly tell you."
+      intro="How Ravelyth Talent works for candidates, employers and agencies."
     >
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
       {faqs.map((faq) => (

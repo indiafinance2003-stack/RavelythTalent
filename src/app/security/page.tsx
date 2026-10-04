@@ -4,7 +4,7 @@ import { InfoPage, InfoSection } from '@/components/layout/info-page';
 
 export const metadata: Metadata = {
   title: 'Security',
-  description: 'How Ravelyth protects visitors, and how to report a security issue.',
+  description: 'How Ravelyth Talent protects candidates, employers, and platform data, and how to report a security issue.',
   alternates: { canonical: '/security' },
 };
 
@@ -16,21 +16,21 @@ export default function Page(): React.ReactElement {
     >
       <InfoSection title="Reporting a security issue" id="reporting">
         <p>
-          If you find a suspected vulnerability — in the DNS tools, authentication, or anything else — please
+          If you find a suspected vulnerability — in the job board, authentication, or anything else — please
           report it through the project’s repository at{' '}
           <a
-            href="https://github.com/indiafinance2003-stack/servexa-dns-tools"
+            href="https://github.com/indiafinance2003-stack/RavelythTalent"
             className="font-medium text-accent hover:text-accent-strong"
             rel="noopener noreferrer"
           >
-            github.com/indiafinance2003-stack/servexa-dns-tools
+            github.com/indiafinance2003-stack/RavelythTalent
           </a>{' '}
           using a private security advisory where possible. Include reproduction steps and the affected route. Do
           not test vulnerabilities against accounts or data belonging to other people.
         </p>
         <p>
-          Ravelyth is an open, community-maintained project. It holds no certifications and claims none; this page
-          describes actual implemented controls.
+          Ravelyth Talent is an open, community-maintained project. It holds no certifications and claims none;
+          this page describes actual implemented controls.
         </p>
       </InfoSection>
       <InfoSection title="Controls in place" id="controls">

@@ -5,7 +5,7 @@ import { ContactForm } from '@/components/contact/contact-form';
 
 export const metadata: Metadata = {
   title: 'Contact',
-  description: 'Send a message to the Ravelyth team, or report a problem with the tools.',
+  description: 'Send a message to the Ravelyth Talent team, or report a problem with the platform.',
   alternates: { canonical: '/contact' },
 };
 
@@ -35,14 +35,14 @@ export default function Page(): React.ReactElement {
 
       <InfoSection title="What to include" id="include">
         <ul className="list-disc space-y-2 pl-5">
-          <li>The tool page you used (for example /dns/lookup).</li>
-          <li>The exact domain, record type, or header input.</li>
+          <li>The page you were using and what you were trying to do.</li>
+          <li>The job, company, or application involved.</li>
           <li>The timestamp (UTC) of the request.</li>
           <li>A short description of what you expected versus what was shown.</li>
         </ul>
         <p className="mt-2">
-          Please never paste passwords, full email headers with personal information, or anything you would
-          not want a support team to see when requesting help.
+          Please never paste passwords, payment details, or anything else you would not want a support team to see
+          when requesting help.
         </p>
       </InfoSection>
     </InfoPage>

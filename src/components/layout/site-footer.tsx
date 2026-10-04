@@ -7,49 +7,43 @@ const columns: Array<{
   links: Array<{ label: string; href: string }>;
 }> = [
   {
-    title: 'DNS Tools',
+    title: 'Jobs',
     links: [
-      { label: 'DNS Lookup', href: '/dns/lookup' },
-      { label: 'DNS Health', href: '/dns/analyze' },
-      { label: 'SPF Checker', href: '/dns/spf' },
-      { label: 'DKIM Checker', href: '/dns/dkim' },
-      { label: 'DMARC Checker', href: '/dns/dmarc' },
+      { label: 'Browse jobs', href: '/jobs' },
+      { label: 'Saved jobs', href: '/candidate/saved-jobs' },
+      { label: 'Job alerts', href: '/candidate/alerts' },
+      { label: 'Candidate profile', href: '/candidate/profile' },
     ],
   },
   {
-    title: 'More Tools',
+    title: 'Employers',
     links: [
-      { label: 'DNSSEC Records', href: '/dns/analyze' },
-      { label: 'PTR Lookup', href: '/dns/ptr' },
-      { label: 'Resolver Comparison', href: '/dns/resolvers' },
-      { label: 'Email Header Analyzer', href: '/email/analyze' },
+      { label: 'Employer overview', href: '/employer' },
+      { label: 'Post a job', href: '/employer/jobs/new' },
+      { label: 'Job credits', href: '/employer/credits' },
+      { label: 'Applications', href: '/employer/applications' },
+      { label: 'Saved candidates', href: '/employer/saved-candidates' },
     ],
   },
   {
     title: 'Resources',
     links: [
-      { label: 'Knowledge Base', href: '/docs' },
-      { label: 'DNS Guides', href: '/guides/dns' },
-      { label: 'Email Authentication Guides', href: '/guides/email' },
+      { label: 'Recruiter pricing', href: '/pricing' },
       { label: 'FAQ', href: '/faq' },
+      { label: 'Report a problem', href: '/reports/new' },
     ],
   },
   {
     title: 'Company',
     links: [
       { label: 'About', href: '/about' },
-      { label: 'Pricing', href: '/pricing' },
-      { label: 'Managed Services', href: '/services' },
-      { label: 'Request Support', href: '/support/request' },
       { label: 'Contact', href: '/contact' },
-      { label: 'Privacy Policy', href: '/privacy' },
-      { label: 'Terms of Service', href: '/terms' },
       { label: 'Security', href: '/security' },
     ],
   },
   {
-    // The Ravelyth Talent policies, kept separate from the DNS tools legal
-    // pages above because they are different documents with different terms.
+    // The Ravelyth Talent policies. Each is a separate document with its own
+    // terms, and all of them are readable without an account.
     title: 'Ravelyth Talent',
     links: [
       { label: 'All policies', href: '/legal' },
@@ -68,13 +62,14 @@ export function SiteFooter({ authenticated = false }: { authenticated?: boolean 
   const social = configuredSocialLinks();
   const year = new Date().getFullYear();
 
+  // Authenticated visitors are sent to the dashboard that matches their role, so
+  // the account column never offers a link the visitor cannot actually open.
   const accountColumn = authenticated
     ? [
-        { label: 'Your Account', href: '/account' },
-        { label: 'Support Tickets', href: '/account/support' },
-        { label: 'Notifications', href: '/account/notifications' },
-        { label: 'Billing', href: '/account/billing' },
-        { label: 'Public Tools', href: '/dns/lookup' },
+        { label: 'Your dashboard', href: '/candidate' },
+        { label: 'Notifications', href: '/notifications' },
+        { label: 'Applications', href: '/candidate/applications' },
+        { label: 'My resumes', href: '/candidate/resumes' },
       ]
     : [
         { label: 'Sign In', href: '/login' },
@@ -91,8 +86,8 @@ export function SiteFooter({ authenticated = false }: { authenticated?: boolean 
               <span className="text-lg font-semibold tracking-tight text-ink">Ravelyth</span>
             </div>
             <p className="mt-3 max-w-sm text-sm text-slate-400">
-              Free DNS and email diagnostics for developers, administrators, businesses and domain owners. Real
-              lookups, structured findings, and no unexplained scores.
+              Connecting great people with great opportunities. Right People, Better Opportunities, Stronger
+              Tomorrow.
             </p>
           </div>
           {columns.map((column) => (

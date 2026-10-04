@@ -1,7 +1,10 @@
 import { NextRequest } from 'next/server';
 import { handleApi } from '@/lib/errors/api-handler';
-import { requireSupportUser, withSupportErrors } from '@/lib/support/api';
-import { assertTicketId } from '@/lib/support/api';
+import {
+  assertUuid,
+  requireNotificationUser,
+  withNotificationErrors,
+} from '@/lib/notifications/api';
 import { markNotificationRead } from '@/lib/notifications/notifications';
 
 /** Marks one owned notification as read. Ids are UUID-guarded before use. */
@@ -11,10 +14,10 @@ export async function POST(
 ): Promise<Response> {
   return handleApi(
     req,
-    withSupportErrors(async () => {
-      const user = await requireSupportUser();
+    withNotificationErrors(async () => {
+      const user = await requireNotificationUser();
       const { id } = await context.params;
-      assertTicketId(id);
+      assertUuid(id);
       const notification = await markNotificationRead(user.id, id);
       return { notification };
     })

@@ -61,28 +61,28 @@ describesDb('database integration (PostgreSQL)', () => {
     expect(remaining).toHaveLength(0);
   });
 
-  it('cascades saved analysis deletion when the user is deleted', async () => {
+  it('cascades candidate profile deletion when the user is deleted', async () => {
     const email = uniqueEmail();
     const [user] = await sql<{ id: string }[]>`INSERT INTO users (email, password_hash, name) VALUES (${email}, 'hash', 'A') RETURNING id`;
-    const [saved] = await sql<{ id: string }[]>`INSERT INTO saved_analyses (user_id, analysis_type, target, result_json) VALUES (${user.id}, 'dns_lookup', 'example.com', ${sql.json({ ok: true })}) RETURNING id`;
+    const [profile] = await sql<{ id: string }[]>`INSERT INTO candidate_profiles (user_id, full_name) VALUES (${user.id}, 'A') RETURNING id`;
     await sql`DELETE FROM users WHERE id = ${user.id}`;
-    const remaining = await sql<{ id: string }[]>`SELECT id FROM saved_analyses WHERE id = ${saved.id}`;
+    const remaining = await sql<{ id: string }[]>`SELECT id FROM candidate_profiles WHERE id = ${profile.id}`;
     expect(remaining).toHaveLength(0);
   });
 
-  it('keeps saved analyses isolated between users', async () => {
+  it('keeps candidate profiles isolated between users', async () => {
     const emailA = uniqueEmail();
     const emailB = uniqueEmail();
     const [userA] = await sql<{ id: string }[]>`INSERT INTO users (email, password_hash, name) VALUES (${emailA}, 'hash', 'A') RETURNING id`;
     const [userB] = await sql<{ id: string }[]>`INSERT INTO users (email, password_hash, name) VALUES (${emailB}, 'hash', 'B') RETURNING id`;
-    const [saved] = await sql<{ id: string }[]>`INSERT INTO saved_analyses (user_id, analysis_type, target, result_json) VALUES (${userA.id}, 'dns_lookup', 'example.com', ${sql.json({ ok: true })}) RETURNING id`;
+    const [profile] = await sql<{ id: string }[]>`INSERT INTO candidate_profiles (user_id, full_name) VALUES (${userA.id}, 'A') RETURNING id`;
 
-    // User B's isolation query (mirrors deleteSavedAnalysis) must not touch user A's row.
-    const deleted = await sql<{ id: string }[]>`DELETE FROM saved_analyses WHERE id = ${saved.id} AND user_id = ${userB.id} RETURNING id`;
+    // User B's isolation query must not touch user A's row.
+    const deleted = await sql<{ id: string }[]>`DELETE FROM candidate_profiles WHERE id = ${profile.id} AND user_id = ${userB.id} RETURNING id`;
     expect(deleted).toHaveLength(0);
 
     // Cleanup.
-    await sql`DELETE FROM saved_analyses WHERE id = ${saved.id}`;
+    await sql`DELETE FROM candidate_profiles WHERE id = ${profile.id}`;
     await sql`DELETE FROM users WHERE id IN (${userA.id}, ${userB.id})`;
   });
 

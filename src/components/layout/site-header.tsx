@@ -7,8 +7,6 @@ import { RavelythLogo } from '@/components/ui/logo';
 const nav = [
   { href: '/jobs', label: 'Browse jobs' },
   { href: '/talent', label: 'For employers' },
-  { href: '/tools', label: 'Free tools' },
-  { href: '/docs', label: 'Docs' },
   { href: '/pricing', label: 'Pricing' },
   { href: '/about', label: 'About' },
 ];

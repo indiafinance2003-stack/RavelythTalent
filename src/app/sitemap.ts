@@ -1,40 +1,21 @@
 import type { MetadataRoute } from 'next';
 import { config } from '@/lib/config';
-import { serviceSlugs } from '@/lib/plans/services';
-import { listPublicArticleSlugs, listPublicCategories } from '@/lib/kb/service';
 import { searchJobs } from '@/lib/portal/jobs/search';
 
 // Every URL listed here corresponds to an actual public page. Authentication
 // and account pages are intentionally excluded (they are noindex utility
-// pages, and /account requires a session).
-const toolPaths = [
-  '/dns/lookup',
-  '/dns/analyze',
-  '/dns/spf',
-  '/dns/dkim',
-  '/dns/dmarc',
-  '/dns/ptr',
-  '/dns/resolvers',
-  '/email/analyze',
-];
-
+// pages, and portal areas require a session).
 const infoPaths = [
-  '/docs',
-  '/docs/about',
   '/pricing',
-  '/services',
   '/about',
-  '/control',
-  '/guides/dns',
-  '/guides/email',
   '/faq',
   '/privacy',
   '/terms',
   '/security',
   '/contact',
-  // Ravelyth Talent — the Part 2 public job board. This is the ONE canonical
-  // public job experience. The older agency-curated board at /talent/jobs has
-  // been consolidated onto it with a permanent redirect, so it is deliberately
+  // Ravelyth Talent — the public job board. This is the ONE canonical public
+  // job experience. The older agency-curated board at /talent/jobs has been
+  // consolidated onto it with a permanent redirect, so it is deliberately
   // absent here: listing a URL that only ever 308s would tell search engines to
   // index a redirect.
   '/jobs',
@@ -53,15 +34,8 @@ const infoPaths = [
 ];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  // Published Knowledge Base articles and service detail pages are real public
-  // pages. KB reads fail soft (empty list) when the database is unavailable so
-  // the sitemap still renders.
-  const articleSlugs = await listPublicArticleSlugs();
-  const categorySlugs = (await listPublicCategories()).data.map((category) => category.slug);
-  const servicePathSlugs = serviceSlugs();
-
-  // Published jobs on the canonical board. Like the KB, this fails soft (an
-  // empty list) so a database outage can never take down the sitemap route.
+  // Published jobs on the canonical board. This fails soft (an empty list) so a
+  // database outage can never take down the sitemap route.
   let publishedJobIds: string[] = [];
   try {
     publishedJobIds = (await searchJobs({ page: 1, pageSize: 500 })).items.map((job) => job.id);
@@ -71,26 +45,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   return [
     { url: `${config.APP_URL}/`, changeFrequency: 'weekly', priority: 1 },
-    ...toolPaths.map((path) => ({
-      url: `${config.APP_URL}${path}`,
-      changeFrequency: 'weekly' as const,
-      priority: 0.7,
-    })),
-    ...servicePathSlugs.map((slug) => ({
-      url: `${config.APP_URL}/services/${slug}`,
-      changeFrequency: 'monthly' as const,
-      priority: 0.6,
-    })),
-    ...articleSlugs.map((slug) => ({
-      url: `${config.APP_URL}/docs/${slug}`,
-      changeFrequency: 'monthly' as const,
-      priority: 0.5,
-    })),
-    ...categorySlugs.map((slug) => ({
-      url: `${config.APP_URL}/docs/category/${slug}`,
-      changeFrequency: 'weekly' as const,
-      priority: 0.5,
-    })),
     ...infoPaths.map((path) => ({
       url: `${config.APP_URL}${path}`,
       changeFrequency: 'monthly' as const,
