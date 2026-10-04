@@ -120,6 +120,17 @@ export const emailOutbox = pgTable(
     sentAt: timestamp("sent_at", { withTimezone: true }),
     messageId: text("message_id"),
     metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}),
+    /** Either a local disk `path` or inline `contentBase64` per attachment. */
+    attachments: jsonb("attachments")
+      .$type<
+        Array<{
+          filename: string;
+          contentType: string;
+          path?: string;
+          contentBase64?: string;
+        }>
+      >()
+      .default([]),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

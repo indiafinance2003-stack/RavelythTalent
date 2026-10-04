@@ -32,18 +32,18 @@ Legend: `[x]` done · `[~]` partially done / needs owner input · `[ ]` not star
 - [x] `ASSUMPTIONS.md`
 
 ## Phase 2 — Auth, sessions, rate limiting, email outbox
-- [ ] Password hashing (argon2id, bcryptjs fallback)
-- [ ] Sessions in PostgreSQL, hashed opaque token, httpOnly/Secure/SameSite=Lax cookie
-- [ ] Register + email verification (24h token, resend with rate limit)
-- [ ] Login, logout, log out of all devices, account lockout
-- [ ] Password reset (single-use, 1h) + password-changed security email
-- [ ] Google OAuth 2.0 (PKCE + state) `/api/auth/google` + `/callback`
-- [ ] Mobile OTP abstraction (`SmsProvider`: console + msg91/twilio stubs)
-- [ ] DB-backed rate limiting helper + per-endpoint limits
-- [ ] CSRF (Origin/Host) guard + security headers
-- [ ] Email outbox, processor, retry with exponential backoff, SMTP transport
-- [ ] Branded HTML + text email templates
-- [ ] Auth UI: login, register, verify, forgot/reset password
+- [x] Password hashing (argon2id, bcryptjs fallback)
+- [x] Sessions in PostgreSQL, hashed opaque token, httpOnly/Secure/SameSite=Lax cookie
+- [x] Register + email verification (24h token, resend with rate limit)
+- [x] Login, logout, log out of all devices, account lockout
+- [x] Password reset (single-use, 1h) + password-changed security email
+- [x] Google OAuth 2.0 (PKCE + state) `/api/auth/google` + `/callback`
+- [x] Mobile OTP abstraction (`SmsProvider`: console + msg91/twilio stubs)
+- [x] DB-backed rate limiting helper + per-endpoint limits
+- [x] CSRF (Origin/Host) guard + security headers
+- [x] Email outbox, processor, retry with exponential backoff, SMTP transport
+- [x] Branded HTML + text email templates
+- [x] Auth UI: login, register, verify, forgot/reset password
 
 ## Phase 3 — Companies, jobs, search, applications, candidate profile
 - [ ] Recruiter company registration → admin approval workflow + emails
