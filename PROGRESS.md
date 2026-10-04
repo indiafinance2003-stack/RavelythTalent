@@ -77,26 +77,23 @@ Legend: `[x]` done · `[~]` partially done / needs owner input · `[ ]` not star
 - [x] Invoice PDF download `/api/files/invoices/[id]` (owner/company-member/admin only)
 - [x] Add-ons admin configuration and purchase flow with company/job scope,
       idempotent activation, invoice and email delivery
-- [ ] Plan/promotion admin CRUD (deferred to Phase 5 admin panel)
+- [x] Plan/promotion admin CRUD (completed in Phase 5)
 
-## Phase 5 — Admin panel, interviews, search, reports and public pages (PENDING)
+## Phase 5 — Admin panel, interviews, search and reports ✅
 - [x] Recruiter area: company setup, job posting with entitlement checks, applicant pipeline
-  - [x] Shell, overview, company, jobs list, new + edit job routes (`/recruiter/jobs/[id]`);
-        applicant pipeline UI (`/recruiter/applications` with job/status filters, inline
-        status changes via existing `changeApplicationStatus` service + resume viewer link);
-        `typecheck` + `lint` + `build` green
-  - [ ] Team management, interviews scheduling UI, reports UI
-- [ ] Admin dashboard KPIs; users, companies, job moderation, categories, plans, promotions
-- [ ] Admin: subscriptions, payments, invoices, add-ons, site settings, email log
-- [ ] Blog posts (public list/detail + admin CRUD)
-- [ ] Interviews (schedule, email, candidate confirm)
-- [ ] Resume database / candidate search (Professional+)
-- [ ] Reports: views, applications, conversion, source, time-to-hire
-- [ ] Static pages: about, faq, privacy, terms, refund, contact
-- [ ] Final ASSUMPTIONS.md / README sync
+  - [x] Company team invitations, acceptance, and member removal with plan gating
+- [x] Admin dashboard and administration for users, companies, jobs, categories, plans,
+      promotions, subscriptions/payments/invoices, add-ons, settings, email outbox,
+      support, and audit logs
+- [x] Interview scheduling/rescheduling, email and in-app notifications, candidate confirmation
+- [x] Discoverable-candidate search and saved candidates, gated by plan entitlement;
+      resume database downloads enforce monthly access limits
+- [x] Reports for job views, applications, conversion, application source, and time-to-hire
+- [x] Phase 5 validation: `npm run typecheck`, `npm run lint`, and `npm run build`
 
 ## Phase 6 — Resume builder, reviews, salary insights
 - [ ] Paid Resume Builder (templates, versions, PDF, history)
+- [ ] Blog posts (public list/detail + admin CRUD)
 - [ ] Company reviews (submit, moderate, company page)
 - [ ] Salary insights (aggregates, threshold-gated)
 - [ ] Recruiter↔candidate chat: intentionally NOT built (documented placeholder)
@@ -108,12 +105,12 @@ Legend: `[x]` done · `[~]` partially done / needs owner input · `[ ]` not star
 - [x] `/deploy`: nginx, systemd + cron timers, deploy.sh, postgres/setup.sql
 - [x] `DEPLOYMENT.md` runbook
 - [x] `.env.example` complete (includes RAZORPAY_*)
-- [ ] Final: typecheck / lint / build green (run at the end of each phase)
+- [x] Final Phase 5 build checks: typecheck / lint / build green
 
 ---
 
 ## Notes / decisions
 See `ASSUMPTIONS.md` for every decision taken while working autonomously.
 
-Next: Phase 5 admin panel (including plan/promotion CRUD), interviews, candidate
-search and reports. Phases 1-4 are complete; typecheck, lint and build are green.
+Next: Phase 6 paid Resume Builder, blog, company reviews, and salary insights.
+Phases 1-5 are complete; typecheck, lint, and build are green.

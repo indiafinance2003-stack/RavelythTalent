@@ -95,6 +95,61 @@ export function companyVerificationRejectedEmail(params: {
   });
 }
 
+export function companySuspendedEmail(params: {
+  ownerName: string;
+  companyName: string;
+  reason: string;
+  brand?: EmailBrand;
+}): RenderedEmail {
+  return render({
+    subject: `${params.companyName} has been suspended`,
+    preheader: "Company features are temporarily unavailable.",
+    heading: "Company account suspended",
+    intro: `Hi ${params.ownerName}, access for ${params.companyName} has been suspended by the Ravelyth Talent team.`,
+    blocks: [
+      { type: "note", text: `Reason: ${params.reason}` },
+      { type: "paragraph", text: "Your public job listings are hidden while the suspension is active. Contact support if you believe this is an error." },
+    ],
+    cta: { label: "Contact support", url: appUrl("/contact") },
+    brand: params.brand,
+  });
+}
+
+export function companyRestoredEmail(params: {
+  ownerName: string;
+  companyName: string;
+  brand?: EmailBrand;
+}): RenderedEmail {
+  return render({
+    subject: `${params.companyName} is active again`,
+    preheader: "Company access has been restored.",
+    heading: "Company account restored",
+    intro: `Hi ${params.ownerName}, access for ${params.companyName} has been restored.`,
+    blocks: [{ type: "paragraph", text: "Your company can manage its profile and approved job postings again." }],
+    cta: { label: "Open recruiter dashboard", url: appUrl("/recruiter") },
+    brand: params.brand,
+  });
+}
+
+export function teamInvitationEmail(params: {
+  companyName: string;
+  role: string;
+  inviteUrl: string;
+  brand?: EmailBrand;
+}): RenderedEmail {
+  return render({
+    subject: `Invitation to join ${params.companyName} on Ravelyth Talent`,
+    preheader: "A company team invited you to collaborate.",
+    heading: "Join a hiring team",
+    intro: `You have been invited to join ${params.companyName} as a ${params.role}.`,
+    blocks: [
+      { type: "paragraph", text: "Sign in or create a verified recruiter account with this email address, then accept the invitation within 7 days." },
+    ],
+    cta: { label: "Accept invitation", url: params.inviteUrl },
+    brand: params.brand,
+  });
+}
+
 /* -------------------------------------------------------------------------- */
 /* Job moderation                                                             */
 /* -------------------------------------------------------------------------- */

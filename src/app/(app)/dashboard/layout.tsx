@@ -5,6 +5,7 @@ import {
   Bell,
   Bookmark,
   BriefcaseBusiness,
+  CalendarDays,
   CreditCard,
   FileText,
   LayoutDashboard,
@@ -23,6 +24,7 @@ export const dynamic = "force-dynamic";
 const NAV = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
   { href: "/dashboard/applications", label: "Applications", icon: BriefcaseBusiness },
+  { href: "/dashboard/interviews", label: "Interviews", icon: CalendarDays },
   { href: "/dashboard/saved", label: "Saved jobs", icon: Bookmark },
   { href: "/dashboard/resumes", label: "Resumes", icon: FileText },
   { href: "/dashboard/billing", label: "Billing", icon: CreditCard },

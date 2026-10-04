@@ -3,7 +3,7 @@
 Every decision taken while building Ravelyth Talent autonomously, with the
 reasoning. Anything marked **[OWNER ACTION]** needs a human.
 
-Last updated: Phase 3.
+Last updated: Phase 5.
 
 ---
 
@@ -208,3 +208,26 @@ tokens, skill links, application history).
   approved company. No add-on price or active offering is seeded.
 - The checkout uses an active promotion's stored paise price only after the
   server validates its plan, billing period, active flag, and date window.
+
+## 7. Admin, recruiter tools & candidate discovery
+
+- Admin plan, promotion, category, site-setting, and add-on management is
+  restricted to authenticated admins; monetary values are entered and stored
+  in paise, and plan feature flags remain the source of entitlement checks.
+- Candidate discovery is opt-in: only discoverable profiles are searchable.
+  Resume-database access requires an approved company and an active plan with
+  the corresponding entitlement. Monthly usage is counted per recruiter user
+  in audit logs and limited by `site_settings.resumeDbViewLimit`. Resume
+  downloads attached to a job application continue to use the separate
+  application/company authorization path.
+- Team invitations use 32-byte random tokens; only SHA-256 hashes are stored.
+  They expire after seven days, and acceptance requires a verified recruiter
+  account whose email matches the invitation. Team changes require the plan's
+  team-management entitlement and are audited.
+- Interview scheduling is scoped to applications belonging to the active
+  company. Reschedules update the interview record and notify the candidate;
+  candidate confirmation is restricted to the application owner.
+- Recruiter analytics report application source (not job-view source), since
+  the source field is captured on applications. Time-to-hire is derived from
+  the application timeline and only includes hired applications with usable
+  timestamps.

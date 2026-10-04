@@ -86,6 +86,12 @@ export function PipelineList({
               </div>
               <div className="flex flex-wrap items-center gap-3 border-t border-slate-100 pt-3">
                 <ApplicantStatusForm applicationId={a.id} current={a.status} />
+                {a.status === "shortlisted" || a.status === "interview" ? (
+                  <Link href={`/recruiter/interviews?application=${a.id}`}
+                    className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-navy hover:border-royal">
+                    Schedule interview
+                  </Link>
+                ) : null}
                 {a.resumeId ? (
                   <Link href={`/api/files/resumes/${a.resumeId}`} target="_blank" rel="noreferrer"
                     className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-navy hover:border-royal">

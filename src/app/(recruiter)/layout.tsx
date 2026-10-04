@@ -4,11 +4,15 @@ import { redirect } from "next/navigation";
 import {
   Bell,
   Building2,
+  CalendarDays,
   CreditCard,
   FileText,
   LayoutDashboard,
   LogOut,
   Sparkles,
+  ChartNoAxesCombined,
+  Search,
+  UserRoundCog,
   UsersRound,
 } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/current-user";
@@ -22,9 +26,13 @@ const NAV = [
   { href: "/recruiter", label: "Overview", icon: LayoutDashboard, exact: true },
   { href: "/recruiter/jobs", label: "Jobs", icon: FileText },
   { href: "/recruiter/applications", label: "Applicants", icon: UsersRound },
+  { href: "/recruiter/interviews", label: "Interviews", icon: CalendarDays },
   { href: "/recruiter/company", label: "Company", icon: Building2 },
   { href: "/recruiter/billing", label: "Billing", icon: CreditCard },
   { href: "/recruiter/add-ons", label: "Add-ons", icon: Sparkles },
+  { href: "/recruiter/reports", label: "Reports", icon: ChartNoAxesCombined },
+  { href: "/recruiter/candidates", label: "Candidates", icon: Search },
+  { href: "/recruiter/team", label: "Team", icon: UserRoundCog },
 ];
 
 /** Shared shell for every `/recruiter/*` route (route group `(recruiter)`). */

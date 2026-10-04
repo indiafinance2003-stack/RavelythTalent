@@ -1,6 +1,7 @@
 import { and, asc, eq, inArray, lte } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { emailOutbox } from "@/lib/db/schema";
+import { AppError } from "@/lib/errors";
 import { fromAddress, getTransport } from "./smtp";
 
 /**
@@ -152,7 +153,7 @@ export async function processEmailOutbox(
 
 /** Admin "retry" action for a failed message. */
 export async function retryOutboxEmail(id: number): Promise<void> {
-  await db
+  const updated = await db
     .update(emailOutbox)
     .set({
       status: "queued",
@@ -161,5 +162,9 @@ export async function retryOutboxEmail(id: number): Promise<void> {
       nextAttemptAt: new Date(),
       updatedAt: new Date(),
     })
-    .where(eq(emailOutbox.id, id));
+    .where(and(eq(emailOutbox.id, id), eq(emailOutbox.status, "failed")))
+    .returning({ id: emailOutbox.id });
+  if (updated.length === 0) {
+    throw new AppError("Failed email was not found or is no longer retryable.", 404, "email_not_retryable");
+  }
 }

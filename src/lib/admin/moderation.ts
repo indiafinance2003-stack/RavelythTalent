@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   auditLogs,
@@ -49,6 +49,24 @@ export async function listCompanyReviewQueue() {
       .limit(300),
   ]);
   return { companies: companyRows, documents };
+}
+
+export async function listManagedCompanies() {
+  return db
+    .select({
+      id: companies.id,
+      name: companies.name,
+      status: companies.status,
+      statusReason: companies.statusReason,
+      ownerName: users.fullName,
+      ownerEmail: users.email,
+      updatedAt: companies.updatedAt,
+    })
+    .from(companies)
+    .innerJoin(users, eq(users.id, companies.ownerUserId))
+    .where(inArray(companies.status, ["approved", "suspended"]))
+    .orderBy(desc(companies.updatedAt))
+    .limit(200);
 }
 
 export async function listJobReviewQueue() {
