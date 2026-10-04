@@ -1,0 +1,14 @@
+[Unit]
+Description=Timer: Expire subscriptions and send renewal reminders (hourly)
+Documentation=file:/var/www/ravelyth/DEPLOYMENT.md
+
+[Timer]
+OnCalendar=*-*-* *:05:00
+# Spread the first run slightly so timers do not all fire on the same second.
+Persistent=true
+AccuracySec=30s
+RandomizedDelaySec=30
+Unit=ravelyth-cron-subscription-expiry-and-reminders.service
+
+[Install]
+WantedBy=timers.target

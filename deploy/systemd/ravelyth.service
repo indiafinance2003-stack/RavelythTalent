@@ -1,0 +1,66 @@
+# =============================================================================
+# Ravelyth Talent - application service
+#   sudo cp deploy/systemd/ravelyth.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now ravelyth
+# =============================================================================
+
+[Unit]
+Description=Ravelyth Talent (Next.js)
+Documentation=file:/var/www/ravelyth/DEPLOYMENT.md
+After=network-online.target postgresql.service
+Wants=network-online.target
+Requires=postgresql.service
+
+[Service]
+Type=simple
+User=ravelyth
+Group=ravelyth
+WorkingDirectory=/var/www/ravelyth
+
+EnvironmentFile=/var/www/ravelyth/.env
+Environment=NODE_ENV=production
+Environment=PORT=3000
+Environment=HOSTNAME=127.0.0.1
+
+ExecStart=/usr/bin/npm run start
+ExecStartPre=/usr/bin/npm run db:migrate
+
+Restart=always
+RestartSec=5
+# Give the app 20s to start, then kill it.
+TimeoutStartSec=60
+TimeoutStopSec=30
+KillSignal=SIGINT
+
+# --- Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectHostname=true
+ProtectClock=true
+ProtectProc=invisible
+RestrictSUIDSGID=true
+RestrictRealtime=true
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=false
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+LockPersonality=true
+
+# Only these paths are writable.
+ReadWritePaths=/var/lib/ravelyth /var/www/ravelyth/.next
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ravelyth
+
+[Install]
+WantedBy=multi-user.target

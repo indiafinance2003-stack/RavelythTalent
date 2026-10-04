@@ -1,0 +1,26 @@
+[Unit]
+Description=Send Ravelyth Talent job alerts
+After=network.target ravelyth.service
+Requires=ravelyth.service
+
+[Service]
+Type=oneshot
+User=ravelyth
+Group=ravelyth
+WorkingDirectory=/var/www/ravelyth
+EnvironmentFile=/var/www/ravelyth/.env
+
+# CRON_SECRET is read from .env by the EnvironmentFile directive above.
+ExecStart=/usr/bin/curl --fail --silent --show-error --max-time 120 \\
+  -H "x-cron-secret: \" \\
+  http://127.0.0.1:3000/api/internal/cron/send-job-alerts
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ravelyth-cron-send-job-alerts
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true

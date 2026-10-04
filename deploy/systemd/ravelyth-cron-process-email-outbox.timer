@@ -1,0 +1,14 @@
+[Unit]
+Description=Timer: Drain the Ravelyth Talent email outbox (every minute)
+Documentation=file:/var/www/ravelyth/DEPLOYMENT.md
+
+[Timer]
+OnCalendar=*:*:0/1
+# Spread the first run slightly so timers do not all fire on the same second.
+Persistent=true
+AccuracySec=30s
+RandomizedDelaySec=30
+Unit=ravelyth-cron-process-email-outbox.service
+
+[Install]
+WantedBy=timers.target

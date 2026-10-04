@@ -1,0 +1,14 @@
+[Unit]
+Description=Timer: Close expired Ravelyth Talent job postings (hourly)
+Documentation=file:/var/www/ravelyth/DEPLOYMENT.md
+
+[Timer]
+OnCalendar=*-*-* *:20:00
+# Spread the first run slightly so timers do not all fire on the same second.
+Persistent=true
+AccuracySec=30s
+RandomizedDelaySec=30
+Unit=ravelyth-cron-expire-jobs.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,14 @@
+[Unit]
+Description=Timer: Purge expired tokens, sessions and rate-limit rows (daily 03:40)
+Documentation=file:/var/www/ravelyth/DEPLOYMENT.md
+
+[Timer]
+OnCalendar=*-*-* 03:40:00
+# Spread the first run slightly so timers do not all fire on the same second.
+Persistent=true
+AccuracySec=30s
+RandomizedDelaySec=30
+Unit=ravelyth-cron-cleanup-expired-tokens-sessions.service
+
+[Install]
+WantedBy=timers.target
