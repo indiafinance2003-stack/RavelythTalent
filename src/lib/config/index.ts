@@ -93,6 +93,52 @@ interface Config {
   JOB_REQUIRE_VERIFIED_EMAIL_TO_APPLY: boolean;
   /** Whether posting a job consumes one job credit. */
   JOB_CREDIT_REQUIRED: boolean;
+  /**
+   * Whether the monthly job-post allowance that comes with a recruiter plan is
+   * enforced. Defaults to true. This is the limit the brief requires the SERVER
+   * to decide, so turning it off is a deliberate operational decision rather
+   * than a way to work around a full allowance.
+   */
+  RECRUITER_JOB_LIMIT_ENFORCED: boolean;
+  /**
+   * Whether an employer MUST hold an active plan before posting.
+   *
+   * Defaults to FALSE, which keeps an employer that only holds prepaid job
+   * credits working exactly as before. A deployment that wants plan-only
+   * posting sets this to true; the limit rule itself is unaffected.
+   */
+  RECRUITER_REQUIRE_ACTIVE_PLAN: boolean;
+  /** Usage fraction (0–1) at which the "limit approaching" notice is sent. */
+  RECRUITER_LIMIT_WARNING_RATIO: number;
+  /** Days before renewal at which a subscription is reported as 'expiring'. */
+  RECRUITER_RENEWAL_WARNING_DAYS: number;
+  /** Tax applied to portal invoices, in basis points (1800 = 18% GST). */
+  BILLING_TAX_RATE_BASIS_POINTS: number;
+  /** Invoice number prefix for Ravelyth Talent portal invoices. */
+  PORTAL_INVOICE_NUMBER_PREFIX: string;
+  /** Platform name printed on invoices. */
+  BILLING_ENTITY_NAME: string;
+  /** Billing contact printed on invoices. */
+  BILLING_ENTITY_EMAIL: string;
+  /** Registered billing address printed on invoices, when supplied. */
+  BILLING_ENTITY_ADDRESS: string;
+  /** GSTIN printed on invoices, when supplied. */
+  BILLING_ENTITY_GSTIN: string;
+  /**
+   * Private owner/admin bootstrap.
+   *
+   * `ADMIN_USERNAME` is a name, not a secret, and defaults to the platform's
+   * admin handle. The credential itself is NEVER in source: it comes from
+   * `ADMIN_PASSWORD_HASH` (an Argon2id hash) or `ADMIN_PASSWORD` (hashed once at
+   * bootstrap and never stored, logged or returned). With neither set, no admin
+   * account is created and the console stays unreachable.
+   */
+  ADMIN_USERNAME: string;
+  ADMIN_EMAIL: string;
+  ADMIN_PASSWORD_HASH: string;
+  ADMIN_PASSWORD: string;
+  /** Whether admin bootstrap can run (a credential was supplied). */
+  ADMIN_BOOTSTRAP_ENABLED: boolean;
   /** Private directory for resumes, avatars and company logos. Never in /public. */
   PORTAL_STORAGE_DIR: string;
   /** Maximum accepted resume upload size, in bytes. */
@@ -163,6 +209,16 @@ function parseEnvNonNegativeInt(name: string, fallback: number): number {
   if (raw === undefined || raw.trim() === '') return fallback;
   const value = parseInt(raw, 10);
   return Number.isFinite(value) && value >= 0 ? value : fallback;
+}
+
+/** A ratio in [0,1]. An out-of-range or unparsable value falls back rather than
+ * silently disabling a warning threshold. */
+function parseEnvRatio(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (raw === undefined || raw.trim() === '') return fallback;
+  const value = Number.parseFloat(raw);
+  if (!Number.isFinite(value) || value <= 0 || value > 1) return fallback;
+  return value;
 }
 
 function parseEnvInterval(name: string, fallback: BillingIntervalConfig): BillingIntervalConfig {
@@ -272,6 +328,30 @@ function getConfig(): Config {
       true
     ),
     JOB_CREDIT_REQUIRED: parseEnvBool('JOB_CREDIT_REQUIRED', true),
+    // Recruiter plans. The limit is enforced by default; `RECRUITER_REQUIRE_ACTIVE_PLAN`
+    // stays off so an employer holding only prepaid credits is unaffected.
+    RECRUITER_JOB_LIMIT_ENFORCED: parseEnvBool('RECRUITER_JOB_LIMIT_ENFORCED', true),
+    RECRUITER_REQUIRE_ACTIVE_PLAN: parseEnvBool('RECRUITER_REQUIRE_ACTIVE_PLAN', false),
+    RECRUITER_LIMIT_WARNING_RATIO: parseEnvRatio('RECRUITER_LIMIT_WARNING_RATIO', 0.8),
+    RECRUITER_RENEWAL_WARNING_DAYS: parseEnvInt('RECRUITER_RENEWAL_WARNING_DAYS', 7),
+    BILLING_TAX_RATE_BASIS_POINTS: parseEnvNonNegativeInt(
+      'BILLING_TAX_RATE_BASIS_POINTS',
+      0
+    ),
+    PORTAL_INVOICE_NUMBER_PREFIX: (process.env.PORTAL_INVOICE_NUMBER_PREFIX || 'RVLYT').trim(),
+    BILLING_ENTITY_NAME: (process.env.BILLING_ENTITY_NAME || 'Ravelyth Talent').trim(),
+    BILLING_ENTITY_EMAIL: (process.env.BILLING_ENTITY_EMAIL || 'billing@ravelyth.in').trim(),
+    BILLING_ENTITY_ADDRESS: (process.env.BILLING_ENTITY_ADDRESS || '').trim(),
+    BILLING_ENTITY_GSTIN: (process.env.BILLING_ENTITY_GSTIN || '').trim(),
+    // Admin bootstrap. The username is a name; the credential is only ever read
+    // from the environment and is never written to source, logs or responses.
+    ADMIN_USERNAME: (process.env.ADMIN_USERNAME || 'Liky').trim(),
+    ADMIN_EMAIL: (process.env.ADMIN_EMAIL || '').trim().toLowerCase(),
+    ADMIN_PASSWORD_HASH: process.env.ADMIN_PASSWORD_HASH || '',
+    ADMIN_PASSWORD: process.env.ADMIN_PASSWORD || '',
+    ADMIN_BOOTSTRAP_ENABLED: Boolean(
+      (process.env.ADMIN_PASSWORD_HASH || '').trim() || (process.env.ADMIN_PASSWORD || '').length > 0
+    ),
     // Defaults beside the application, never under /public, never committed.
     PORTAL_STORAGE_DIR: (process.env.PORTAL_STORAGE_DIR || '.ravelyth-private/portal').trim(),
     PORTAL_MAX_RESUME_BYTES: parseEnvInt('PORTAL_MAX_RESUME_BYTES', 5 * 1024 * 1024),

@@ -58,9 +58,20 @@ export const users = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
     lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
+    /**
+     * Optional sign-in handle.
+     *
+     * Only the private owner/admin console uses this: the admin signs in with a
+     * username (`ADMIN_USERNAME`, default 'Liky') rather than an email address,
+     * so the console's existence is not tied to a discoverable mailbox. It is
+     * NULL for every ordinary candidate and employer account, and the unique
+     * index makes two accounts claiming the same handle impossible.
+     */
+    username: text('username'),
   },
   (table) => [
     uniqueIndex('users_email_unique_idx').on(table.email),
+    uniqueIndex('users_username_unique_idx').on(table.username),
     index('users_role_idx').on(table.role),
     index('users_status_idx').on(table.status),
     index('users_account_status_idx').on(table.accountStatus),

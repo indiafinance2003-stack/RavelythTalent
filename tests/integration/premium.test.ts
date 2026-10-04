@@ -55,10 +55,23 @@ describe('candidate premium purchase (real database)', () => {
     const candidateId = await fx.candidate('Premium Buyer');
     const candidateUserId = await fx.user('candidate', 'Premium Buyer');
     const companyId = await fx.company('Buyer Co');
-    const [entitlement] = await db
-      .insert(premiumEntitlements)
-      .values({ code: 'profile_boost', name: 'Profile boost', description: 'Top of search' })
-      .returning({ id: premiumEntitlements.id });
+
+    // Idempotent: `premium_entitlements` is seeded reference data that
+    // `truncateAllTables` preserves, so this row survives between tests in this
+    // file and a blind insert would collide on the unique `code`.
+    const [existing] = await db
+      .select({ id: premiumEntitlements.id })
+      .from(premiumEntitlements)
+      .where(eq(premiumEntitlements.code, 'profile_boost'))
+      .limit(1);
+    const entitlement =
+      existing ??
+      (
+        await db
+          .insert(premiumEntitlements)
+          .values({ code: 'profile_boost', name: 'Profile boost', description: 'Top of search' })
+          .returning({ id: premiumEntitlements.id })
+      )[0];
 
     const [plan] = await db
       .insert(candidatePremiumPlans)

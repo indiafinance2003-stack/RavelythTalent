@@ -76,7 +76,30 @@ export function restoreDatabase(): void {
   setDatabaseForTests(undefined);
 }
 
-/** Removes all rows while keeping the schema, so each test starts clean. */
+/**
+ * Seeded reference tables, which are catalogue data rather than test data.
+ *
+ * They are populated by migrations and every test expects them present (plan
+ * prices, the five resume templates, the entitlement codes). Truncating them
+ * would silently turn "candidate has no premium plan" into "the premium
+ * catalogue vanished", so they are excluded.
+ */
+const SEEDED_REFERENCE_TABLES = [
+  'premium_entitlements',
+  'candidate_premium_plans',
+  'candidate_premium_plan_entitlements',
+  'recruiter_plans',
+  'recruiter_plan_features',
+  'resume_templates',
+] as const;
+
+/**
+ * Removes all test-owned rows while keeping the schema and the seeded
+ * reference tables, so each test starts clean.
+ *
+ * Consequence: a test that INSERTS into a seeded reference table must clean up
+ * after itself, because the next `truncateAllTables` will not remove it.
+ */
 export async function truncateAllTables(db: TestDatabase): Promise<void> {
   await db.$client.exec(`
     DO $$
@@ -86,7 +109,8 @@ export async function truncateAllTables(db: TestDatabase): Promise<void> {
       SELECT 'TRUNCATE TABLE ' || string_agg(quote_ident(tablename), ', ') || ' CASCADE'
         INTO stmt
         FROM pg_tables
-       WHERE schemaname = 'public';
+       WHERE schemaname = 'public'
+         AND tablename <> ALL (ARRAY[${SEEDED_REFERENCE_TABLES.map((t) => `'${t}'`).join(', ')}]::text[]);
       IF stmt IS NOT NULL THEN
         EXECUTE stmt;
       END IF;

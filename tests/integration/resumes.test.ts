@@ -147,6 +147,35 @@ describe('resumes: storage, versioning and access control (real database)', () =
   });
 
   it('versions a resume rather than replacing it', async () => {
+    // Premium: the second version is exactly what `multiple_resume_versions`
+    // gates, so the entitlement has to exist before the upload is attempted.
+    await truncateAllTables(db);
+    const candidateId = await fx.premiumCandidate();
+    const resume = await createResume(candidateId, { label: 'Main resume', makeDefault: true });
+
+    await uploadResumeVersion({
+      candidateId,
+      resumeId: resume.id,
+      filename: 'v1.pdf',
+      contentType: 'application/pdf',
+      body: PDF_BYTES,
+    });
+    const second = await uploadResumeVersion({
+      candidateId,
+      resumeId: resume.id,
+      filename: 'v2.pdf',
+      contentType: 'application/pdf',
+      body: Buffer.concat([PDF_BYTES, Buffer.from(' more')]),
+    });
+
+    expect(second.versionNumber).toBe(2);
+    const versions = await listResumeVersions(candidateId, resume.id);
+    expect(versions).toHaveLength(2);
+    // Both files remain independently retrievable.
+    expect(new Set(versions.map((v) => v.storageKey)).size).toBe(2);
+  });
+
+  it('caps a free candidate at one version per resume', async () => {
     const { candidateId, resumeId } = await candidateWithResume();
 
     await uploadResumeVersion({
@@ -156,19 +185,23 @@ describe('resumes: storage, versioning and access control (real database)', () =
       contentType: 'application/pdf',
       body: PDF_BYTES,
     });
-    const second = await uploadResumeVersion({
-      candidateId,
-      resumeId,
-      filename: 'v2.pdf',
-      contentType: 'application/pdf',
-      body: Buffer.concat([PDF_BYTES, Buffer.from(' more')]),
-    });
 
-    expect(second.versionNumber).toBe(2);
-    const versions = await listResumeVersions(candidateId, resumeId);
-    expect(versions).toHaveLength(2);
-    // Both files remain independently retrievable.
-    expect(new Set(versions.map((v) => v.storageKey)).size).toBe(2);
+    // A second version requires `multiple_resume_versions`. This is asserted on
+    // the UPLOAD path as well as the builder path on purpose: gating only the
+    // builder would let a free candidate mint unlimited versions by uploading
+    // files, which would make the entitlement decorative.
+    await expect(
+      uploadResumeVersion({
+        candidateId,
+        resumeId,
+        filename: 'v2.pdf',
+        contentType: 'application/pdf',
+        body: Buffer.concat([PDF_BYTES, Buffer.from(' more')]),
+      })
+    ).rejects.toThrowError(/premium/i);
+
+    // The rejected upload must not leave a partial row behind.
+    expect(await listResumeVersions(candidateId, resumeId)).toHaveLength(1);
   });
 
   it('does not expose a resume to an unauthenticated or unrelated caller', async () => {
@@ -254,7 +287,10 @@ describe('resumes: storage, versioning and access control (real database)', () =
 
   it('does not let an employer read a NEWER version they were never sent', async () => {
     await truncateAllTables(db);
-    const candidateId = await fx.candidate();
+    // Premium: this test needs two uploaded versions, and the second one is
+    // behind `multiple_resume_versions`. That is incidental here — the point
+    // being asserted is employer authorisation of the version they applied with.
+    const candidateId = await fx.premiumCandidate();
     const resume = await createResume(candidateId, { label: 'Main' });
     const applied = await uploadResumeVersion({
       candidateId,

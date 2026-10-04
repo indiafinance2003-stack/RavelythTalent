@@ -17,6 +17,12 @@ import { deleteFile, getFile, putFile, StorageError } from '@/lib/storage';
 import { sanitizeFilename, sniffContent, validateResumeFile } from '@/lib/uploads/validation';
 import { refreshProfileCompletion } from './profile';
 import { recordPortalAudit } from '@/lib/portal/audit';
+import {
+  requireEntitlement,
+  requireEntitlementWith,
+  type DbExecutor
+} from '@/lib/portal/premium/entitlements';
+import { CANDIDATE_ENTITLEMENT_CODES } from '@/lib/portal/premium/entitlement-codes';
 
 /**
  * Resume and Resume Builder backend (see §5).
@@ -46,7 +52,20 @@ export interface ResumeSummary {
   createdAt: string;
 }
 
-/** Creates an empty resume container for a candidate. */
+/**
+ * Creates an empty resume container for a candidate.
+ *
+ * PREMIUM TEMPLATES ARE A PAID CAPABILITY, ENFORCED HERE. `isPremium` on a
+ * template row is not decoration: selecting one requires the
+ * `professional_resume_templates` entitlement, checked server-side before the
+ * row is written. A candidate who could pass a premium `templateCode` without
+ * paying would be getting the sold product for free, and the check has to live
+ * on the server because the template code arrives in a request body.
+ *
+ * A template that does not exist, or is inactive, is NOT an error: the resume is
+ * still created with no template. Typing an unknown code should not lose
+ * somebody's work.
+ */
 export async function createResume(
   candidateId: string,
   input: { label: string; templateCode?: string | null; makeDefault?: boolean }
@@ -58,7 +77,7 @@ export async function createResume(
   let templateId: string | null = null;
   if (input.templateCode) {
     const [template] = await db
-      .select({ id: resumeTemplates.id })
+      .select({ id: resumeTemplates.id, isPremium: resumeTemplates.isPremium })
       .from(resumeTemplates)
       .where(
         and(
@@ -67,7 +86,17 @@ export async function createResume(
         )
       )
       .limit(1);
-    templateId = template?.id ?? null;
+
+    if (template) {
+      // Throws 403 when the candidate lacks the entitlement.
+      if (template.isPremium) {
+        await requireEntitlement(
+          candidateId,
+          CANDIDATE_ENTITLEMENT_CODES.PROFESSIONAL_TEMPLATES
+        );
+      }
+      templateId = template.id;
+    }
   }
 
   const { db: exec } = dbFromRequest();
@@ -162,10 +191,11 @@ export async function deleteResume(candidateId: string, resumeId: string): Promi
 
   await db.delete(resumes).where(eq(resumes.id, resumeId));
 
-  // Best-effort file cleanup: a failure must not block the delete.
+  // Best-effort file cleanup: a failure must not block the delete. Builder-created
+  // versions have no uploaded source document, so both keys are nullable.
   for (const version of versions) {
     try {
-      await deleteFile(version.storageKey);
+      if (version.storageKey) await deleteFile(version.storageKey);
       if (version.pdfStorageKey) await deleteFile(version.pdfStorageKey);
     } catch {
       // ignore
@@ -185,6 +215,49 @@ export interface UploadResumeInput {
   /** Structured Resume Builder content stored alongside the document. */
   contentJson?: Record<string, unknown> | null;
 }
+
+/**
+ * How many versions of one resume a candidate may keep without paying.
+ *
+ * `multiple_resume_versions` is described in the database as "keep several
+ * tailored resume versions and pick one per application". A single version is
+ * therefore usable by everybody, and the SECOND one onwards is the paid
+ * capability.
+ *
+ * This is enforced inside `uploadResumeVersion` as well as builder version
+ * creation on purpose: gating only the builder would let a candidate mint
+ * unlimited "versions" by uploading files instead, which would make the
+ * entitlement decorative — exactly the failure mode the `resume_templates`
+ * seeding migration warns about.
+ */
+export const FREE_VERSION_LIMIT = 1;
+
+/**
+ * Throws 403 when this resume already has as many versions as the candidate is
+ * entitled to. Call inside the version-creating transaction so two parallel
+ * requests cannot both pass the count and both insert.
+ */
+export async function assertVersionAllowance(
+  candidateId: string,
+  resumeId: string,
+  tx: DbExecutor
+): Promise<void> {
+  const [countRow] = await tx
+    .select({ value: sql<number>`COUNT(*)::int` })
+    .from(resumeVersions)
+    .where(eq(resumeVersions.resumeId, resumeId));
+
+  if ((countRow?.value ?? 0) < FREE_VERSION_LIMIT) return;
+
+  // Deliberately the transactional form, not `requireEntitlement`: this runs
+  // while the caller still holds the transaction, and a root-connection query
+  // there deadlocks PGlite and a single-connection pool. Checking on `tx` also
+  // closes the TOCTOU window the doc comment promises.
+  await requireEntitlementWith(tx, candidateId, CANDIDATE_ENTITLEMENT_CODES.MULTIPLE_VERSIONS);
+}
+
+/** Either the root database or an existing transaction, for composable helpers. */
+export type { DbExecutor };
 
 /**
  * Uploads a new VERSION of a resume.
@@ -226,7 +299,7 @@ export async function uploadResumeVersion(
     stored = await putFile(validation.file.extension, input.body, validation.file.mimeType);
   } catch (error) {
     if (error instanceof StorageError) {
-      throw new AppError(AppErrorCode.INTERNAL_ERROR, 'The r�sum� could not be stored.', 500);
+      throw new AppError(AppErrorCode.INTERNAL_ERROR, 'The resume could not be stored.', 500);
     }
     throw error;
   }
@@ -234,6 +307,10 @@ export async function uploadResumeVersion(
   // The next version number is computed inside the transaction so two parallel
   // uploads cannot claim the same number.
   const versionRow = await db.transaction(async (tx) => {
+    // Entitlement gate lives inside the transaction so a second parallel upload
+    // cannot slip past the count.
+    await assertVersionAllowance(input.candidateId, input.resumeId, tx);
+
     const [maxRow] = await tx
       .select({ value: sql<number>`COALESCE(MAX(version_number), 0)::int` })
       .from(resumeVersions)
@@ -320,7 +397,7 @@ export interface ResumeAccessContext {
 }
 
 /** Who may read a given resume version, and why. */
-interface AccessDecision {
+export interface AccessDecision {
   allowed: boolean;
   reason: string;
   applicationId: string | null;
@@ -332,7 +409,7 @@ interface AccessDecision {
  * An employer is allowed ONLY through a real application to a job belonging to
  * their own company. There is deliberately no "browse all candidates" path.
  */
-async function decideAccess(
+export async function decideAccess(
   versionId: string,
   ctx: ResumeAccessContext
 ): Promise<AccessDecision> {
@@ -432,12 +509,24 @@ export async function readResumeForAuthorizedViewer(
       storageKey: resumeVersions.storageKey,
       originalFilename: resumeVersions.originalFilename,
       mimeType: resumeVersions.mimeType,
+      source: resumeVersions.source,
     })
     .from(resumeVersions)
     .where(eq(resumeVersions.id, versionId))
     .limit(1);
 
   if (!row) throw new AppError(AppErrorCode.NOT_FOUND, 'The requested resume was not found.', 404);
+
+  // A version created in the resume builder has no uploaded document behind it,
+  // so there is no source file to hand back. Callers wanting the rendered document
+  // must ask for the generated PDF instead.
+  if (!row.storageKey || !row.originalFilename || !row.mimeType) {
+    throw new AppError(
+      AppErrorCode.BAD_REQUEST,
+      'This resume version was created in the builder and has no uploaded file.',
+      409
+    );
+  }
 
   const body = await getFile(row.storageKey);
 

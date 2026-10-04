@@ -4,6 +4,7 @@ import type { AnyPgColumn } from 'drizzle-orm/pg-core';
 import type { TestDatabase } from './database';
 import { buildJobPredicates } from '@/lib/portal/jobs/filters';
 import {
+  candidatePremiumPlans,
   candidateProfiles,
   companies,
   employerProfiles,
@@ -14,6 +15,7 @@ import {
   savedJobs,
   users,
 } from '@/lib/db/schema';
+import { activateSubscription } from '@/lib/portal/premium/entitlements';
 
 /**
  * Shared seeding helpers for portal integration tests.
@@ -50,6 +52,35 @@ export class PortalFixtures {
 
   employer(): Promise<string> {
     return this.user('employer');
+  }
+
+  /**
+   * The seeded Candidate Premium plan id.
+   *
+   * Prefers the monthly plan so tests get a 30-day period, which keeps
+   * entitlement-expiry assertions independent of the test's run date.
+   */
+  async premiumPlan(): Promise<string> {
+    const [row] = await this.db
+      .select({ id: candidatePremiumPlans.id })
+      .from(candidatePremiumPlans)
+      .where(eq(candidatePremiumPlans.code, 'candidate_premium_monthly'))
+      .limit(1);
+    if (!row) throw new Error('The seeded candidate premium plan is missing.');
+    return row.id;
+  }
+
+  /**
+   * Creates a candidate holding an ACTIVE Candidate Premium subscription.
+   *
+   * Goes through the real `activateSubscription`, so plan entitlements are
+   * materialised from the seeded mapping rather than hand-inserted. That keeps
+   * tests honest if the plan's entitlement list ever changes.
+   */
+  async premiumCandidate(name = 'Jane Doe'): Promise<string> {
+    const candidateId = await this.candidate(name);
+    await activateSubscription({ candidateId, planId: await this.premiumPlan() });
+    return candidateId;
   }
 
   /** Creates an employer user bound to a fresh company. */

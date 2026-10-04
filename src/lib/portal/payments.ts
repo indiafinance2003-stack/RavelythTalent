@@ -1,11 +1,13 @@
 import 'server-only';
 import { and, desc, eq, lt, sql } from 'drizzle-orm';
+import { config } from '@/lib/config';
 import { dbFromRequest } from '@/lib/db/request';
 import {
   companies,
   jobPackages,
   orders,
   payments,
+  recruiterPlans,
   webhookEvents,
   type OrderRow,
   type OrderStatus,
@@ -13,7 +15,10 @@ import {
 import { AppError, AppErrorCode } from '@/lib/errors/app-error';
 import { recordPortalAudit } from '@/lib/portal/audit';
 import { grantCreditsWith } from '@/lib/portal/credits';
+import { issueInvoiceForOrderWith, emailInvoiceForOrder } from '@/lib/portal/invoices';
 import { activateSubscriptionWith, getPlan } from '@/lib/portal/premium/entitlements';
+import { isPlanBillingPeriod } from '@/lib/portal/recruiter-plans/catalog';
+import { activateSubscriptionFromOrder } from '@/lib/portal/recruiter-plans/service';
 
 /**
  * Orders and payments (see §14).
@@ -260,6 +265,92 @@ export async function createPremiumOrder(input: {
   return order;
 }
 
+/**
+ * Creates a pending order for a RECRUITER PLAN subscription.
+ *
+ * The plan is resolved through the catalogue and MUST be active; the price for
+ * the requested billing period is copied from the plan row, and any configured
+ * tax is added server-side, so `amountMinor` on the returned order is the GROSS
+ * amount that will be settled at the gateway. Nothing about the price comes
+ * from the request.
+ *
+ * The row stays 'created' — and the company stays un-activated — until a
+ * verified webhook or signature check runs `markOrderPaidAndGrantCredits`.
+ */
+export async function createPlanOrder(input: {
+  companyId: string;
+  userId: string;
+  planId: string;
+  billingPeriod: 'monthly' | 'annual';
+  /** Acceptance of the commercial terms for the subscription purchase. */
+  nonRefundableAccepted: boolean;
+}): Promise<OrderRow> {
+  const { db } = dbFromRequest();
+
+  if (!isPlanBillingPeriod(input.billingPeriod)) {
+    throw new AppError(
+      AppErrorCode.VALIDATION_ERROR,
+      'billingPeriod must be monthly or annual.',
+      400
+    );
+  }
+
+  // An inactive plan cannot be bought, even with a valid id: the price and
+  // terms of a retired plan are no longer offerable.
+  const [plan] = await db
+    .select()
+    .from(recruiterPlans)
+    .where(and(eq(recruiterPlans.id, input.planId), eq(recruiterPlans.isActive, true)))
+    .limit(1);
+  if (!plan) {
+    throw new AppError(AppErrorCode.NOT_FOUND, 'The requested plan was not found.', 404);
+  }
+
+  const baseMinor =
+    input.billingPeriod === 'annual' ? plan.priceAnnualMinor : plan.priceMonthlyMinor;
+  if (!Number.isInteger(baseMinor) || baseMinor < 0) {
+    throw new AppError(AppErrorCode.INTERNAL_ERROR, 'The plan price is not set.', 500);
+  }
+
+  // Gross settlement amount: the plan price plus any configured tax. The tax
+  // RATE is configuration; the BASE is the plan row; neither is client input.
+  const taxBp = Math.max(0, config.BILLING_TAX_RATE_BASIS_POINTS);
+  const grossMinor = taxBp > 0 ? baseMinor + Math.round((baseMinor * taxBp) / 10000) : baseMinor;
+
+  const [order] = await db
+    .insert(orders)
+    .values({
+      orderNumber: generateOrderNumber(),
+      companyId: input.companyId,
+      userId: input.userId,
+      packageId: plan.id,
+      orderType: 'recruiter_plan',
+      // Carried so the webhook knows which period was bought without ever
+      // guessing from the amount.
+      billingPeriod: input.billingPeriod,
+      amountMinor: grossMinor,
+      currency: plan.currency,
+      status: 'created',
+      nonRefundableAccepted: input.nonRefundableAccepted,
+    })
+    .returning();
+
+  await recordPortalAudit({
+    action: 'order_created',
+    actorUserId: input.userId,
+    description: `Plan order ${order.orderNumber} created for ${plan.name} (${input.billingPeriod})`,
+    metadata: {
+      orderId: order.id,
+      planId: plan.id,
+      planCode: plan.code,
+      billingPeriod: input.billingPeriod,
+      amountMinor: grossMinor,
+    },
+  });
+
+  return order;
+}
+
 export async function markOrderFailed(orderId: string): Promise<void> {
   const { db } = dbFromRequest();
   await db
@@ -332,6 +423,34 @@ export async function markOrderPaidAndGrantCredits(input: {
       })
       .returning({ id: payments.id });
 
+    // A RECRUITER PLAN purchase activates (renews or changes) the company's
+    // subscription. It must be branched before the job-package path below,
+    // because `packageId` on this order type points at a `recruiter_plans` row
+    // and must never pay out prepaid job credits.
+    if (order.orderType === 'recruiter_plan') {
+      const activation = await activateSubscriptionFromOrder(tx, {
+        order,
+        // The payment ROW id: `payments.id` is the uuid FK on the subscription.
+        paymentId: payment.id,
+        now,
+      });
+
+      await issueInvoiceForOrderWith(tx, {
+        order,
+        paymentReference: input.providerPaymentId,
+        subscriptionId: activation.subscriptionId,
+        periodStart: activation.periodStart,
+        periodEnd: activation.periodEnd,
+        now,
+      });
+
+      return {
+        grantedCredits: 0,
+        alreadyProcessed: false,
+        orderNumber: order.orderNumber,
+      };
+    }
+
     // A candidate PREMIUM purchase grants a subscription, not job credits.
     // Without this branch a premium order would silently pay out employer job
     // credits, because `jobPackages.credits` is always defined, and the
@@ -350,13 +469,20 @@ export async function markOrderPaidAndGrantCredits(input: {
       // the transaction that already holds the only one.
       const plan = await getPlan(order.packageId, tx);
 
-      await activateSubscriptionWith(tx, {
+      const activated = await activateSubscriptionWith(tx, {
         candidateId: order.candidateId,
         plan,
         orderId: input.orderId,
         // The payment ROW id, not the gateway reference: `payment_id` is a
         // uuid that references `payments`.
         paymentId: payment.id,
+        now,
+      });
+
+      await issueInvoiceForOrderWith(tx, {
+        order,
+        paymentReference: input.providerPaymentId,
+        candidateSubscriptionId: activated.subscriptionId,
         now,
       });
 
@@ -377,6 +503,14 @@ export async function markOrderPaidAndGrantCredits(input: {
     // runs on the SAME transaction so the order and its credits commit together.
     await grantCreditsWith(tx, input.orderId);
 
+    // The invoice commits with the grant: a customer can never be charged
+    // without a document, and the unique index on order_id means a replay can
+    // never issue a second one.
+    await issueInvoiceForOrderWith(tx, {
+      order,
+      paymentReference: input.providerPaymentId,
+      now,
+    });
 
     return { grantedCredits: pkg?.credits ?? 0, alreadyProcessed: false, orderNumber: order.orderNumber };
   });
@@ -391,6 +525,13 @@ export async function markOrderPaidAndGrantCredits(input: {
         credits: result.grantedCredits,
       },
     });
+  }
+
+  // Email the invoice AFTER the transaction committed, so a mail failure can
+  // never roll back a payment that genuinely settled. Delivery is best-effort
+  // and `emailedAt` is only written when the provider actually accepted it.
+  if (!result.alreadyProcessed) {
+    await emailInvoiceForOrder(input.orderId);
   }
 
   return { grantedCredits: result.grantedCredits, alreadyProcessed: result.alreadyProcessed };

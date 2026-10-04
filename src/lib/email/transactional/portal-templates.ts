@@ -369,6 +369,62 @@ export function renderPaymentConfirmationEmail(input: PaymentConfirmationInput):
   return { subject, text, html: layout(brand, rows) };
 }
 
+export interface InvoiceIssuedInput {
+  recipientName: string;
+  invoiceNumber: string;
+  description: string;
+  subtotalLabel: string;
+  taxLabel: string;
+  totalLabel: string;
+  dashboardPath: string;
+  context?: TemplateContext;
+}
+
+/**
+ * Tax invoice, sent only after an invoice row has actually been issued.
+ *
+ * The figures are the SNAPSHOT stored on the invoice, not values recomputed
+ * here: an invoice is a historical document, so the email must quote the same
+ * numbers that were written down at issue time. The caller passes formatted
+ * labels because currency formatting belongs to one place in the codebase.
+ */
+export function renderInvoiceIssuedEmail(input: InvoiceIssuedInput): EmailContent {
+  const brand = resolveBrand(input.context);
+  const subject = `Your ${brand} invoice ${input.invoiceNumber}`;
+
+  const lines = [
+    `Invoice number: ${input.invoiceNumber}`,
+    `Description:    ${input.description}`,
+    `Subtotal:       ${input.subtotalLabel}`,
+    `Tax:            ${input.taxLabel}`,
+    `Total paid:     ${input.totalLabel}`,
+  ];
+
+  const text = [
+    `Hi ${input.recipientName || 'there'},`,
+    '',
+    `Your invoice for ${brand} is ready.`,
+    '',
+    ...lines,
+    '',
+    `You can view and download it at any time from ${input.dashboardPath}.`,
+    '',
+    `— The ${brand} team`,
+  ].join('\n');
+
+  const rows = [
+    greeting(input.recipientName),
+    spacer(12),
+    paragraph(`Your invoice for ${brand} is ready.`),
+    spacer(20),
+    ...lines.map((line) => paragraph(line)),
+    spacer(12),
+    note(`You can view and download it at any time from your ${brand} dashboard.`),
+  ].join('\n');
+
+  return { subject, text, html: layout(brand, rows) };
+}
+
 export interface SecurityAlertInput {
   recipientName: string;
   eventDescription: string;

@@ -68,15 +68,22 @@ export async function listCandidateEntitlements(
   }));
 }
 
-/** Whether the candidate currently holds a specific entitlement. */
-export async function hasEntitlement(
+/**
+ * Whether the candidate holds a specific entitlement, on a caller's executor.
+ *
+ * USE THIS INSIDE A TRANSACTION. `hasEntitlement` runs on the root connection,
+ * and PGlite and a single-connection pool deadlock if a non-transactional query
+ * runs while a transaction still holds the only connection. Checking on the
+ * caller's executor also keeps the gate atomic: a check-then-insert on the root
+ * connection could pass and then be overtaken before the write commits.
+ */
+export async function hasEntitlementWith(
+  executor: DbExecutor,
   candidateId: string,
   entitlementCode: string,
   now: Date = new Date()
 ): Promise<boolean> {
-  const { db } = dbFromRequest();
-
-  const [row] = await db
+  const [row] = await executor
     .select({ id: candidateEntitlements.id })
     .from(candidateEntitlements)
     .innerJoin(premiumEntitlements, eq(candidateEntitlements.entitlementId, premiumEntitlements.id))
@@ -93,6 +100,15 @@ export async function hasEntitlement(
   return row !== undefined;
 }
 
+/** Whether the candidate currently holds a specific entitlement. */
+export async function hasEntitlement(
+  candidateId: string,
+  entitlementCode: string,
+  now: Date = new Date()
+): Promise<boolean> {
+  return hasEntitlementWith(dbFromRequest().db, candidateId, entitlementCode, now);
+}
+
 /**
  * Requires an entitlement, throwing a 403 with the entitlement name.
  * Premium-gated features call this on the server; the client never decides.
@@ -101,7 +117,16 @@ export async function requireEntitlement(
   candidateId: string,
   entitlementCode: string
 ): Promise<void> {
-  if (await hasEntitlement(candidateId, entitlementCode)) return;
+  await requireEntitlementWith(dbFromRequest().db, candidateId, entitlementCode);
+}
+
+/** The transactional form of `requireEntitlement`. See `hasEntitlementWith`. */
+export async function requireEntitlementWith(
+  executor: DbExecutor,
+  candidateId: string,
+  entitlementCode: string
+): Promise<void> {
+  if (await hasEntitlementWith(executor, candidateId, entitlementCode)) return;
   throw new AppError(
     AppErrorCode.FORBIDDEN,
     'This feature requires an active premium plan.',
@@ -188,7 +213,7 @@ export async function getPlan(
 }
 
 /** Either the root database or an existing transaction, for composable helpers. */
-type DbExecutor = Pick<
+export type DbExecutor = Pick<
   AppDatabase,
   'select' | 'insert' | 'update' | 'delete' | 'execute'
 >;

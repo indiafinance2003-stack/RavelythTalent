@@ -12,7 +12,10 @@ import {
 } from '@/lib/db/portal-schema';
 import { AppError, AppErrorCode } from '@/lib/errors/app-error';
 import { recordPortalAudit } from '@/lib/portal/audit';
-import { consumeCreditWith, refundCreditForJob } from '@/lib/portal/credits';
+import {
+  consumeJobPostWith,
+  releaseJobPostForJob,
+} from '@/lib/portal/recruiter-plans/service';
 import { requireAgencyClientAccess } from '@/lib/portal/agencies';
 import { notifyJobDecision } from '@/lib/portal/candidate-notifications';
 import {
@@ -200,8 +203,9 @@ export async function submitJobForApproval(input: {
     assertTransition(job.status, 'pending_approval', 'employer');
 
     if (config.JOB_CREDIT_REQUIRED) {
-      // Joins THIS transaction, so a later failure returns the credit.
-      await consumeCreditWith(tx, {
+      // Plan allowance first, prepaid credits as the overflow — and it joins
+      // THIS transaction, so a later failure returns whatever was spent.
+      await consumeJobPostWith(tx, {
         companyId: input.companyId,
         jobId: input.jobId,
         actorUserId: input.actorUserId,
@@ -431,15 +435,15 @@ export async function withdrawJob(input: {
     throw new AppError(AppErrorCode.CONFLICT, 'The job changed. Please reload and try again.', 409);
   }
 
-  // Return the credit: the employer never got a live posting out of it.
-  if (config.JOB_CREDIT_REQUIRED) {
-    await refundCreditForJob({
-      companyId: input.companyId,
-      jobId: input.jobId,
-      actorUserId: input.actorUserId,
-      reason: 'job withdrawn before approval',
-    });
-  }
+  // Return whatever the submission consumed: a plan post (allowance returned to
+  // the period) or a prepaid credit (ledger refund). Both are safe no-ops when
+  // nothing was taken.
+  await releaseJobPostForJob({
+    companyId: input.companyId,
+    jobId: input.jobId,
+    actorUserId: input.actorUserId,
+    reason: 'job withdrawn before approval',
+  });
 
   await db.insert(jobStatusHistory).values({
     jobId: input.jobId,

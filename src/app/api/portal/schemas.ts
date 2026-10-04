@@ -251,6 +251,86 @@ export const createOrderSchema = z
   })
   .strict();
 
+/**
+ * Recruiter plan checkout.
+ *
+ * As with `createOrderSchema` there is deliberately NO price field: the amount
+ * is computed from the plan row and the configured tax rate server-side. The
+ * client names which plan and which billing period it wants — and nothing else.
+ */
+export const createPlanCheckoutSchema = z
+  .object({
+    planId: z.string().uuid(),
+    billingPeriod: z.enum(['monthly', 'annual'], {
+      errorMap: () => ({ message: 'billingPeriod must be monthly or annual.' }),
+    }),
+    nonRefundableAccepted: z.literal(true, {
+      errorMap: () => ({
+        message: 'You must accept the subscription purchase terms to continue.',
+      }),
+    }),
+  })
+  .strict();
+
+/**
+ * Interview scheduling.
+ *
+ * No candidate id or company id: both are derived server-side from the
+ * application and the caller's session, so a request can never schedule
+ * somebody else's interview.
+ */
+export const scheduleInterviewSchema = z
+  .object({
+    applicationId: z.string().uuid(),
+    mode: z.enum(['video', 'phone', 'onsite']),
+    scheduledAt: z.coerce.date({
+      errorMap: () => ({ message: 'scheduledAt must be a valid ISO date.' }),
+    }),
+    durationMinutes: z.number().int().min(5).max(480).optional(),
+    round: z.number().int().min(1).max(50).optional(),
+    locationOrLink: z.string().max(500).nullish(),
+    notes: z.string().max(4000).nullish(),
+  })
+  .strict();
+
+export const updateInterviewSchema = z.discriminatedUnion('action', [
+  z
+    .object({
+      action: z.literal('reschedule'),
+      scheduledAt: z.coerce.date({
+        errorMap: () => ({ message: 'scheduledAt must be a valid ISO date.' }),
+      }),
+      durationMinutes: z.number().int().min(5).max(480).optional(),
+      mode: z.enum(['video', 'phone', 'onsite']).optional(),
+      locationOrLink: z.string().max(500).nullish(),
+      note: z.string().max(1000).nullish(),
+    })
+    .strict(),
+  z
+    .object({
+      action: z.literal('status'),
+      status: z.enum(['completed', 'cancelled', 'no_show']),
+      notes: z.string().max(4000).nullish(),
+    })
+    .strict(),
+]);
+
+/** Agency submission: put a candidate forward for a client's job. */
+export const submitCandidateSchema = z
+  .object({
+    jobId: z.string().uuid(),
+    candidateId: z.string().uuid(),
+    notes: z.string().max(4000).nullish(),
+  })
+  .strict();
+
+export const updateSubmissionSchema = z
+  .object({
+    status: z.enum(['under_review', 'client_interview', 'client_selected', 'rejected', 'withdrawn']),
+    note: z.string().max(2000).nullish(),
+  })
+  .strict();
+
 export const reviewJobSchema = z
   .object({
     decision: z.enum(['approve', 'reject']),

@@ -31,6 +31,12 @@ export enum AppErrorCode {
   EMAIL_NOT_VERIFIED = 'EMAIL_NOT_VERIFIED',
   VERIFICATION_INVALID = 'VERIFICATION_INVALID',
   INSUFFICIENT_CREDITS = 'INSUFFICIENT_CREDITS',
+  /**
+   * The company has used every job post its plan allows for this billing
+   * period and holds no credits. A distinct code so the dashboard can offer the
+   * upgrade action instead of showing a generic validation failure.
+   */
+  PLAN_LIMIT_REACHED = 'PLAN_LIMIT_REACHED',
   PAYMENT_NOT_CONFIGURED = 'PAYMENT_NOT_CONFIGURED',
   APPROVAL_REQUIRED = 'APPROVAL_REQUIRED',
 }

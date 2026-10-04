@@ -123,6 +123,220 @@ export interface PublicCompanyProfile {
   openJobs: number;
 }
 
+/** Recruiter plan billing period. Annual plans are charged as one order. */
+export type BillingPeriod = 'monthly' | 'annual';
+
+/** Interview states. See `INTERVIEW_STATUSES`. */
+export type InterviewStatus = 'scheduled' | 'completed' | 'cancelled' | 'no_show';
+
+/** How an interview will be conducted. */
+export type InterviewMode = 'video' | 'phone' | 'onsite';
+
+/** Where an agency submission currently stands. See `AGENCY_SUBMISSION_STATUSES`. */
+export type AgencySubmissionStatus =
+  | 'submitted'
+  | 'under_review'
+  | 'client_interview'
+  | 'client_selected'
+  | 'rejected'
+  | 'withdrawn';
+
+/**
+ * GET /api/portal/plans — the public recruiter catalogue.
+ *
+ * This mirrors the `recruiter_plans` rows that checkout charges against, so the
+ * prices rendered here are the same numbers the server will quote.
+ */
+export interface RecruiterPlanDTO {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  priceMonthlyMinor: number;
+  priceAnnualMinor: number;
+  annualListPriceMinor: number | null;
+  jobPostsPerMonth: number;
+  currency: string;
+  supportTier: string;
+  isEnterprise: boolean;
+  isActive: boolean;
+  sortOrder: number;
+  features: string[];
+}
+
+/**
+ * Allowance arithmetic for the current billing period.
+ *
+ * `level` is the server's own verdict, so a screen must not recompute it: the
+ * dashboard and the posting-limit check read the same number.
+ */
+export interface AllowanceUsage {
+  allowance: number;
+  used: number;
+  remaining: number;
+  percentUsed: number;
+  level: 'ok' | 'warning' | 'exhausted';
+}
+
+export interface CompanySubscriptionDTO {
+  id: string;
+  status: string;
+  billingPeriod: string;
+  amountMinor: number;
+  currency: string;
+  startedAt: string | null;
+  currentPeriodStart: string | null;
+  currentPeriodEnd: string | null;
+  renewalAt: string | null;
+  cancelAtPeriodEnd: boolean;
+  planCode: string;
+  planName: string;
+}
+
+/** One append-only entry in the subscription's lifecycle history. */
+export interface SubscriptionEventDTO {
+  id: string;
+  eventType: string;
+  fromPlanId: string | null;
+  toPlanId: string | null;
+  billingPeriod: string | null;
+  amountMinor: number | null;
+  notes: string | null;
+  createdAt: string;
+}
+
+/**
+ * GET /api/portal/employer/subscription.
+ *
+ * `canPost` is the server's decision, not a client-side guess: it already
+ * accounts for the plan requirement, the enforcement flag and the credit
+ * overflow. A screen that re-derived it could disagree with what actually
+ * happens when a job is submitted.
+ */
+export interface CompanyPlanOverview {
+  subscription: CompanySubscriptionDTO | null;
+  plan: RecruiterPlanDTO | null;
+  features: string[];
+  usage: AllowanceUsage | null;
+  creditsAvailable: number;
+  postsRemaining: number;
+  limitEnforced: boolean;
+  requiresActivePlan: boolean;
+  canPost: boolean;
+  events?: SubscriptionEventDTO[];
+}
+
+/** An invoice as the company sees it. Mirrors the server's `InvoiceDTO`. */
+export interface PortalInvoiceDTO {
+  id: string;
+  invoiceNumber: string;
+  invoiceType: string;
+  planCode: string | null;
+  description: string;
+  billingPeriod: string | null;
+  status: string;
+  subtotalMinor: number;
+  taxMinor: number;
+  totalMinor: number;
+  taxRateBasisPoints: number;
+  currency: string;
+  customerName: string;
+  customerEmail: string;
+  customerAddress: string | null;
+  customerGstin: string | null;
+  placeOfSupply: string | null;
+  paymentReference: string | null;
+  periodStart: string | null;
+  periodEnd: string | null;
+  issuedAt: string;
+  paidAt: string | null;
+}
+
+/**
+ * GET /api/portal/employer/interviews.
+ *
+ * `notes` is interviewer notes and appears ONLY on employer-facing responses;
+ * the candidate DTO omits the field entirely rather than nulling it.
+ */
+export interface InterviewDTO {
+  id: string;
+  applicationId: string;
+  jobId: string;
+  candidateId: string;
+  companyId: string;
+  round: number;
+  mode: InterviewMode;
+  scheduledAt: string;
+  durationMinutes: number;
+  locationOrLink: string | null;
+  notes?: string | null;
+  status: InterviewStatus;
+  jobTitle: string;
+  candidateName: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** The candidate's view: identical, minus the employer-only notes. */
+export type CandidateInterviewDTO = Omit<InterviewDTO, 'notes'>;
+
+/** One entry from GET /api/portal/employer/interviews/[id]. */
+export interface InterviewHistoryEntry {
+  id: string;
+  eventType: string;
+  scheduledAt: string | null;
+  note: string | null;
+  createdAt: string;
+}
+
+/** GET /api/portal/employer/saved-candidates — the company shortlist. */
+export interface SavedCandidateDTO {
+  id: string;
+  candidateId: string;
+  fullName: string;
+  headline: string | null;
+  currentJobTitle: string | null;
+  currentCompany: string | null;
+  location: string | null;
+  openToWork: boolean;
+  notes: string | null;
+  savedAt: string;
+}
+
+/**
+ * GET /api/portal/employer/agency-submissions.
+ *
+ * `asAgency` says which side of the relationship the caller is looking from,
+ * because the permitted next statuses differ: the agency withdraws, the client
+ * decides.
+ */
+export interface AgencySubmissionDTO {
+  id: string;
+  status: AgencySubmissionStatus;
+  agencyCompanyId: string;
+  agencyName: string;
+  clientCompanyId: string;
+  clientName: string;
+  jobId: string;
+  jobTitle: string;
+  candidateId: string;
+  candidateName: string;
+  applicationId: string | null;
+  notes: string | null;
+  submittedAt: string;
+  updatedAt: string;
+  asAgency: boolean;
+}
+
+/** One entry from GET /api/portal/employer/agency-submissions/[id]. */
+export interface AgencySubmissionEventDTO {
+  id: string;
+  fromStatus: string | null;
+  toStatus: string;
+  note: string | null;
+  createdAt: string;
+}
+
 /** GET/PUT /api/portal/candidate/profile */
 export interface CandidateProfile {
   id: string;

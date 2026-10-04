@@ -1,12 +1,23 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { portalGet, portalSend } from '@/lib/portal-client/client';
+import { portalGet, portalPost, portalSend, portalDownload } from '@/lib/portal-client/client';
 import { formatApiError } from '@/lib/client/api';
 import { useAsync } from '@/lib/portal-client/use-async';
-import type { CandidateDetails, CandidateProfile, ResumeSummary, ResumeVersion } from '@/lib/portal-client/types';
+import type { ResumeSummary } from '@/lib/portal-client/types';
+import type { ResumeDocument } from '@/lib/resume/content';
+import {
+  DEFAULT_RESUME_TEMPLATE,
+  isResumeTemplateCode,
+  RESUME_TEMPLATE_LAYOUTS,
+  type ResumeTemplateCode,
+} from '@/lib/resume/template-layouts';
+import {
+  resolveBuilderCapabilities,
+  type BuilderCapabilities,
+} from '@/lib/portal/premium/entitlement-codes';
 import {
   Alert,
   Badge,
@@ -17,112 +28,191 @@ import {
   ErrorState,
   Field,
   LoadingState,
+  Meter,
   PageHeader,
   inputClass,
 } from '@/components/portal/ui';
+import { DocumentEditor } from './resume-builder/document-editor';
+import { ResumePreview } from './resume-builder/live-preview';
+import { TemplatePicker } from './resume-builder/template-picker';
 
 /**
  * Resume Builder.
  *
- * IMPORTANT AND DELIBERATE: a builder document is stored against an existing
- * uploaded VERSION, because that is the backend's real model — every version has
- * a stored file, and there is no "content with no document". The builder
- * therefore lets you pick one of your uploaded versions and keeps its structured
- * content attached to it. It does not pretend to generate a PDF: the download
- * button fetches the actual stored document through the authorised endpoint.
+ * THE MODEL HAS CHANGED, AND THIS COMPONENT IS THE REASON IT WORKS
+ * ---------------------------------------------------------------
+ * The builder used to attach a flat, ad-hoc shape (`headline`, a comma-joined
+ * `skills` string, `experience[].period`) to an already-uploaded file version, and
+ * had no way to produce a document of its own. Nothing rendered that shape, so
+ * saving it changed nothing about any PDF.
  *
- * The preview renders from the same structured content, using React text nodes
- * only. Nothing here interprets HTML, so builder content can never inject markup
- * into the page.
+ * It now edits the same `ResumeDocument` the server validates and the PDF renderer
+ * prints, against a working copy on the resume (`builderContentJson`). Versions
+ * are immutable snapshots created deliberately, and each one can be rendered to a
+ * real, privately stored PDF.
+ *
+ * WHAT IS *NOT* DECIDED HERE
+ * --------------------------
+ * Every paid capability. The buttons below are disabled based on entitlements so
+ * the UI is honest about what the account can do, but each one is enforced again
+ * server-side — this component cannot grant anything, and a modified client gets
+ * a 403 from the service rather than a feature.
  */
 
-interface BuilderContent {
-  headline: string;
-  summary: string;
-  skills: string;
-  experience: Array<{ title: string; company: string; period: string; description: string }>;
-  education: Array<{ institution: string; detail: string }>;
+interface BuilderVersionDTO {
+  id: string;
+  versionNumber: number;
+  source: string;
+  label: string | null;
+  isDefault: boolean;
+  hasPdf: boolean;
+  pdfByteSize: number | null;
+  hasContent: boolean;
+  hasUpload: boolean;
+  createdAt: string;
 }
 
-const EMPTY: BuilderContent = {
-  headline: '',
-  summary: '',
-  skills: '',
-  experience: [],
-  education: [],
+interface BuilderDraftDTO {
+  resumeId: string;
+  label: string;
+  templateCode: string | null;
+  document: ResumeDocument;
+  completion: number;
+  sections: string[];
+  updatedAt: string;
+}
+
+interface ExportResult {
+  pdf: {
+    versionId: string;
+    templateCode: string | null;
+    byteSize: number;
+    checksumSha256: string;
+    renderedSections: string[];
+    generatedAt: string;
+  };
+}
+
+/** The capabilities of an account with nothing granted, used before any load. */
+const NO_CAPABILITIES: BuilderCapabilities = {
+  canBuild: false,
+  canUseProfessionalTemplates: false,
+  canKeepMultipleVersions: false,
+  canExportPdf: false,
+  canViewVersionHistory: false,
+  hasAnyRestriction: true,
 };
+
+function emptyDocument(fullName: string): ResumeDocument {
+  return {
+    schemaVersion: 1,
+    basics: { fullName },
+    contact: { email: '' },
+    experience: [],
+    education: [],
+    skills: [],
+    projects: [],
+    certifications: [],
+    languages: [],
+    sectionOrder: ['summary', 'experience', 'education', 'skills', 'projects', 'certifications', 'languages'],
+  };
+}
 
 export function ResumeBuilder(): React.ReactElement {
   const searchParams = useSearchParams();
   const requestedResumeId = searchParams.get('resumeId');
-  const requestedVersionId = searchParams.get('versionId');
 
   const resumes = useAsync(
     () => portalGet<{ resumes: ResumeSummary[] }>('/api/portal/candidate/resumes'),
     []
   );
-  const profile = useAsync(
-    () => portalGet<{ profile: CandidateProfile }>('/api/portal/candidate/profile'),
+
+  // Capabilities come from the server's own entitlement list, so the UI cannot
+  // disagree with the service about what this account may do.
+  const premium = useAsync(
+    () =>
+      portalGet<{ entitlements: Array<{ code: string }> }>(
+        '/api/portal/candidate/premium'
+      ),
     []
   );
-  const details = useAsync(() => portalGet<CandidateDetails>('/api/portal/candidate/details'), []);
 
   const [resumeId, setResumeId] = useState<string | null>(requestedResumeId);
-  const [versionId, setVersionId] = useState<string | null>(requestedVersionId);
-  const versions = useAsync(
-    () =>
-      resumeId
-        ? portalGet<{ versions: ResumeVersion[] }>(`/api/portal/candidate/resumes/${resumeId}/versions`)
-        : Promise.resolve({ versions: [] }),
-    [resumeId]
-  );
-
-  const [content, setContent] = useState<BuilderContent>(EMPTY);
-  const [loadedVersion, setLoadedVersion] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [document, setDocument] = useState<ResumeDocument | null>(null);
+  const [templateCode, setTemplateCode] = useState<ResumeTemplateCode>(DEFAULT_RESUME_TEMPLATE);
+  const [busy, setBusy] = useState<'save' | 'version' | 'export' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [preview, setPreview] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [versions, setVersions] = useState<BuilderVersionDTO[]>([]);
 
-  const activeVersionId = versionId ?? versions.data?.versions[0]?.id ?? null;
+  const capabilities = useMemo<BuilderCapabilities>(() => {
+    if (!premium.data) return NO_CAPABILITIES;
+    return resolveBuilderCapabilities(premium.data.entitlements.map((row) => row.code));
+  }, [premium.data]);
 
-  // Load stored content for the selected version exactly once per version, and
-  // never overwrite edits in progress with a stale re-fetch.
+  // Default to the first resume once the list arrives, so the page is usable
+  // without a resumeId in the URL.
   useEffect(() => {
-    if (!activeVersionId || loadedVersion === activeVersionId) return;
-    const found = versions.data?.versions.find((version) => version.id === activeVersionId);
-    if (!found) return;
+    if (resumeId) return;
+    const first = resumes.data?.resumes[0];
+    if (first) setResumeId(first.id);
+  }, [resumes.data, resumeId]);
 
-    setContent(readContent(found, profile.data?.profile, details.data));
-    setLoadedVersion(activeVersionId);
-  }, [activeVersionId, versions.data, profile.data, details.data, loadedVersion]);
+  const draft = useAsync(
+    () =>
+      resumeId
+        ? portalGet<{ draft: BuilderDraftDTO }>(
+            `/api/portal/candidate/resumes/${resumeId}/builder`
+          )
+        : Promise.resolve(null),
+    [resumeId]
+  );
 
-  const canSave = Boolean(activeVersionId) && loadedVersion === activeVersionId;
-
-  async function save(): Promise<void> {
-    if (!activeVersionId) return;
-    setSaving(true);
-    setError(null);
-    setMessage(null);
-    try {
-      await portalSend(
-        'PUT',
-        `/api/portal/candidate/resumes/versions/${activeVersionId}/content`,
-        { content: content as unknown as Record<string, unknown> }
-      );
-      await versions.reload();
-      setMessage('Your resume content has been saved to this version.');
-    } catch (caught) {
-      setError(formatApiError(caught));
-    } finally {
-      setSaving(false);
+  // Adopt the stored working copy when the selected resume changes, but never
+  // while the candidate is mid-edit: overwriting unsaved edits because a
+  // background refetch landed would be worse than a stale form.
+  useEffect(() => {
+    if (!draft.data?.draft) {
+      setDocument(null);
+      return;
     }
-  }
+    setDocument(draft.data.draft.document);
+    setTemplateCode(
+      draft.data.draft.templateCode && isResumeTemplateCode(draft.data.draft.templateCode)
+        ? draft.data.draft.templateCode
+        : DEFAULT_RESUME_TEMPLATE
+    );
+  }, [draft.data]);
 
-  if (resumes.loading || profile.loading || details.loading) {
+  const loadVersions = useCallback(async (): Promise<void> => {
+    if (!resumeId || !capabilities.canViewVersionHistory) {
+      setVersions([]);
+      return;
+    }
+    try {
+      const response = await portalGet<{ versions: BuilderVersionDTO[] }>(
+        `/api/portal/candidate/resumes/${resumeId}/history`
+      );
+      setVersions(response.versions);
+      setHistoryError(null);
+    } catch (caught) {
+      // A history that will not load must not take the editor down with it.
+      setVersions([]);
+      setHistoryError(formatApiError(caught));
+    }
+  }, [resumeId, capabilities.canViewVersionHistory]);
+
+  useEffect(() => {
+    void loadVersions();
+  }, [loadVersions]);
+
+  if (resumes.loading || premium.loading || draft.loading) {
     return <LoadingState label="Loading the Resume Builder…" />;
   }
   if (resumes.error) return <ErrorState message={resumes.error} onRetry={resumes.reload} />;
+  if (draft.error) return <ErrorState message={draft.error} onRetry={draft.reload} />;
 
   const resumeList = resumes.data?.resumes ?? [];
 
@@ -131,8 +221,8 @@ export function ResumeBuilder(): React.ReactElement {
       <div className="space-y-4">
         <PageHeader eyebrow="Resume Builder" title="Build a resume" />
         <EmptyState
-          title="Create a resume and upload a document first"
-          description="Ravelyth stores every resume version as a real document, so the builder attaches your structured content to a version you have uploaded."
+          title="Create a resume to start building"
+          description="A builder document belongs to a resume, so create the resume first. You can still upload a file for any resume from your resumes page."
           action={
             <Link
               href="/candidate/resumes"
@@ -146,19 +236,123 @@ export function ResumeBuilder(): React.ReactElement {
     );
   }
 
+  const currentDraft = draft.data?.draft ?? null;
+  const template = RESUME_TEMPLATE_LAYOUTS[templateCode];
+  const templateLocked = template.isPremium && !capabilities.canUseProfessionalTemplates;
+  const canExport =
+    capabilities.canExportPdf && !templateLocked && (versions.length > 0 || document !== null);
+  const editable = capabilities.canBuild;
+
+  async function save(): Promise<void> {
+    if (!resumeId || !document) return;
+    setBusy('save');
+    setError(null);
+    setMessage(null);
+    try {
+      const response = await portalSend<{ draft: BuilderDraftDTO }>(
+        'PUT',
+        `/api/portal/candidate/resumes/${resumeId}/builder`,
+        { document, templateCode }
+      );
+      setDocument(response.draft.document);
+      setMessage('Saved. Your working copy is up to date.');
+    } catch (caught) {
+      setError(formatApiError(caught));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function saveVersion(): Promise<void> {
+    if (!resumeId) return;
+    setBusy('version');
+    setError(null);
+    setMessage(null);
+    try {
+      // Saving a version snapshots the STORED working copy, so an unsaved edit is
+      // never captured by accident.
+      await portalPost<{ version: BuilderVersionDTO }>(
+        '/api/portal/candidate/resumes/versions',
+        { resumeId }
+      );
+      await draft.reload();
+      await loadVersions();
+      setMessage('Saved a new version. You can now export it as a PDF.');
+    } catch (caught) {
+      setError(formatApiError(caught));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function exportPdf(versionId: string): Promise<void> {
+    setBusy('export');
+    setError(null);
+    setMessage(null);
+    try {
+      const response = await portalPost<ExportResult>(
+        `/api/portal/candidate/resumes/versions/${versionId}/pdf`,
+        {}
+      );
+      await loadVersions();
+      setMessage(
+        `PDF generated from ${response.pdf.renderedSections.length} section${
+          response.pdf.renderedSections.length === 1 ? '' : 's'
+        } (${Math.max(1, Math.round(response.pdf.byteSize / 1024))} KB).`
+      );
+      await downloadGenerated(versionId);
+    } catch (caught) {
+      setError(formatApiError(caught));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function downloadGenerated(versionId: string): Promise<void> {
+    try {
+      await portalDownload(
+        `/api/portal/candidate/resumes/versions/${versionId}/pdf`,
+        'resume.pdf'
+      );
+    } catch (caught) {
+      setError(formatApiError(caught));
+    }
+  }
+
+  async function restore(versionId: string): Promise<void> {
+    setBusy('version');
+    setError(null);
+    setMessage(null);
+    try {
+      await portalPost<{ draft: BuilderDraftDTO }>(
+        `/api/portal/candidate/resumes/versions/${versionId}/restore`,
+        {}
+      );
+      await draft.reload();
+      setMessage('Restored into your working copy. Save to keep it as a new version.');
+    } catch (caught) {
+      setError(formatApiError(caught));
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="Resume Builder"
         title="Build a resume"
-        description="Compose a focused resume for a specific role. Saving attaches your content to the selected document version."
+        description="Compose structured content, save versions, and export a formatted PDF."
         action={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button variant="secondary" onClick={() => setPreview((value) => !value)}>
               {preview ? 'Back to editing' : 'Preview'}
             </Button>
-            <Button onClick={save} loading={saving} disabled={!canSave}>
-              Save content
+            <Button variant="secondary" onClick={saveVersion} loading={busy === 'version'}>
+              Save version
+            </Button>
+            <Button onClick={save} loading={busy === 'save'} disabled={!editable || !document}>
+              Save
             </Button>
           </div>
         }
@@ -167,11 +361,18 @@ export function ResumeBuilder(): React.ReactElement {
       {error ? <Alert kind="error">{error}</Alert> : null}
       {message ? <Alert kind="success">{message}</Alert> : null}
 
+      {!capabilities.canBuild ? (
+        <Alert kind="warning">
+          The Resume Builder is part of Candidate Premium, so saving structured content is locked on
+          your plan. You can still upload a document to any resume and apply with it.{' '}
+          <Link href="/candidate/premium" className="underline">
+            See plans
+          </Link>
+        </Alert>
+      ) : null}
+
       <Card>
-        <CardHeader
-          title="Which document are you building on?"
-          description="Each version is a stored file. Choose the one this content belongs to."
-        />
+        <CardHeader title="Which resume are you building?" />
         <div className="grid gap-4 p-5 sm:grid-cols-2">
           <Field label="Resume" htmlFor="builder-resume">
             <select
@@ -180,9 +381,8 @@ export function ResumeBuilder(): React.ReactElement {
               value={resumeId ?? ''}
               onChange={(event) => {
                 setResumeId(event.target.value);
-                setVersionId(null);
-                setLoadedVersion(null);
                 setMessage(null);
+                setError(null);
               }}
             >
               {resumeList.map((resume) => (
@@ -193,388 +393,165 @@ export function ResumeBuilder(): React.ReactElement {
               ))}
             </select>
           </Field>
-          <Field label="Version" htmlFor="builder-version">
-            <select
-              id="builder-version"
-              className={inputClass}
-              value={activeVersionId ?? ''}
-              onChange={(event) => {
-                setVersionId(event.target.value);
-                setLoadedVersion(null);
-                setMessage(null);
-              }}
-              disabled={(versions.data?.versions.length ?? 0) === 0}
-            >
-              {(versions.data?.versions ?? []).length === 0 ? (
-                <option value="">No versions uploaded</option>
-              ) : null}
-              {(versions.data?.versions ?? []).map((version) => (
-                <option key={version.id} value={version.id}>
-                  Version {version.versionNumber} — {version.originalFilename}
-                </option>
-              ))}
-            </select>
-          </Field>
+          {currentDraft ? (
+            <div>
+              <span className="mb-1 block text-sm font-medium text-slate-300">Completeness</span>
+              <Meter
+                value={currentDraft.completion}
+                max={100}
+                label="Resume completeness"
+              />
+              <p className="mt-1 text-xs text-slate-500">
+                {currentDraft.sections.length} section
+                {currentDraft.sections.length === 1 ? '' : 's'} with content
+              </p>
+            </div>
+          ) : null}
         </div>
       </Card>
 
-      {(versions.data?.versions.length ?? 0) === 0 && resumeId ? (
-        <Alert kind="warning">
-          This resume has no uploaded document yet, so there is no version to attach content to.{' '}
-          <Link href="/candidate/resumes" className="underline">
-            Upload a PDF, DOC or DOCX
-          </Link>{' '}
-          first.
-        </Alert>
-      ) : null}
+      <TemplatePicker
+        selected={templateCode}
+        onSelect={setTemplateCode}
+        canUsePremium={capabilities.canUseProfessionalTemplates}
+        disabled={!editable}
+      />
 
       {preview ? (
-        <ResumePreview content={content} name={profile.data?.profile.fullName ?? ''} />
+        <Card>
+          <CardHeader
+            title={`Preview — ${template.name}`}
+            description="Laid out exactly like the PDF: the same sidebar, header band and accent colour."
+          />
+          <div className="p-5">
+            <ResumePreview
+              document={document ?? emptyDocument(currentDraft?.label ?? '')}
+              templateCode={templateCode}
+            />
+          </div>
+        </Card>
       ) : (
-        <div className="space-y-5">
-          <Card>
-            <CardHeader title="Introduction" />
-            <div className="space-y-4 p-5">
-              <Field label="Headline" htmlFor="b-headline" hint="One line: what you do.">
-                <input
-                  id="b-headline"
-                  className={inputClass}
-                  value={content.headline}
-                  onChange={(event) =>
-                    setContent((c) => ({ ...c, headline: event.target.value }))
-                  }
-                />
-              </Field>
-              <Field label="Summary" htmlFor="b-summary" hint="Two or three focused sentences.">
-                <textarea
-                  id="b-summary"
-                  rows={4}
-                  className={inputClass}
-                  value={content.summary}
-                  onChange={(event) =>
-                    setContent((c) => ({ ...c, summary: event.target.value }))
-                  }
-                />
-              </Field>
-              <Field label="Skills for this role" htmlFor="b-skills" hint="Comma separated.">
-                <textarea
-                  id="b-skills"
-                  rows={2}
-                  className={inputClass}
-                  value={content.skills}
-                  onChange={(event) => setContent((c) => ({ ...c, skills: event.target.value }))}
-                />
-              </Field>
-            </div>
-          </Card>
-
-          <Card>
-            <CardHeader
-              title="Experience"
-              description="Copied from your profile. Edit here without changing your profile."
-              action={
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() =>
-                    setContent((c) => ({
-                      ...c,
-                      experience: [
-                        ...c.experience,
-                        { title: '', company: '', period: '', description: '' },
-                      ],
-                    }))
-                  }
-                >
-                  Add role
-                </Button>
-              }
-            />
-            <div className="space-y-4 p-5">
-              {content.experience.length === 0 ? (
-                <EmptyState title="No roles on this resume yet" />
-              ) : null}
-              {content.experience.map((item, index) => (
-                <fieldset key={index} className="rounded-lg border border-line p-4">
-                  <legend className="px-1 text-xs font-medium text-slate-400">
-                    Role {index + 1}
-                  </legend>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <input
-                      aria-label="Job title"
-                      className={inputClass}
-                      value={item.title}
-                      placeholder="Job title"
-                      onChange={(event) => updateExperience(index, 'title', event.target.value)}
-                    />
-                    <input
-                      aria-label="Company"
-                      className={inputClass}
-                      value={item.company}
-                      placeholder="Company"
-                      onChange={(event) => updateExperience(index, 'company', event.target.value)}
-                    />
-                    <input
-                      aria-label="Period"
-                      className={inputClass}
-                      value={item.period}
-                      placeholder="2023 – Present"
-                      onChange={(event) => updateExperience(index, 'period', event.target.value)}
-                    />
-                  </div>
-                  <textarea
-                    aria-label="What you did"
-                    rows={2}
-                    className={`${inputClass} mt-3`}
-                    value={item.description}
-                    onChange={(event) => updateExperience(index, 'description', event.target.value)}
-                  />
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() =>
-                      setContent((c) => ({
-                        ...c,
-                        experience: c.experience.filter((_, position) => position !== index),
-                      }))
-                    }
-                    className="mt-2"
-                  >
-                    Remove this role
-                  </Button>
-                </fieldset>
-              ))}
-            </div>
-          </Card>
-
-          <Card>
-            <CardHeader
-              title="Education"
-              action={
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() =>
-                    setContent((c) => ({
-                      ...c,
-                      education: [...c.education, { institution: '', detail: '' }],
-                    }))
-                  }
-                >
-                  Add education
-                </Button>
-              }
-            />
-            <div className="space-y-3 p-5">
-              {content.education.length === 0 ? (
-                <EmptyState title="No education on this resume yet" />
-              ) : null}
-              {content.education.map((item, index) => (
-                <div key={index} className="grid gap-3 sm:grid-cols-2">
-                  <input
-                    aria-label="Institution"
-                    className={inputClass}
-                    value={item.institution}
-                    placeholder="Institution"
-                    onChange={(event) => updateEducation(index, 'institution', event.target.value)}
-                  />
-                  <input
-                    aria-label="Detail"
-                    className={inputClass}
-                    value={item.detail}
-                    placeholder="B.Tech Computer Science, 2021"
-                    onChange={(event) => updateEducation(index, 'detail', event.target.value)}
-                  />
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() =>
-                      setContent((c) => ({
-                        ...c,
-                        education: c.education.filter((_, position) => position !== index),
-                      }))
-                    }
-                    className="sm:col-span-2"
-                  >
-                    Remove this entry
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </Card>
-        </div>
+        <DocumentEditor
+          document={document ?? emptyDocument(currentDraft?.label ?? '')}
+          onChange={setDocument}
+          disabled={!editable}
+        />
       )}
 
+      {/* ------------------------------------------------------------ versions */}
       <Card>
-        <CardHeader title="Download" description="Downloads the stored document for the selected version." />
-        <div className="p-5">
-          {activeVersionId ? (
-            <Link
-              href={`/api/portal/candidate/resumes/versions/${activeVersionId}`}
-              className="inline-block rounded-md border border-line px-4 py-2 text-sm font-medium text-slate-300 hover:border-accent hover:text-accent"
+        <CardHeader
+          title="Versions"
+          description="Each saved version is an immutable snapshot you can export, apply with, or restore."
+          action={
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={saveVersion}
+              loading={busy === 'version'}
+              title={
+                capabilities.canKeepMultipleVersions
+                  ? undefined
+                  : 'Keeping more than one version needs a premium plan'
+              }
             >
-              Download the document
-            </Link>
-          ) : (
+              Save current as a version
+            </Button>
+          }
+        />
+        <div className="space-y-3 p-5">
+          {!capabilities.canViewVersionHistory ? (
             <p className="text-sm text-slate-500">
-              Upload a document to enable downloads.
+              Version history is part of Candidate Premium.{' '}
+              <Link href="/candidate/premium" className="underline">
+                See plans
+              </Link>
+            </p>
+          ) : historyError ? (
+            <Alert kind="error">{historyError}</Alert>
+          ) : versions.length === 0 ? (
+            <EmptyState
+              title="No versions yet"
+              description="Save your content, then save a version to generate an exportable snapshot."
+            />
+          ) : (
+            <ul className="space-y-2">
+              {versions.map((version) => (
+                <li
+                  key={version.id}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line p-3"
+                >
+                  <div className="min-w-0">
+                    <p className="flex items-center gap-2 text-sm text-ink">
+                      <span className="font-medium">
+                        {version.label ?? `Version ${version.versionNumber}`}
+                      </span>
+                      <Badge tone="bg-slate-800 text-slate-300">
+                        {version.source === 'builder' ? 'Builder' : 'Upload'}
+                      </Badge>
+                      {version.hasPdf ? (
+                        <Badge tone="bg-emerald-500/15 text-emerald-300">PDF ready</Badge>
+                      ) : null}
+                    </p>
+                    <p className="mt-0.5 text-xs text-slate-500">
+                      v{version.versionNumber} · saved {new Date(version.createdAt).toLocaleDateString()}
+                      {version.pdfByteSize ? ` · ${Math.round(version.pdfByteSize / 1024)} KB` : ''}
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    {version.hasPdf ? (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => void downloadGenerated(version.id)}
+                        disabled={busy !== null}
+                      >
+                        Download PDF
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        loading={busy === 'export'}
+                        disabled={!capabilities.canExportPdf || !version.hasContent || templateLocked}
+                        title={
+                          !capabilities.canExportPdf
+                            ? 'PDF export is part of Candidate Premium'
+                            : !version.hasContent
+                              ? 'This version has no structured content to render'
+                              : templateLocked
+                                ? 'Switch to a free template, or upgrade to export this layout'
+                                : undefined
+                        }
+                        onClick={() => void exportPdf(version.id)}
+                      >
+                        Generate PDF
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={!version.hasContent || busy !== null}
+                      onClick={() => void restore(version.id)}
+                    >
+                      Restore
+                    </Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {canExport ? null : capabilities.canExportPdf ? null : (
+            <p className="text-xs text-slate-500">
+              Generating and downloading a PDF is part of Candidate Premium.{' '}
+              <Link href="/candidate/premium" className="underline">
+                See plans
+              </Link>
             </p>
           )}
         </div>
       </Card>
     </div>
   );
-
-  function updateExperience(
-    index: number,
-    key: 'title' | 'company' | 'period' | 'description',
-    value: string
-  ): void {
-    setContent((c) => ({
-      ...c,
-      experience: c.experience.map((item, position) =>
-        position === index ? { ...item, [key]: value } : item
-      ),
-    }));
-  }
-
-  function updateEducation(
-    index: number,
-    key: 'institution' | 'detail',
-    value: string
-  ): void {
-    setContent((c) => ({
-      ...c,
-      education: c.education.map((item, position) =>
-        position === index ? { ...item, [key]: value } : item
-      ),
-    }));
-  }
-}
-
-function ResumePreview({
-  content,
-  name,
-}: {
-  content: BuilderContent;
-  name: string;
-}): React.ReactElement {
-  const skills = useMemo(
-    () => content.skills.split(',').map((skill) => skill.trim()).filter(Boolean),
-    [content.skills]
-  );
-
-  return (
-    <Card as="article">
-      <CardHeader title="Preview" description="Rendered from the same structured content that is saved." />
-      <div className="space-y-6 p-6">
-        <header>
-          <h2 className="text-xl font-semibold text-ink">{name || 'Your name'}</h2>
-          {content.headline ? (
-            <p className="mt-1 text-sm text-accent-soft">{content.headline}</p>
-          ) : null}
-        </header>
-
-        {content.summary ? (
-          <section>
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Summary</h3>
-            <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-slate-300">
-              {content.summary}
-            </p>
-          </section>
-        ) : null}
-
-        {skills.length > 0 ? (
-          <section>
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Skills</h3>
-            <ul className="mt-2 flex flex-wrap gap-1.5">
-              {skills.map((skill) => (
-                <li key={skill}>
-                  <Badge tone="bg-accent-tint text-accent-soft ring-accent/40">{skill}</Badge>
-                </li>
-              ))}
-            </ul>
-          </section>
-        ) : null}
-
-        {content.experience.length > 0 ? (
-          <section>
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Experience</h3>
-            <ul className="mt-3 space-y-4">
-              {content.experience.map((item, index) => (
-                <li key={`${item.title}-${index}`}>
-                  <p className="text-sm font-medium text-ink">{item.title || 'Role'}</p>
-                  <p className="text-sm text-slate-400">
-                    {item.company}
-                    {item.period ? ` · ${item.period}` : ''}
-                  </p>
-                  {item.description ? (
-                    <p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-slate-400">
-                      {item.description}
-                    </p>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          </section>
-        ) : null}
-
-        {content.education.length > 0 ? (
-          <section>
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Education</h3>
-            <ul className="mt-3 space-y-2">
-              {content.education.map((item, index) => (
-                <li key={`${item.institution}-${index}`}>
-                  <p className="text-sm font-medium text-ink">{item.institution || 'Institution'}</p>
-                  {item.detail ? <p className="text-sm text-slate-400">{item.detail}</p> : null}
-                </li>
-              ))}
-            </ul>
-          </section>
-        ) : null}
-      </div>
-    </Card>
-  );
-}
-
-/**
- * Reads stored builder content, seeding from the profile when a version has none
- * so a candidate is not staring at an empty form.
- */
-function readContent(
-  version: ResumeVersion,
-  profile: CandidateProfile | undefined,
-  details: CandidateDetails | null | undefined,
-): BuilderContent {
-  const stored = version.contentJson as Partial<BuilderContent> | null;
-
-  const experience = Array.isArray(stored?.experience)
-    ? (stored!.experience as BuilderContent['experience'])
-    : (details?.experience ?? []).map((item) => ({
-        title: item.title,
-        company: item.company,
-        period: item.isCurrent
-          ? `${item.startDate ?? ''} – Present`.trim()
-          : `${item.startDate ?? ''} – ${item.endDate ?? ''}`.trim(),
-        description: item.description ?? '',
-      }));
-
-  const education = Array.isArray(stored?.education)
-    ? (stored!.education as BuilderContent['education'])
-    : (details?.education ?? []).map((item) => ({
-        institution: item.institution,
-        detail: [item.degree, item.fieldOfStudy, item.endYear].filter(Boolean).join(', '),
-      }));
-
-  return {
-    headline: stored?.headline ?? profile?.headline ?? '',
-    summary: stored?.summary ?? profile?.summary ?? '',
-    skills:
-      stored?.skills ??
-      (details?.skills ?? [])
-        .map((skill) => skill.displayName || skill.name)
-        .join(', '),
-    experience,
-    education,
-  };
 }
