@@ -72,6 +72,7 @@ Fill in at minimum:
 | `ADMIN_NAME` / `ADMIN_EMAIL` / `ADMIN_PASSWORD` | used by `npm run seed:admin` |
 | `UPLOAD_DIR` | `/var/lib/ravelyth/uploads` |
 | `SMTP_*`, `EMAIL_FROM` | SMTP credentials |
+| `SUPPORT_EMAIL` | Receives public contact-form messages; site settings can also supply it |
 | `RAZORPAY_*`, `NEXT_PUBLIC_RAZORPAY_KEY_ID` | Razorpay keys |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth client |
 | `SMS_PROVIDER` + provider credentials | keep `console` until a real provider is wired |
@@ -87,7 +88,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"   # CRO
 
 ```bash
 cd /var/www/ravelyth
-sudo -u ravelyth npm ci
+sudo -u ravelyth npm ci --include=dev
 sudo -u ravelyth npm run db:migrate
 sudo -u ravelyth npm run seed        # plans, categories, skills, add-ons, settings
 sudo -u ravelyth npm run seed:admin  # idempotent, uses ADMIN_* env vars

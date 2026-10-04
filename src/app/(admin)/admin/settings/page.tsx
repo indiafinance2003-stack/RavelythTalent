@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Card, PageHeader } from "@/components/ui/primitives";
+import { Alert, Card, PageHeader } from "@/components/ui/primitives";
 import { saveSiteSettingsAction } from "@/lib/admin/settings-actions";
 import { getSiteSettings } from "@/lib/settings";
 
@@ -94,6 +94,9 @@ export default async function AdminSettingsPage() {
         </Card>
         <Card className="space-y-4">
           <h2 className="text-base font-bold text-navy">Legal policy overrides</h2>
+          <Alert tone="warning">
+            Draft: to be reviewed by legal counsel. This notice is shown to admins only; replace or approve the policy text before relying on it.
+          </Alert>
           <TextAreaField label="Privacy policy" name="privacyPolicyOverride" value={settings.privacyPolicyOverride} />
           <TextAreaField label="Terms of service" name="termsOverride" value={settings.termsOverride} />
           <TextAreaField label="Refund and cancellation policy" name="refundPolicyOverride" value={settings.refundPolicyOverride} />

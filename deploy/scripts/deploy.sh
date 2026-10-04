@@ -29,7 +29,9 @@ git checkout "$BRANCH"
 git pull --ff-only origin "$BRANCH" || fail "git pull failed (local changes?)"
 
 step "Install dependencies"
-npm ci --omit=dev || fail "npm ci failed"
+# Migration, seed, and build scripts use devDependencies such as tsx and
+# TypeScript. Keep them installed for this deployment workflow.
+npm ci --include=dev || fail "npm ci failed"
 
 step "Apply database migrations"
 # Migrations are committed SQL in ./drizzle and are idempotent.

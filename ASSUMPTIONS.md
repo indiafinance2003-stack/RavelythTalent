@@ -3,7 +3,7 @@
 Every decision taken while building Ravelyth Talent autonomously, with the
 reasoning. Anything marked **[OWNER ACTION]** needs a human.
 
-Last updated: Phase 5.
+Last updated: Phase 7.
 
 ---
 
@@ -231,3 +231,50 @@ tokens, skill links, application history).
   the source field is captured on applications. Time-to-hire is derived from
   the application timeline and only includes hired applications with usable
   timestamps.
+
+## 8. Resume Builder, blog, reviews & salary insights
+
+- Free candidates may edit one Classic resume as a visual preview, but cannot
+  download a PDF or use professional templates. Paid-builder, template, and
+  version entitlements are checked on the server. Paid edits generate a PDF
+  snapshot; finite version limits retain the newest versions and remove older
+  PDF files. Generated PDFs stay outside `/public` and are served only through
+  an owner-checked route.
+- Blog article content is plain text with paragraph breaks rather than
+  user-authored HTML, avoiding unsafe HTML rendering. Optional cover images are
+  limited to validated JPEG, PNG, or WebP files and stored outside `/public`;
+  only published posts and their covers are public. The `featureBlog` setting
+  gates public blog routes.
+- A candidate may submit one review per approved company. Reviews remain
+  pending until an admin publishes them; public company pages show only
+  published reviews and do not expose reviewer identity. Company rating/count
+  aggregates are recalculated when a review is moderated. `featureReviews`
+  controls public review display and submission.
+- Salary insights include only published, visible, INR job salary ranges.
+  Pay periods are annualized using 1 year, 12 months, 260 working days, and
+  2,080 working hours per year. Groups are split by title, category, location,
+  and original pay period and require at least five postings before display.
+  These are listing aggregates, not individual salary guidance.
+- Recruiter↔candidate chat is intentionally not implemented in v1, as required
+  by the specification.
+
+## 9. Public information, legal pages & contact
+
+- About and FAQ copy describes current platform capabilities only; no company
+  milestones, customers, or performance claims are invented. Public company,
+  blog, and salary pages expose only their intended approved/published/
+  threshold-qualified data.
+- Legal policy pages use plain-text admin overrides from `site_settings` when
+  provided; otherwise they use general India-aware starter language and the
+  configured legal name, address, and contact details. The exact
+  "Draft: to be reviewed by legal counsel" notice is visible to admins in
+  `/admin/settings`, not to public visitors. **[OWNER ACTION]** complete legal
+  details and have counsel review/replace the starter text before launch.
+- The public contact form is limited to five submissions per hour per
+  requester IP, persists messages in `contact_messages`, and queues support
+  email through `email_outbox`. Admins can mark those messages handled in
+  `/admin/support`. A working support email must be configured in site settings
+  or `SUPPORT_EMAIL`.
+- A live manual walkthrough was not performed because the runtime database and
+  external service credentials are not configured in this workspace. Use the
+  post-deploy smoke-test checklist after owner setup.

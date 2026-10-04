@@ -91,26 +91,32 @@ Legend: `[x]` done · `[~]` partially done / needs owner input · `[ ]` not star
 - [x] Reports for job views, applications, conversion, application source, and time-to-hire
 - [x] Phase 5 validation: `npm run typecheck`, `npm run lint`, and `npm run build`
 
-## Phase 6 — Resume builder, reviews, salary insights
-- [ ] Paid Resume Builder (templates, versions, PDF, history)
-- [ ] Blog posts (public list/detail + admin CRUD)
-- [ ] Company reviews (submit, moderate, company page)
-- [ ] Salary insights (aggregates, threshold-gated)
+## Phase 6 — Resume builder, blog, reviews and salary insights ✅
+- [x] Resume Builder: one basic free preview; paid templates, server-side plan gates,
+      saved versions/history, generated PDFs, and owner-only downloads
+- [x] Admin-managed blog drafts/publication, safe cover uploads, public listing/detail,
+      SEO metadata, and feature flag
+- [x] Candidate company reviews, admin moderation, published company-page reviews,
+      and maintained company rating aggregates
+- [x] Salary insights from published disclosed INR jobs, annualized by pay period,
+      with a five-posting minimum per role/category/location group
 - [ ] Recruiter↔candidate chat: intentionally NOT built (documented placeholder)
 
 ## Phase 7 — SEO, legal, final QA
 - [x] sitemap.xml, robots.txt, per-page metadata, OG, JobPosting JSON-LD (jobs part done in Phase 3)
-- [ ] Legal pages + admin-only draft notice
-- [ ] About, Contact, FAQ, 404, error pages
+- [x] Privacy, terms, refund/cancellation templates use site settings; admin-only legal draft notice
+- [x] About, Contact (rate-limited form, email outbox, admin inbox), FAQ, 404, error pages
 - [x] `/deploy`: nginx, systemd + cron timers, deploy.sh, postgres/setup.sql
 - [x] `DEPLOYMENT.md` runbook
 - [x] `.env.example` complete (includes RAZORPAY_*)
-- [x] Final Phase 5 build checks: typecheck / lint / build green
+- [x] Final `npm run typecheck`, `npm run lint`, `npm run build`
+- [~] Live manual walkthrough requires configured PostgreSQL, SMTP, Google and Razorpay owner credentials
 
 ---
 
 ## Notes / decisions
 See `ASSUMPTIONS.md` for every decision taken while working autonomously.
 
-Next: Phase 6 paid Resume Builder, blog, company reviews, and salary insights.
-Phases 1-5 are complete; typecheck, lint, and build are green.
+Implementation is complete. Automated quality checks are green. Before launch,
+configure owner credentials and perform the database-backed and provider-backed
+manual smoke tests listed in `DEPLOYMENT.md`.

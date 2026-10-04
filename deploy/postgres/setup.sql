@@ -14,7 +14,7 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'ravelyth_app') THEN
         CREATE ROLE ravelyth_app WITH
             LOGIN
-            PASSWORD ''CHANGE_ME_TO_A_LONG_RANDOM_PASSWORD''
+            PASSWORD 'CHANGE_ME_TO_A_LONG_RANDOM_PASSWORD'
             NOSUPERUSER
             NOCREATEDB
             NOCREATEROLE
