@@ -12,9 +12,9 @@ import { AppError } from "@/lib/errors";
 
 export function uploadRoot(): string {
   const configured = getEnv().UPLOAD_DIR;
-  return path.isAbsolute(configured)
-    ? path.normalize(configured)
-    : path.normalize(path.join(process.cwd(), configured));
+  // `path.resolve` handles both absolute paths and paths relative to the app
+  // root without a dynamic join (which trips Turbopack's tracing heuristic).
+  return path.normalize(path.resolve(configured));
 }
 
 export const STORAGE_BUCKETS = [

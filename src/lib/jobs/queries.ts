@@ -1,6 +1,6 @@
 import { and, count, desc, eq, isNull, sql, type SQL } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { categories, companies, jobSkills, jobs, skills } from "@/lib/db/schema";
+import { categories, companies, jobSkills, jobs, savedJobs, skills } from "@/lib/db/schema";
 
 /**
  * Public job search.
@@ -297,5 +297,25 @@ export async function getLatestJobs(limit = 6): Promise<JobCard[]> {
     )
     .orderBy(desc(jobs.publishedAt), desc(jobs.createdAt))
     .limit(limit);
+  return rows;
+}
+
+/** Jobs a candidate bookmarked, newest save first. */
+export async function getSavedJobsForUser(userId: string): Promise<JobCard[]> {
+  const rows = await db
+    .select(CARD_COLUMNS)
+    .from(savedJobs)
+    .innerJoin(jobs, eq(jobs.id, savedJobs.jobId))
+    .innerJoin(companies, eq(companies.id, jobs.companyId))
+    .leftJoin(categories, eq(categories.id, jobs.categoryId))
+    .where(
+      and(
+        eq(savedJobs.userId, userId),
+        eq(jobs.status, "published"),
+        isNull(jobs.deletedAt),
+      ),
+    )
+    .orderBy(desc(savedJobs.createdAt));
+
   return rows;
 }
