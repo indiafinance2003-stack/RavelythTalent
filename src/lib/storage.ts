@@ -159,6 +159,16 @@ export async function readValidatedUpload(
     );
   }
 
+  if (
+    !file.name ||
+    file.name.includes("/") ||
+    file.name.includes("\\") ||
+    file.name.includes("\0") ||
+    path.win32.parse(file.name).root
+  ) {
+    throw new AppError("The file name must not contain a path.", 400, "invalid_file_name");
+  }
+
   const declaredExt = path.extname(file.name).toLowerCase();
   const allowedExts = new Set(
     options.allowedMimes.map((m) => EXT_BY_MIME[m]).filter(Boolean) as string[],

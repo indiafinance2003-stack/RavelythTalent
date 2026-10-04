@@ -49,9 +49,9 @@ export async function assertSameOrigin(): Promise<void> {
 }
 
 /**
- * Guards the internal cron endpoints: requires a constant-time match of the
- * `x-cron-secret` header AND a loopback caller. External callers therefore
- * cannot trigger background work even if the secret leaked.
+ * Guards internal cron endpoints with a constant-time secret comparison.
+ * Network access is restricted by the loopback-only app listener and public
+ * Nginx denial; forwarded headers are untrusted and are not peer identity.
  */
 export async function assertCronRequest(): Promise<void> {
   const h = await headers();
@@ -62,19 +62,12 @@ export async function assertCronRequest(): Promise<void> {
     throw new AuthorizationError("Invalid cron secret.", "invalid_cron_secret", 401);
   }
 
-  const remoteIp =
-    h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? h.get("x-real-ip") ?? null;
-
-  // Behind nginx on the same host, 127.0.0.1 is what the proxy reports.
-  const loopback = new Set(["127.0.0.1", "::1", "localhost", "::ffff:127.0.0.1"]);
-  if (remoteIp && !loopback.has(remoteIp)) {
-    throw new AuthorizationError("Cron calls are localhost-only.", "cron_remote", 403);
-  }
 }
 
 export async function getRequestIp(): Promise<string | null> {
   const h = await headers();
-  const forwarded = h.get("x-forwarded-for");
-  if (forwarded) return forwarded.split(",")[0]!.trim();
-  return h.get("x-real-ip") ?? h.get("cf-connecting-ip") ?? null;
+  // Nginx overwrites X-Real-IP with the peer address. X-Forwarded-For and
+  // provider-specific headers can contain client-supplied values and must not
+  // be used to evade IP-based rate limits.
+  return h.get("x-real-ip")?.trim() || null;
 }

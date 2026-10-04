@@ -1,35 +1,51 @@
 # Project audit
 
-Audit performed against `MASTER_PROMPT.md.txt` (the specification file present
-in the repository root) and the current repository state.
+Audit performed against `MASTER_PROMPT.md` and the current repository state.
+Phase status describes implementation evidence; it does not imply that
+database-backed runtime behavior has been verified.
 
 ## Baseline commands
 
 | Command | Result |
 | --- | --- |
-| `npm install` | Succeeded; dependency audit reported 9 vulnerabilities (4 moderate, 5 high). |
-| `npm run typecheck` | Passed. |
-| `npm run lint` | Passed. |
-| `npm run build` | Passed; no build errors. |
+| `npm install` | Dependencies installed; no secrets or `.env` were created. |
+| `npm run typecheck` | Passed on the final code. |
+| `npm run lint` | Passed on the final code. |
+| `npm run build` | Passed; optimized production build completed. |
+| `npm run test` | Passed: 45 tests in 5 files. |
+| `npm run test:e2e` | 2 smoke tests passed; DB health failed on local `ravelyth_app` authentication. |
+| `npm run db:migrate` | Blocked because `DATABASE_URL` is unset; migrations and seeds have not run. |
+| `npm audit --omit=dev --audit-level=low` | 0 production vulnerabilities. Full audit has 5 high findings in dev/lint tooling. |
 
 ## Phase status
 
 | Phase | Status | Evidence and remaining work |
 | --- | --- | --- |
-| 1. Scaffold, brand, schema, migrations, seeds, env validation | DONE | `package.json`, `src/app/layout.tsx`, `src/components/brand/logo.tsx`, `src/lib/db/schema/`, `drizzle/0000_magical_alex_wilder.sql`, `drizzle/0001_search_extensions_and_sequences.sql`, `scripts/seed.ts`, `src/lib/env.ts`. |
-| 2. Authentication, sessions, rate limits, email outbox | DONE | `src/lib/auth/`, `src/lib/rate-limit.ts`, `src/lib/email/`, `src/app/(auth)/`, and `src/app/api/auth/`. |
-| 3. Company approval, job moderation, search and application pipeline | DONE | Recruiter company setup/verification upload and job/application flows exist in `src/lib/recruiter/`, `src/app/(recruiter)/`, and `src/components/recruiter/`. Company/job review queues and audited decisions are in `src/lib/admin/moderation.ts` and `src/app/(admin)/admin/`; protected document downloads are in `src/app/api/files/verification/[id]/route.ts`. |
-| 4. Plans, payments, subscriptions, entitlements and invoices | DONE | Plan catalog, Razorpay order/verify/webhook, subscription activation, quota helper, invoices, and billing pages exist in `src/lib/billing/`, `src/lib/entitlements.ts`, `src/app/api/billing/`, `src/app/api/webhooks/razorpay/`, and dashboard billing pages. Add-on configuration is in `/admin/add-ons`; company-scoped checkout, activation, PDF invoice and outbox email are in `src/app/(recruiter)/recruiter/add-ons/`, `src/lib/billing/addons.ts`, and billing routes. Promotion prices are validated and applied server-side in `src/app/api/billing/order/route.ts`. Plan/promotion administration is in `src/app/(admin)/admin/plans/` and `src/lib/admin/plan-actions.ts`. |
-| 5. Admin panel, interviews, notifications, alerts, cron, candidate search and reports | DONE | Admin pages and actions cover dashboard, users, companies/jobs, categories, plans/promotions, billing, add-ons, settings, email outbox, support and audit logs in `src/app/(admin)/admin/` and `src/lib/admin/`. Interview scheduling/confirmation is in `src/lib/interviews/` and recruiter/candidate routes. Candidate search, saved candidates and download authorization are in `src/app/(recruiter)/recruiter/candidates/`, `src/lib/recruiter/candidate-actions.ts`, and `src/lib/candidate/downloads.ts`. Reports are in `src/lib/recruiter/reports.ts` and `/recruiter/reports`. Team management is in `src/lib/recruiter/team.ts` and `/recruiter/team`. Existing notifications, alerts and cron handlers remain in `src/lib/notifications.ts`, `src/lib/alerts/`, and `src/app/api/internal/cron/`. |
-| 6. Resume builder, blog, reviews and salary insights | DONE | Candidate Resume Builder, plan gates, PDF generation, version history and protected download are in `src/app/(app)/dashboard/resume-builder/`, `src/lib/candidate/builder*.ts*`, and `src/app/api/files/built-resumes/`. Blog admin/public routes are in `src/app/(admin)/admin/blog/`, `src/app/(public)/blog/`, and `src/lib/admin/blog-actions.ts`; migration `drizzle/0004_elite_inhumans.sql` enforces unique blog slugs. Company review submission/moderation and public company pages are in `src/lib/company-reviews/`, `src/app/(admin)/admin/reviews/`, and `src/app/(public)/companies/`. Threshold-gated salary insights are in `src/lib/jobs/salary-insights.ts` and `/salary-insights`. |
-| 7. SEO, legal, public informational pages, deployment and final QA | PARTIAL | Sitemap, robots, job metadata, company/blog/salary pages, About/Contact/FAQ, legal templates, admin-only legal draft notice, existing 404/error pages, nginx/systemd deployment assets and `DEPLOYMENT.md` are present. Final typecheck/lint/build pass. Live manual walkthrough remains blocked on owner-provided PostgreSQL, SMTP, Google OAuth and Razorpay configuration. |
+| 1. Scaffold, brand, schema, migrations, seeds, env validation | DONE (implementation); runtime PARTIAL | `package.json`, `src/app/layout.tsx`, `src/components/brand/logo.tsx`, `src/lib/db/schema/`, `drizzle/`, `scripts/seed.ts`, `scripts/seed-admin.ts`, `scripts/seed-demo.ts`, `src/lib/env.ts`. `npm run db:generate` reports no schema changes. Database migrations and seeds are blocked because no verified `.env`/`DATABASE_URL` is available. |
+| 2. Authentication, sessions, rate limits, email outbox | DONE (implementation); E2E PARTIAL | `src/lib/auth/`, `src/lib/rate-limit.ts`, `src/lib/email/`, `src/app/(auth)/`, and `src/app/api/auth/`. Crypto and template unit tests pass; DB-backed account and SMTP delivery journeys have not run. |
+| 3. Company approval, job moderation, search and application pipeline | DONE (implementation); E2E PARTIAL | Recruiter company/job/application flows in `src/lib/recruiter/`, `src/app/(recruiter)/`, and `src/components/recruiter/`; moderation in `src/lib/admin/moderation.ts`; protected documents in `src/app/api/files/verification/[id]/route.ts`. PostgreSQL-backed workflows are unverified. |
+| 4. Plans, payments, subscriptions, entitlements and invoices | DONE (implementation); E2E PARTIAL | `src/lib/billing/`, `src/lib/entitlements.ts`, `src/app/api/billing/`, `src/app/api/webhooks/razorpay/`, and billing pages. Focused billing unit tests pass; DB activation, webhook, invoice numbering, payment, and quota scenarios have not run. |
+| 5. Admin panel, interviews, notifications, alerts, cron, candidate search and reports | DONE (implementation); E2E PARTIAL | Admin/recruiter routes in `src/app/(admin)/admin/` and `src/app/(recruiter)/recruiter/`; interviews, candidate search, reports, alerts and cron in their corresponding `src/lib/` modules and `src/app/api/internal/cron/`. Authorization and workflows need DB-backed tests. |
+| 6. Resume builder, blog, reviews and salary insights | DONE (implementation); E2E PARTIAL | Resume Builder, blog, reviews, and salary insights in `src/app/` and `src/lib/` routes. Entitlements, moderation, feature flags, and salary thresholds have not been verified against a database. Recruiter↔candidate chat is intentionally not built, as recorded in `PROGRESS.md`. |
+| 7. SEO, legal, public informational pages, deployment and final QA | PARTIAL | Sitemap/robots, public pages, legal templates, Nginx/systemd/deploy assets, `deploy/DEPLOYMENT.md`, and owner checklist exist. Typecheck/lint/build pass and robots smoke test passes. Live sitemap, working database health, provider flows, target-host config validation, and mobile/accessibility walkthrough remain unverified. |
 
 ## Audit notes
 
-- The repository contains `MASTER_PROMPT.md.txt`, not `MASTER_PROMPT.md`; that
-  existing untracked specification was read in full and left untouched.
+- `MASTER_PROMPT.md.txt` was renamed to `MASTER_PROMPT.md` as requested.
 - The initial audit found missing moderation and add-on capabilities in Phases 3
   and 4; these were completed alongside Phase 5 plan/promotion administration.
-- Final `npm run typecheck`, `npm run lint`, and `npm run build` pass.
-  `npm install` reported dependency audit findings (4 moderate, 5 high); no
-  forced dependency upgrades were attempted.
+- The DB health E2E test fails because the local app role cannot authenticate.
+  A bootstrap attempt changed the local `postgres` password before failing;
+  its generated password was not retained. `npm run db:migrate` then stopped
+  before connection because no verified `DATABASE_URL` exists. No `.env` was
+  created; migrations and seeds are not claimed as complete.
+- The earlier missing `zod` import in
+  `src/app/api/files/verification/[id]/route.ts` was fixed; final typecheck
+  passes. Production-mode health errors were smoke-tested as generic JSON
+  without SQL/stack detail, using intentionally invalid database credentials.
+- A bounded static security review found one HIGH privilege issue in the
+  root-run backup service; it now runs as the unprivileged `ravelyth` account.
+  See `SECURITY_NOTES.md`.
+- Full audit has five high findings in development/lint tooling; the suggested
+  forced fix downgrades the Next.js lint configuration across a major version
+  and was not applied. Production dependencies have zero reported findings.

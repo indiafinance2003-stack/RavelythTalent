@@ -1,7 +1,6 @@
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
-  companyMembers,
   invoices,
   payments,
   plans,
@@ -137,7 +136,7 @@ export async function listInvoices(
   }));
 }
 
-/** Loads one invoice if the signed-in user owns it (or belongs to its company). */
+/** Loads an invoice only for its account owner or an administrator. */
 export async function findOwnedInvoice(
   invoiceId: string,
   userId: string,
@@ -164,23 +163,7 @@ export async function findOwnedInvoice(
   const invoice = rows.at(0);
   if (!invoice) return null;
 
-  // Company invoices stay visible to other active members of that company;
-  // everything else is owner-only (admins always pass).
-  if (invoice.invoiceUserId !== userId && role !== "admin") {
-    if (!invoice.companyId) return null;
-    const member = await db
-      .select({ id: companyMembers.id })
-      .from(companyMembers)
-      .where(
-        and(
-          eq(companyMembers.companyId, invoice.companyId),
-          eq(companyMembers.userId, userId),
-          eq(companyMembers.status, "active"),
-        ),
-      )
-      .limit(1);
-    if (!member.at(0)) return null;
-  }
+  if (invoice.invoiceUserId !== userId && role !== "admin") return null;
 
   return {
     id: invoice.id,

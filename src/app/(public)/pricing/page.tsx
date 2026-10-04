@@ -5,6 +5,7 @@ import { listUserCompanies } from "@/lib/entitlements";
 import { listPublicPlans } from "@/lib/billing/plans";
 import { PricingPlans } from "@/components/billing/pricing-plans";
 import { DecorCircles } from "@/components/ui/primitives";
+import { razorpayCheckoutConfigured } from "@/lib/billing/razorpay";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +40,7 @@ export default async function PricingPage() {
             plans={plans}
             signedIn={Boolean(user)}
             companyId={companies.at(0)?.id ?? null}
+            paymentAvailable={razorpayCheckoutConfigured()}
           />
         </div>
 

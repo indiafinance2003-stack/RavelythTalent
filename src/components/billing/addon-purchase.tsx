@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Alert, Card } from "@/components/ui/primitives";
 import { formatPaise } from "@/lib/utils";
@@ -19,10 +20,12 @@ export function AddonPurchase({
   addon,
   companyId,
   jobs,
+  paymentAvailable,
 }: {
   addon: AddonOption;
   companyId: string;
   jobs: Array<{ id: string; title: string }>;
+  paymentAvailable: boolean;
 }) {
   const router = useRouter();
   const [jobId, setJobId] = useState("");
@@ -85,6 +88,12 @@ export function AddonPurchase({
       {addon.description ? <p className="mt-2 flex-1 text-sm text-slate-600">{addon.description}</p> : null}
       <p className="mt-4 font-semibold text-navy">{formatPaise(addon.pricePaise)}</p>
       <p className="mt-1 text-xs text-slate-500">Active for {addon.durationDays} days</p>
+      {!paymentAvailable ? (
+        <p className="mt-4 text-sm text-amber-900">
+          Online payment will be available soon.{" "}
+          <Link className="font-semibold underline" href="/contact">Contact us to subscribe</Link>.
+        </p>
+      ) : null}
       {addon.type === "per_job" ? (
         <label className="mt-4 block text-sm font-medium text-navy">
           Published job
@@ -102,7 +111,7 @@ export function AddonPurchase({
       {message ? <Alert className="mt-4" tone="success">{message}</Alert> : null}
       <button
         className="mt-5 rounded-xl bg-royal px-4 py-2.5 text-sm font-semibold text-white hover:bg-navy disabled:opacity-60"
-        disabled={busy || (addon.type === "per_job" && jobs.length === 0)}
+        disabled={!paymentAvailable || busy || (addon.type === "per_job" && jobs.length === 0)}
         onClick={buyAddon}
         type="button"
       >

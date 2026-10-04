@@ -61,7 +61,7 @@ export function emptyEntitlements(): Map<FeatureKey, Entitlement> {
   return new Map();
 }
 
-async function loadPlanById(planId: string): Promise<ActivePlan | null> {
+async function loadPlanBySubscriptionId(subscriptionId: string): Promise<ActivePlan | null> {
   const rows = await db
     .select({
       subscriptionId: subscriptions.id,
@@ -75,7 +75,7 @@ async function loadPlanById(planId: string): Promise<ActivePlan | null> {
     .innerJoin(plans, eq(plans.id, subscriptions.planId))
     .where(
       and(
-        eq(subscriptions.planId, planId),
+        eq(subscriptions.id, subscriptionId),
         eq(subscriptions.status, "active"),
         lte(subscriptions.startedAt, new Date()),
         sql`${subscriptions.currentPeriodEnd} > now()`,
@@ -109,40 +109,42 @@ async function loadPlanById(planId: string): Promise<ActivePlan | null> {
 /** Most recently ending active subscription for a company, if any. */
 export async function getCompanyPlan(companyId: string): Promise<ActivePlan | null> {
   const rows = await db
-    .select({ planId: subscriptions.planId })
+    .select({ subscriptionId: subscriptions.id })
     .from(subscriptions)
     .where(
       and(
         eq(subscriptions.companyId, companyId),
         eq(subscriptions.status, "active"),
+        lte(subscriptions.startedAt, new Date()),
         sql`${subscriptions.currentPeriodEnd} > now()`,
       ),
     )
     .orderBy(desc(subscriptions.currentPeriodEnd))
     .limit(1);
 
-  const planId = rows.at(0)?.planId;
-  return planId ? loadPlanById(planId) : null;
+  const subscriptionId = rows.at(0)?.subscriptionId;
+  return subscriptionId ? loadPlanBySubscriptionId(subscriptionId) : null;
 }
 
 /** Active candidate (B2C) subscription for a user. */
 export async function getUserPlan(userId: string): Promise<ActivePlan | null> {
   const rows = await db
-    .select({ planId: subscriptions.planId })
+    .select({ subscriptionId: subscriptions.id })
     .from(subscriptions)
     .where(
       and(
         eq(subscriptions.userId, userId),
         isNull(subscriptions.companyId),
         eq(subscriptions.status, "active"),
+        lte(subscriptions.startedAt, new Date()),
         sql`${subscriptions.currentPeriodEnd} > now()`,
       ),
     )
     .orderBy(desc(subscriptions.currentPeriodEnd))
     .limit(1);
 
-  const planId = rows.at(0)?.planId;
-  return planId ? loadPlanById(planId) : null;
+  const subscriptionId = rows.at(0)?.subscriptionId;
+  return subscriptionId ? loadPlanBySubscriptionId(subscriptionId) : null;
 }
 
 /**

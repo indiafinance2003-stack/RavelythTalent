@@ -2,7 +2,7 @@ import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { otpCodes, users } from "@/lib/db/schema";
 import { generateOtp, sha256Hex } from "@/lib/auth/crypto";
-import { dispatchOtp, normalizePhone } from "@/lib/sms";
+import { dispatchOtp, normalizePhone, smsProviderAvailable } from "@/lib/sms";
 import { AppError } from "@/lib/errors";
 import type { OtpPurpose } from "@/lib/sms";
 
@@ -23,6 +23,13 @@ export async function sendOtp(
   phoneRaw: string,
   purpose: OtpPurpose,
 ): Promise<void> {
+  if (!smsProviderAvailable()) {
+    throw new AppError(
+      "Mobile OTP is not available yet. Please use email or contact support.",
+      503,
+      "sms_provider_unavailable",
+    );
+  }
   const phone = normalizePhone(phoneRaw);
 
   const recent = await db

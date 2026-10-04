@@ -14,12 +14,22 @@ export default function robots(): MetadataRoute.Robots {
     rules: [
       {
         userAgent: "*",
-        allow: ["/", "/jobs", "/companies", "/blog", "/about", "/pricing", "/faq"],
+        allow: [
+          "/",
+          "/jobs",
+          "/companies",
+          "/blog",
+          "/about",
+          "/pricing",
+          "/faq",
+          "/contact",
+          "/salary-insights",
+        ],
         disallow: [
           "/api/",
-          "/dashboard",
-          "/recruiter",
-          "/admin",
+          "/dashboard/",
+          "/recruiter/",
+          "/admin/",
           "/account",
           "/login",
           "/register",

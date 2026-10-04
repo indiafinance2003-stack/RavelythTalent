@@ -115,9 +115,12 @@ sudo systemctl enable --now ravelyth-cron-cleanup-expired-tokens-sessions.timer
 systemctl list-timers 'ravelyth-cron-*'
 ```
 
-Each timer calls `http://127.0.0.1:3000/api/internal/cron/<job>` with the
-`x-cron-secret` header read from `/var/www/ravelyth/.env`. The endpoint also
-rejects any caller that is not loopback.
+Each timer calls `http://127.0.0.1:3000/api/internal/cron/<job>` directly with
+the `x-cron-secret` header read from `/var/www/ravelyth/.env`. The Next.js
+service binds only to `127.0.0.1`; the public Nginx virtual host returns 404
+for every `/api/internal/` path instead of proxying it. The application checks
+the secret in constant time and deliberately does not infer the peer address
+from `X-Forwarded-For` or other client-controlled headers.
 
 Manual trigger for a smoke test:
 
@@ -179,21 +182,25 @@ Keep `SMS_PROVIDER=console` until a real provider is implemented in
 ## 9. Backups
 
 ```bash
-sudo install -m 0755 -o root -g root /dev/null /etc/cron.daily/ravelyth-backup
-sudo tee /etc/cron.daily/ravelyth-backup >/dev/null <<'EOF'
-#!/bin/bash
-set -euo pipefail
-DEST=/var/backups/ravelyth
-mkdir -p "$DEST"
-pg_dump --dbname="$DATABASE_URL" --format=custom --file="$DEST/ravelyth-$(date +%F).dump"
-tar -czf "$DEST/uploads-$(date +%F).tar.gz" -C /var/lib/ravelyth uploads
-find "$DEST" -type f -mtime +14 -delete
-EOF
-sudo chmod 0755 /etc/cron.daily/ravelyth-backup
+sudo install -d -m 0700 -o ravelyth -g ravelyth /var/backups/ravelyth
+sudo install -m 0755 -o root -g root \
+  /var/www/ravelyth/deploy/scripts/backup.sh /usr/local/sbin/ravelyth-backup
+sudo cp /var/www/ravelyth/deploy/systemd/ravelyth-backup.service \
+  /var/www/ravelyth/deploy/systemd/ravelyth-backup.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now ravelyth-backup.timer
+sudo systemctl start ravelyth-backup.service
+sudo systemctl status ravelyth-backup.service --no-pager
+sudo ls -lh /var/backups/ravelyth
 ```
 
-For encrypted off-site backups, add restic/borg; keep the passphrase in
-`/root/.config`.
+The backup service runs as the unprivileged `ravelyth` account; it reads the
+app environment and writes only to its mode-0700 backup directory. The timer
+keeps daily custom-format database dumps for approximately 14 days.
+Database dumps do **not** include uploaded resumes, invoices, or other files in
+`/var/lib/ravelyth/uploads`; configure a separate encrypted off-site backup for
+that directory and regularly test both database and upload restores. Treat all
+backups as sensitive personal data.
 
 ## 10. Routine deploys
 
@@ -226,8 +233,8 @@ sudo fail2ban-client status
       `/dashboard/applications`.
 - [ ] `https://ravelyth.in/verify-email` resend works.
 - [ ] Admin sign-in works and the email test button delivers.
-- [ ] Each cron endpoint returns `{"ok":true}` when called from localhost with
-      the secret, and **403** without it.
+- [ ] Each cron endpoint returns `{"ok":true}` when called directly on localhost
+      with the secret, and rejects a missing or wrong secret.
 - [ ] `https://www.ravelyth.in` 301s to the apex.
 - [ ] `http://ravelyth.in` 301s to HTTPS.
 - [ ] TLS: `https://www.ssllabs.com/ssltest/` or `openssl s_client`.

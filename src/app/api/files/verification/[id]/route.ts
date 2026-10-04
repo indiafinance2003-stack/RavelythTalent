@@ -1,6 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { readFile } from "node:fs/promises";
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { requireApiUser } from "@/lib/auth/current-user";
 import { db } from "@/lib/db";
 import { companies, companyMembers, companyVerificationDocuments } from "@/lib/db/schema";
@@ -16,6 +17,8 @@ export async function GET(
   try {
     const user = await requireApiUser();
     const { id } = await params;
+    const parsedId = z.uuid().safeParse(id);
+    if (!parsedId.success) throw new AppError("Document not found.", 404, "not_found");
     const rows = await db
       .select({
         storagePath: companyVerificationDocuments.storagePath,
@@ -25,7 +28,7 @@ export async function GET(
       })
       .from(companyVerificationDocuments)
       .innerJoin(companies, eq(companies.id, companyVerificationDocuments.companyId))
-      .where(eq(companyVerificationDocuments.id, id))
+      .where(eq(companyVerificationDocuments.id, parsedId.data))
       .limit(1);
     const document = rows.at(0);
     if (!document) throw new AppError("Document not found.", 404, "not_found");

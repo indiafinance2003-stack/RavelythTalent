@@ -29,6 +29,11 @@ export function getSmsProvider(): SmsProvider {
   return cached;
 }
 
+/** The MSG91 and Twilio adapters remain stubs; console OTP is never real SMS. */
+export function smsProviderAvailable(): boolean {
+  return false;
+}
+
 /**
  * Sends an OTP. Returns false instead of throwing on transport failures so the
  * caller can show a generic message without leaking provider internals.
@@ -44,7 +49,7 @@ export async function dispatchOtp(input: {
     await provider.sendOtp(input);
     return true;
   } catch (error) {
-    if (error instanceof AppError && error.status === 501) throw error;
+    if (error instanceof AppError && error.status >= 500) throw error;
     console.error(`[sms:${provider.name}] send failed:`, error);
     return false;
   }

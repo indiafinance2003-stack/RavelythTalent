@@ -3,6 +3,8 @@ import { enforceRateLimit, RATE_LIMITS, rateKey } from "@/lib/rate-limit";
 import { handleApi, jsonOk, readJson } from "@/lib/http";
 import { otpRequestSchema } from "@/lib/validation/auth";
 import { sendOtp } from "@/lib/auth/otp";
+import { smsProviderAvailable } from "@/lib/sms";
+import { AppError } from "@/lib/errors";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,6 +12,13 @@ export const dynamic = "force-dynamic";
 /** POST /api/auth/otp/request - sends a 6-digit OTP to an Indian mobile. */
 export const POST = handleApi(async (request: Request) => {
   await assertSameOrigin();
+  if (!smsProviderAvailable()) {
+    throw new AppError(
+      "Mobile OTP is not available yet. Please use email or contact support.",
+      503,
+      "sms_provider_unavailable",
+    );
+  }
 
   const ip = (await getRequestIp()) ?? "unknown";
   await enforceRateLimit(rateKey("otpRequest", ip), RATE_LIMITS.otpRequest);

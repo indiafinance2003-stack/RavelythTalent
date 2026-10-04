@@ -11,9 +11,7 @@ WorkingDirectory=/var/www/ravelyth
 EnvironmentFile=/var/www/ravelyth/.env
 
 # CRON_SECRET is read from .env by the EnvironmentFile directive above.
-ExecStart=/usr/bin/curl --fail --silent --show-error --max-time 120 \\
-  -H "x-cron-secret: \" \\
-  http://127.0.0.1:3000/api/internal/cron/expire-jobs
+ExecStart=/usr/bin/curl --fail --silent --show-error --max-time 120 -H "x-cron-secret: ${CRON_SECRET}" http://127.0.0.1:3000/api/internal/cron/expire-jobs
 
 StandardOutput=journal
 StandardError=journal

@@ -6,6 +6,7 @@ import { requireUser } from "@/lib/auth/current-user";
 import { db } from "@/lib/db";
 import { addons } from "@/lib/db/schema";
 import { resolveRecruiterCompany, listCompanyJobs } from "@/lib/recruiter/service";
+import { razorpayCheckoutConfigured } from "@/lib/billing/razorpay";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Hiring add-ons" };
@@ -54,7 +55,7 @@ export default async function RecruiterAddonsPage({
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {options.map((addon) => addon.pricePaise !== null ? (
-            <AddonPurchase key={addon.id} addon={{ ...addon, pricePaise: addon.pricePaise }} companyId={company.id} jobs={publishedJobs} />
+            <AddonPurchase key={addon.id} addon={{ ...addon, pricePaise: addon.pricePaise }} companyId={company.id} jobs={publishedJobs} paymentAvailable={razorpayCheckoutConfigured()} />
           ) : null)}
         </div>
       )}

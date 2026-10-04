@@ -93,26 +93,33 @@ export function subscriptionActivatedEmail(params: {
   planName: string;
   periodLabel: string;
   endsOn: string;
+  startsOn?: string;
   manageUrl: string;
   brand?: EmailBrand;
 }): RenderedEmail {
+  const scheduled = Boolean(params.startsOn);
   return render({
-    subject: `Your ${params.planName} plan is active`,
-    preheader: "Your subscription has started.",
-    heading: "Subscription activated",
-    intro: `Hi ${params.name}, your subscription is now active.`,
+    subject: `Your ${params.planName} plan ${scheduled ? "is scheduled" : "is active"}`,
+    preheader: scheduled ? `Your subscription starts on ${params.startsOn}.` : "Your subscription has started.",
+    heading: scheduled ? "Subscription scheduled" : "Subscription activated",
+    intro: scheduled
+      ? `Hi ${params.name}, your subscription will start on ${params.startsOn}.`
+      : `Hi ${params.name}, your subscription is now active.`,
     blocks: [
       {
         type: "detail",
         rows: [
           { label: "Plan", value: params.planName },
           { label: "Billing period", value: params.periodLabel },
+          ...(params.startsOn ? [{ label: "Starts on", value: params.startsOn }] : []),
           { label: "Active until", value: params.endsOn },
         ],
       },
       {
         type: "paragraph",
-        text: "We will email you before your plan expires so you can renew without a break.",
+        text: scheduled
+          ? "Your plan features become available on the start date shown above."
+          : "We will email you before your plan expires so you can renew without a break.",
       },
     ],
     cta: { label: "Manage my plan", url: params.manageUrl },

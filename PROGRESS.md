@@ -120,3 +120,27 @@ See `ASSUMPTIONS.md` for every decision taken while working autonomously.
 Implementation is complete. Automated quality checks are green. Before launch,
 configure owner credentials and perform the database-backed and provider-backed
 manual smoke tests listed in `DEPLOYMENT.md`.
+
+## Post-phase runtime validation and launch hardening
+
+- [x] Added focused Vitest and Playwright smoke-test commands; latest unit run:
+      45 tests pass. Typecheck, lint, and production build pass.
+- [x] Added payment/SMS provider-unavailable guards, audited offline
+      subscription activation, robots/sitemap filters, admin first-run checks,
+      internal cron Nginx denial, and rotating database backup assets.
+- [x] Security review finding fixed: backup systemd service now runs as the
+      unprivileged `ravelyth` account instead of root.
+- [ ] Runtime database validation remains blocked. PostgreSQL service is
+      running, but no verified app credentials or `.env` exist; `npm run
+      db:migrate` stops because `DATABASE_URL` is not set. Migrations and seeds
+      have not run. Mailpit is running locally on ports 1025/8025.
+- [ ] Playwright DB health smoke check remains failing on app-role
+      authentication; broader end-to-end, mobile/accessibility, external
+      provider, and target-host deployment checks are outstanding.
+- [ ] Five high npm audit findings remain in development/lint dependencies;
+      production dependencies report zero. Details and recommendations are in
+      `SECURITY_NOTES.md`.
+
+Resume with `TESTING_PROGRESS.md`, which tracks the exact outstanding
+verification and owner actions. Do not consider the application launch-ready
+until the database and integration-test blockers are cleared.

@@ -1,4 +1,5 @@
 import type { SendOtpInput, SendOtpResult, SmsProvider } from "../types";
+import { AppError } from "@/lib/errors";
 
 /**
  * Development provider: writes the OTP to the server console instead of
@@ -12,8 +13,10 @@ export class ConsoleSmsProvider implements SmsProvider {
     const message = `[sms:console] to=${input.to} purpose=${input.purpose} otp=${input.otp} expires=${input.expiresInMinutes}m`;
 
     if (process.env.NODE_ENV === "production") {
-      throw new Error(
-        "SMS_PROVIDER=console is not allowed in production. Configure msg91 or twilio.",
+      throw new AppError(
+        "Mobile verification is unavailable. Configure a real SMS provider.",
+        503,
+        "sms_provider_unavailable",
       );
     }
 

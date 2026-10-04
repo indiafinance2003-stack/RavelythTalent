@@ -17,6 +17,19 @@ export function razorpayConfigured(): boolean {
   return Boolean(RAZORPAY_KEY_ID && RAZORPAY_KEY_SECRET);
 }
 
+export function razorpayCheckoutConfigured(): boolean {
+  const env = getEnv();
+  return Boolean(
+    env.RAZORPAY_KEY_ID &&
+      env.RAZORPAY_KEY_SECRET &&
+      (env.NEXT_PUBLIC_RAZORPAY_KEY_ID || env.RAZORPAY_KEY_ID),
+  );
+}
+
+export function razorpayLaunchConfigured(): boolean {
+  return razorpayCheckoutConfigured() && Boolean(getEnv().RAZORPAY_WEBHOOK_SECRET);
+}
+
 export function publicKeyId(): string {
   const key = getEnv().NEXT_PUBLIC_RAZORPAY_KEY_ID || getEnv().RAZORPAY_KEY_ID;
   if (!key) {
@@ -90,7 +103,12 @@ export function verifyWebhookSignature(rawBody: string, signature: string): bool
 
 /** Invoice number: RAV/<financial year>/<6-digit sequence>. */
 export function financialYear(date = new Date()): string {
-  const year = date.getUTCFullYear();
-  const month = date.getUTCMonth() + 1;
+  const parts = new Intl.DateTimeFormat("en-IN", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "numeric",
+  }).formatToParts(date);
+  const year = Number(parts.find((part) => part.type === "year")?.value);
+  const month = Number(parts.find((part) => part.type === "month")?.value);
   return month >= 4 ? `${year}-${(year + 1) % 100}` : `${year - 1}-${year % 100}`;
 }

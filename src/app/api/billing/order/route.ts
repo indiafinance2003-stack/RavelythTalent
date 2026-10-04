@@ -7,7 +7,7 @@ import { enforceRateLimit, RATE_LIMITS, rateKey } from "@/lib/rate-limit";
 import { handleApi, jsonOk, readJson } from "@/lib/http";
 import { requireApiVerifiedUser } from "@/lib/auth/current-user";
 import { requireCompanyMembership } from "@/lib/entitlements";
-import { createRazorpayOrder, publicKeyId } from "@/lib/billing/razorpay";
+import { createRazorpayOrder, publicKeyId, razorpayCheckoutConfigured } from "@/lib/billing/razorpay";
 import { AppError } from "@/lib/errors";
 
 export const runtime = "nodejs";
@@ -30,6 +30,13 @@ const bodySchema = z.union([subscriptionBodySchema, addonBodySchema]);
 /** POST /api/billing/order - creates the payment row and a Razorpay Order. */
 export const POST = handleApi(async (request: Request) => {
   await assertSameOrigin();
+  if (!razorpayCheckoutConfigured()) {
+    throw new AppError(
+      "Online payment will be available soon. Contact us to subscribe.",
+      503,
+      "payments_unconfigured",
+    );
+  }
   const user = await requireApiVerifiedUser();
 
   const ip = (await getRequestIp()) ?? "unknown";

@@ -29,12 +29,22 @@ export async function GET() {
       { status: 200, headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {
+    if (process.env.NODE_ENV === "production") {
+      console.error("[health] database connectivity check failed.");
+    } else {
+      console.error("[health] database connectivity check failed:", error);
+    }
     return NextResponse.json(
       {
         status: "error",
         database: "down",
         latencyMs: Date.now() - started,
-        message: error instanceof Error ? error.message : "unknown error",
+        message:
+          process.env.NODE_ENV === "production"
+            ? "Database connectivity check failed."
+            : error instanceof Error
+              ? error.message
+              : "unknown error",
       },
       { status: 503, headers: { "Cache-Control": "no-store" } },
     );

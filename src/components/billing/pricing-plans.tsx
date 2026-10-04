@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Check, Sparkles } from "lucide-react";
 import { formatPaise } from "@/lib/utils";
 import { openRazorpayCheckout } from "./razorpay-checkout";
@@ -23,10 +24,12 @@ export function PricingPlans({
   plans,
   signedIn,
   companyId,
+  paymentAvailable,
 }: {
   plans: PublicPlan[];
   signedIn: boolean;
   companyId: string | null;
+  paymentAvailable: boolean;
 }) {
   const router = useRouter();
   const [audience, setAudience] = useState<"candidate" | "employer">("candidate");
@@ -127,6 +130,15 @@ export function PricingPlans({
             </button>
           ))}
         </div>
+
+        {!paymentAvailable ? (
+          <div className="mx-auto mt-6 max-w-2xl rounded-xl border border-amber-300 bg-amber-50 p-4 text-center text-sm text-amber-950">
+            Online payment will be available soon, contact us to subscribe.{" "}
+            <Link className="font-semibold underline" href="/contact">
+              Contact us
+            </Link>
+          </div>
+        ) : null}
 
         <div className="inline-flex items-center rounded-xl border border-slate-300 bg-white p-1">
           {(["monthly", "yearly"] as const).map((key) => (
@@ -230,22 +242,31 @@ export function PricingPlans({
                   ))}
               </ul>
 
-              <button
-                type="button"
-                onClick={() => startCheckout(plan)}
-                disabled={busy === plan.code || price === 0}
-                className={`mt-6 w-full rounded-xl px-5 py-2.5 text-sm font-semibold transition disabled:opacity-60 ${
-                  plan.isFeatured
-                    ? "bg-royal text-white hover:bg-royal-600"
-                    : "border border-slate-300 text-navy hover:border-royal hover:text-royal"
-                }`}
-              >
-                {price === 0
-                  ? "Included"
-                  : busy === plan.code
-                    ? "Starting..."
-                    : `Choose ${plan.name}`}
-              </button>
+              {price > 0 && !paymentAvailable ? (
+                <Link
+                  className="mt-6 w-full rounded-xl border border-slate-300 px-5 py-2.5 text-center text-sm font-semibold text-navy hover:border-royal hover:text-royal"
+                  href="/contact"
+                >
+                  Contact us to subscribe
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => startCheckout(plan)}
+                  disabled={busy === plan.code || price === 0}
+                  className={`mt-6 w-full rounded-xl px-5 py-2.5 text-sm font-semibold transition disabled:opacity-60 ${
+                    plan.isFeatured
+                      ? "bg-royal text-white hover:bg-royal-600"
+                      : "border border-slate-300 text-navy hover:border-royal hover:text-royal"
+                  }`}
+                >
+                  {price === 0
+                    ? "Included"
+                    : busy === plan.code
+                      ? "Starting..."
+                      : `Choose ${plan.name}`}
+                </button>
+              )}
             </Card>
           );
         })}

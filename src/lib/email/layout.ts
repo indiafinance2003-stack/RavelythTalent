@@ -14,6 +14,7 @@ export type EmailBrand = {
   supportEmail?: string | null;
   address?: string | null;
   social?: Array<{ label: string; url: string }>;
+  logoUrl?: string | null;
 };
 
 export const DEFAULT_BRAND: EmailBrand = {
@@ -143,6 +144,8 @@ export function composeEmail(options: EmailOptions): {
   subject: string;
 } {
   const brand = options.brand ?? DEFAULT_BRAND;
+  const plainBrand = brand.brandName.replace(/\s+Talent$/i, "");
+  const showTalentAccent = plainBrand !== brand.brandName;
   const inner = (options.blocks ?? []).map(blockHtml).join("");
 
   const buttons =
@@ -164,9 +167,13 @@ export function composeEmail(options: EmailOptions): {
     <tr><td align="center">
       <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;max-width:600px;background:#FFFFFF;border-radius:16px;box-shadow:0 8px 24px rgba(11,42,111,0.10);overflow:hidden;">
         <tr><td style="padding:28px 32px 8px;">
-          <p style="margin:0;font-size:20px;font-weight:800;color:${NAVY};letter-spacing:-0.3px;">${escapeHtml(
-            brand.brandName,
-          )} <span style="color:${TEAL};font-weight:800;">Talent</span></p>
+          ${
+            brand.logoUrl
+              ? `<img src="${escapeHtml(brand.logoUrl)}" alt="${escapeHtml(brand.brandName)}" width="180" style="display:block;width:auto;max-width:180px;max-height:48px;">`
+              : `<p style="margin:0;font-size:20px;font-weight:800;color:${NAVY};letter-spacing:-0.3px;">${escapeHtml(
+                  plainBrand,
+                )}${showTalentAccent ? ` <span style="color:${TEAL};font-weight:800;">Talent</span>` : ""}</p>`
+          }
           ${
             brand.tagline
               ? `<p style="margin:4px 0 0;font-size:12px;color:${SLATE};">${escapeHtml(brand.tagline)}</p>`

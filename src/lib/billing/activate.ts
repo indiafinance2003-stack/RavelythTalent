@@ -56,8 +56,14 @@ export type ActivateResult = {
 
 export function periodEndFor(from: Date, period: "monthly" | "yearly"): Date {
   const end = new Date(from);
+  const day = end.getUTCDate();
+  end.setUTCDate(1);
   if (period === "yearly") end.setUTCFullYear(end.getUTCFullYear() + 1);
   else end.setUTCMonth(end.getUTCMonth() + 1);
+  const lastDay = new Date(
+    Date.UTC(end.getUTCFullYear(), end.getUTCMonth() + 1, 0),
+  ).getUTCDate();
+  end.setUTCDate(Math.min(day, lastDay));
   return end;
 }
 
@@ -155,11 +161,13 @@ export async function activateSubscription(input: ActivateInput): Promise<Activa
   return { alreadyProcessed: false, subscriptionId, invoiceId };
 }
 
-async function sendPaymentEmails(
+export async function sendPaymentEmails(
   input: ActivateInput,
   subscriptionId: string,
   invoiceId: string | null,
   periodEnd: Date,
+  includePaymentNotice = true,
+  startsAt?: Date,
 ): Promise<void> {
   const user = (
     await db
@@ -181,19 +189,21 @@ async function sendPaymentEmails(
     currency: "INR",
   }).format(input.amountPaise / 100);
 
-  await queueRenderedEmail({
-    to: user.email,
-    toName: user.fullName,
-    templateKey: "payment_success",
-    rendered: paymentSuccessEmail({
-      name,
-      planName: plan.name,
-      amount,
-      orderId: input.orderId,
-      brand,
-    }),
-    metadata: { subscriptionId },
-  });
+  if (includePaymentNotice) {
+    await queueRenderedEmail({
+      to: user.email,
+      toName: user.fullName,
+      templateKey: "payment_success",
+      rendered: paymentSuccessEmail({
+        name,
+        planName: plan.name,
+        amount,
+        orderId: input.orderId,
+        brand,
+      }),
+      metadata: { subscriptionId },
+    });
+  }
 
   await queueRenderedEmail({
     to: user.email,
@@ -203,7 +213,10 @@ async function sendPaymentEmails(
       name,
       planName: plan.name,
       periodLabel: input.billingPeriod === "yearly" ? "1 year" : "1 month",
-      endsOn: periodEnd.toLocaleDateString("en-IN"),
+      endsOn: periodEnd.toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" }),
+      ...(startsAt && startsAt > new Date()
+        ? { startsOn: startsAt.toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" }) }
+        : {}),
       manageUrl: appUrl(
         input.companyId ? "/recruiter/billing" : "/dashboard/billing",
       ),
@@ -213,9 +226,10 @@ async function sendPaymentEmails(
   });
 }
 
-async function createInvoiceForSubscription(params: {
+export async function createInvoiceForSubscription(params: {
   subscriptionId: string;
   orderId: string;
+  paymentId?: string | null;
 }): Promise<string | null> {
   const subscription = (
     await db
@@ -245,11 +259,13 @@ async function createInvoiceForSubscription(params: {
     taxRate > 0 ? Math.round((subscription.amountPaise * taxRate) / 100) : 0;
   const totalPaise = subscription.amountPaise + taxPaise;
 
-  const seqRows = await db.execute<{ nextval: number }>(
+  const seqResult = await db.execute<{ nextval: number | string }>(
     sql`select nextval('invoice_number_seq') as nextval`,
   );
-  const sequence =
-    (seqRows as unknown as Array<{ nextval: number }>).at(0)?.nextval ?? 1;
+  const sequence = Number(seqResult.rows[0]?.nextval);
+  if (!Number.isSafeInteger(sequence) || sequence < 1) {
+    throw new AppError("Could not allocate an invoice number.", 500, "invoice_sequence_failed");
+  }
   const invoiceNumber = `RAV/${financialYear()}/${String(sequence).padStart(6, "0")}`;
 
   const addressLine = [
@@ -270,6 +286,7 @@ async function createInvoiceForSubscription(params: {
       userId: subscription.userId,
       companyId: subscription.companyId,
       subscriptionId: subscription.id,
+      paymentId: params.paymentId ?? null,
       planName: plan.name,
       customerName: user.fullName,
       customerEmail: user.email,

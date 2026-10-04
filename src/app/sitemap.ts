@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { eq, isNull, sql } from "drizzle-orm";
+import { and, eq, isNotNull, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { blogPosts, categories, companies, jobs } from "@/lib/db/schema";
 import { getEnv } from "@/lib/env";
@@ -44,19 +44,23 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     db
       .select({ slug: companies.slug, updatedAt: companies.updatedAt })
       .from(companies)
-      .where(eq(companies.status, "approved")),
+      .where(and(eq(companies.status, "approved"), isNull(companies.deletedAt))),
     db
       .select({ slug: jobs.slug, updatedAt: jobs.updatedAt })
       .from(jobs)
-      .where(
-        sql`${jobs.status} = 'published' and ${jobs.deletedAt} is null`,
-      )
+      .innerJoin(companies, eq(jobs.companyId, companies.id))
+      .where(and(
+        eq(jobs.status, "published"),
+        isNull(jobs.deletedAt),
+        eq(companies.status, "approved"),
+        isNull(companies.deletedAt),
+      ))
       .limit(5000),
     settings.featureBlog
       ? db
           .select({ slug: blogPosts.slug, updatedAt: blogPosts.updatedAt })
           .from(blogPosts)
-          .where(eq(blogPosts.status, "published"))
+          .where(and(eq(blogPosts.status, "published"), isNotNull(blogPosts.publishedAt)))
       : Promise.resolve([]),
   ]);
 
@@ -93,6 +97,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     });
   }
 
-  void isNull;
   return entries;
 }

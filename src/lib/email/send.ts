@@ -1,5 +1,8 @@
+import { existsSync } from "node:fs";
+import path from "node:path";
 import { getSiteSettings, socialLinks } from "@/lib/settings";
 import type { EmailBrand } from "./layout";
+import { appUrl } from "./urls";
 import { enqueueEmail, type EnqueueAttachment } from "./queue";
 import type { RenderedEmail } from "./urls";
 
@@ -29,6 +32,9 @@ export async function getEmailBrand(): Promise<EmailBrand> {
     supportEmail: settings.supportEmail,
     address: address || null,
     social: socialLinks(settings),
+    logoUrl: existsSync(path.join(process.cwd(), "public", "logo.svg"))
+      ? appUrl("/logo.svg")
+      : null,
   };
 }
 

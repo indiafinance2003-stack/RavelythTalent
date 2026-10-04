@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { sessions, users } from "@/lib/db/schema";
 import { generateToken, sha256Hex } from "./crypto";
 import { getEnv } from "@/lib/env";
+import { getRequestIp } from "@/lib/security";
 
 export const SESSION_COOKIE = "ravelyth_session";
 const SESSION_TTL_DAYS = 30;
@@ -29,12 +30,9 @@ export type SessionUser = {
   createdAt: Date;
 };
 
-/** Best-effort client IP from proxy headers (nginx sets X-Forwarded-For). */
+/** Uses X-Real-IP, which the deployment proxy overwrites with its peer IP. */
 export async function getClientIp(): Promise<string | null> {
-  const h = await headers();
-  const forwarded = h.get("x-forwarded-for");
-  if (forwarded) return forwarded.split(",")[0]!.trim();
-  return h.get("x-real-ip") ?? h.get("cf-connecting-ip") ?? null;
+  return getRequestIp();
 }
 
 function cookieSecure(): boolean {
@@ -48,10 +46,7 @@ async function requestMeta(): Promise<{
 }> {
   try {
     const h = await headers();
-    const forwarded = h.get("x-forwarded-for");
-    const ip = forwarded
-      ? forwarded.split(",")[0]!.trim()
-      : (h.get("x-real-ip") ?? h.get("cf-connecting-ip"));
+    const ip = await getRequestIp();
     return { ip, userAgent: h.get("user-agent") };
   } catch {
     return { ip: null, userAgent: null };

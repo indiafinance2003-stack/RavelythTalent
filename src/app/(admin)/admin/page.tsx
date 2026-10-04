@@ -1,14 +1,20 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { and, count, eq, sql } from "drizzle-orm";
+import { and, count, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { companies, jobs, subscriptions, users } from "@/lib/db/schema";
+import { companies, emailOutbox, jobs, subscriptions, users } from "@/lib/db/schema";
 import { Card, PageHeader } from "@/components/ui/primitives";
+import { getSiteSettings } from "@/lib/settings";
+import { existsSync } from "node:fs";
+import path from "node:path";
+import { googleConfigured } from "@/lib/auth/google";
+import { razorpayLaunchConfigured } from "@/lib/billing/razorpay";
+import { smsProviderAvailable } from "@/lib/sms";
 
 export const metadata: Metadata = { title: "Admin overview" };
 
 export default async function AdminPage() {
-  const [companyRows, jobRows, userRows, approvedCompanies, activeSubscriptions] = await Promise.all([
+  const [companyRows, jobRows, userRows, approvedCompanies, activeSubscriptions, settings, smtpTest] = await Promise.all([
     db
       .select({ value: count() })
       .from(companies)
@@ -25,11 +31,48 @@ export default async function AdminPage() {
         sql`${subscriptions.currentPeriodEnd} > now()`,
       ),
     ),
+    getSiteSettings(),
+    db.select({ sentAt: emailOutbox.sentAt })
+      .from(emailOutbox)
+      .where(and(eq(emailOutbox.templateKey, "admin_test"), eq(emailOutbox.status, "sent")))
+      .orderBy(desc(emailOutbox.sentAt))
+      .limit(1),
   ]);
+  const setupItems = [
+    { label: "Logo file", ready: existsSync(path.join(process.cwd(), "public", "logo.svg")) },
+    { label: "Legal name", ready: Boolean(settings.legalCompanyName?.trim()) },
+    { label: "Business address", ready: Boolean(settings.addressLine1?.trim() && settings.city?.trim() && settings.state?.trim() && settings.postalCode?.trim()) },
+    { label: "Support email", ready: Boolean(settings.supportEmail?.trim()) },
+    { label: "Phone", ready: Boolean(settings.contactPhone?.trim()) },
+    { label: "GSTIN", ready: Boolean(settings.gstin?.trim()) },
+    { label: "GST rate", ready: Boolean(settings.updatedByUserId) },
+    { label: "Razorpay keys and webhook", ready: razorpayLaunchConfigured() },
+    { label: "SMTP delivery test", ready: Boolean(smtpTest[0]?.sentAt) },
+    { label: "Google OAuth", ready: googleConfigured() },
+    { label: "Real SMS provider", ready: smsProviderAvailable() },
+  ];
 
   return (
     <div className="space-y-6">
       <PageHeader title="Admin overview" description="Review company verifications and job postings." />
+      {setupItems.some((item) => !item.ready) ? (
+        <Card className="border-amber-300 bg-amber-50">
+          <h2 className="font-bold text-navy">First-run launch checklist</h2>
+          <p className="mt-1 text-sm text-slate-700">Complete these settings before opening the portal to customers.</p>
+          <ul className="mt-3 grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
+            {setupItems.map((item) => (
+              <li className={item.ready ? "text-emerald-800" : "font-medium text-amber-950"} key={item.label}>
+                {item.ready ? "Ready" : "Not configured"}: {item.label}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-3 text-sm">
+            <Link className="font-semibold text-royal hover:underline" href="/admin/settings">Open settings</Link>
+            {" · "}
+            <Link className="font-semibold text-royal hover:underline" href="/admin/emails">Send an SMTP test</Link>
+          </p>
+        </Card>
+      ) : null}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <Card>
           <p className="text-sm text-slate-600">Companies awaiting review</p>

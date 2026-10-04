@@ -8,9 +8,8 @@ export const dynamic = "force-dynamic";
 /**
  * Sends due job alerts (daily/weekly). Called once a day.
  *
- * Internal endpoint: requires a constant-time match of the CRON_SECRET header
- * and a loopback caller. Systemd timers call this every minute/hour/day - see
- * deploy/systemd/.
+ * Internal endpoint: requires a constant-time CRON_SECRET match. Network
+ * access is restricted by loopback binding and the public Nginx deny rule.
  */
 export const GET = handleApi(async () => {
   await assertCronRequest();
