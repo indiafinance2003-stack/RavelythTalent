@@ -1,0 +1,15 @@
+# Normalize to LF in the repository and working tree so that deploys to
+# Ubuntu 24.04 and shell scripts behave consistently.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+
+*.ps1  text eol=crlf
+*.cmd  text eol=crlf
