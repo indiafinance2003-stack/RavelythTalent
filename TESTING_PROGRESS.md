@@ -78,7 +78,7 @@ has not run.
 - [x] Run final typecheck, lint, build, unit/API tests, and E2E tests. Typecheck,
       lint, build, and 45 unit tests pass; E2E has 2 passing public smoke tests
       and 1 failing DB health check because local credentials are unavailable.
-- [ ] Commit completed work locally; never push.
+- [x] Commit completed work locally; nothing was pushed.
 
 ## Current environment
 - Windows; Node 24.19.0 and npm 11.17.0.
