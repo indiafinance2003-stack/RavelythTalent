@@ -11,7 +11,7 @@ Legend: `[x]` done · `[~]` partially done / needs owner input · `[ ]` not star
 
 ---
 
-## Phase 1 — Scaffold, brand tokens, schema, seeds, env validation
+## Phase 1 — Scaffold, brand tokens, schema, seeds, env validation ✅
 - [x] package.json / tsconfig / next.config.ts / postcss / eslint flat config (Next 16)
 - [x] Tailwind v4 theme tokens (navy, royal, teal, sky tint, mint tint, off-white)
 - [x] next/font: Plus Jakarta Sans (UI) + Caveat (script accent)
@@ -31,7 +31,7 @@ Legend: `[x]` done · `[~]` partially done / needs owner input · `[ ]` not star
 - [x] `npm run typecheck`, `npm run lint`, `npm run build` green
 - [x] `ASSUMPTIONS.md`
 
-## Phase 2 — Auth, sessions, rate limiting, email outbox
+## Phase 2 — Auth, sessions, rate limiting, email outbox ✅
 - [x] Password hashing (argon2id, bcryptjs fallback)
 - [x] Sessions in PostgreSQL, hashed opaque token, httpOnly/Secure/SameSite=Lax cookie
 - [x] Register + email verification (24h token, resend with rate limit)
@@ -45,57 +45,62 @@ Legend: `[x]` done · `[~]` partially done / needs owner input · `[ ]` not star
 - [x] Branded HTML + text email templates
 - [x] Auth UI: login, register, verify, forgot/reset password
 
-## Phase 3 — Companies, jobs, search, applications, candidate profile
-- [ ] Recruiter company registration → admin approval workflow + emails
-- [ ] Job create/edit/preview/submit, moderation queue, approve/reject
-- [ ] Public home, job search (FTS + trigram), job detail
-- [ ] Candidate profile (education, experience, skills, preferences, completeness)
-- [ ] Resume upload (magic-byte verified, local disk, authenticated download)
-- [ ] Apply (Easy Apply), duplicate guard, saved jobs, application tracker
-- [ ] Recruiter applicant pipeline, bulk actions, private notes, status emails
-- [ ] Company profile + verification docs + public company page
+## Phase 3 — Job search, candidate dashboard, applications ✅
+- [x] Storage abstraction (local disk, buckets, magic-byte checks, path traversal guard)
+- [x] Entitlements/quota helper (`requireEntitlement`, `listUserCompanies`, membership)
+- [x] Job + company query layer (FTS + trigram search)
+- [x] Home page, public job search, job detail (JSON-LD `JobPosting` + ApplyPanel)
+- [x] Candidate dashboard: overview, applications, saved, resumes, alerts, profile, settings, notifications
+- [x] Resume upload (magic-byte verified) + authenticated download (owner/company/admin)
+- [x] Apply (Easy Apply), duplicate guard, withdraw, saved jobs
+- [x] Job alerts (saved searches) + unsubscribe endpoint
+- [x] Notifications centre (in-app) + notification emails
+- [x] 5 cron endpoints `/api/internal/cron/*` + cron task library
+- [x] `robots.txt` + `sitemap.ts`
+- [x] Deployment artifacts: `deploy/nginx`, `deploy/systemd` (app + 5 timers),
+      `deploy/postgres/setup.sql`, `deploy/scripts/deploy.sh`, `DEPLOYMENT.md`
 
-## Phase 4 — Plans, Razorpay, subscriptions, entitlements, invoices
-- [ ] Plans + plan_features + promotions (candidate launch offer ₹1,999/yr)
-- [ ] Pricing page (candidate/employer tabs, monthly/yearly toggle, savings)
-- [ ] Razorpay Orders create → checkout → verify signature
-- [ ] Webhook `/api/webhooks/razorpay` (raw body, idempotent)
-- [ ] Subscriptions period model, renewal, reminders + expiry job
-- [ ] Central `requireEntitlement()` / quota helper
-- [ ] Invoices (PDF, sequence, GST from settings) + email
-- [ ] Add-ons CRUD + purchase flow
-- [ ] All payment / subscription / quota emails
+## Phase 4 — Plans, Razorpay, subscriptions, entitlements, invoices ✅
+- [x] Plans + plan_features + promotions (candidate launch offer ₹1,999/yr) — seeded in Phase 1
+- [x] Pricing page (`/pricing`: candidate/employer tabs, monthly/yearly toggle, promotion banner)
+- [x] Razorpay Orders create `/api/billing/order` → Checkout → verify `/api/billing/verify` (HMAC signature)
+- [x] Webhook `/api/webhooks/razorpay` (raw body HMAC, dedup via `webhook_events`, retry-safe)
+- [x] Idempotent `activateSubscription()` (browser + webhook safe), period model, upgrade/downgrade rule
+- [x] Renewal reminders + expiry job (`subscription-expiry-and-reminders` cron) — built in Phase 3
+- [x] Invoices: PDF via `@react-pdf/renderer`, `RAV/<FY>/<seq>` numbering, GST from site settings
+- [x] Billing emails: payment success, activated, invoice delivery (payment_success/subscription_activated/invoice)
+- [x] Billing history pages: `/dashboard/billing` + `/recruiter/billing` (company-scoped via `?company=`)
+- [x] Invoice PDF download `/api/files/invoices/[id]` (owner/company-member/admin only)
+- [ ] Add-ons purchase flow (schema + seeds exist; checkout UI not built)
+- [ ] Plan/promotion admin CRUD (deferred to Phase 5 admin panel)
 
-## Phase 5 — Admin panel, interviews, notifications, alerts, cron, reports
-- [ ] Admin dashboard KPIs
-- [ ] Users, companies, job moderation, categories, plans, promotions
-- [ ] Subscriptions, payments, invoices, add-ons, site settings, email log
-- [ ] Blog posts, review moderation, priority support, audit log
+## Phase 5 — Recruiter area, admin panel, blog, static pages (NEXT)
+- [ ] Recruiter area: company setup, job posting with entitlement checks, applicant pipeline
+- [ ] Admin dashboard KPIs; users, companies, job moderation, categories, plans, promotions
+- [ ] Admin: subscriptions, payments, invoices, add-ons, site settings, email log
+- [ ] Blog posts (public list/detail + admin CRUD)
 - [ ] Interviews (schedule, email, candidate confirm)
-- [ ] Notifications centre (in-app + email)
-- [ ] Job alerts (saved searches, daily/weekly, unsubscribe)
-- [ ] Cron endpoints `/api/internal/cron/*`
 - [ ] Resume database / candidate search (Professional+)
 - [ ] Reports: views, applications, conversion, source, time-to-hire
+- [ ] Static pages: about, faq, privacy, terms, refund, contact
+- [ ] Final ASSUMPTIONS.md / README sync
 
-## Phase 6 — Resume builder, blog, reviews, salary insights
+## Phase 6 — Resume builder, reviews, salary insights
 - [ ] Paid Resume Builder (templates, versions, PDF, history)
-- [ ] Blog (public list/detail + admin CRUD)
 - [ ] Company reviews (submit, moderate, company page)
 - [ ] Salary insights (aggregates, threshold-gated)
 - [ ] Recruiter↔candidate chat: intentionally NOT built (documented placeholder)
 
-## Phase 7 — SEO, legal, deployment, final QA
-- [ ] sitemap.xml, robots.txt, per-page metadata, OG, JobPosting JSON-LD
+## Phase 7 — SEO, legal, final QA
+- [x] sitemap.xml, robots.txt, per-page metadata, OG, JobPosting JSON-LD (jobs part done in Phase 3)
 - [ ] Legal pages + admin-only draft notice
 - [ ] About, Contact, FAQ, 404, error pages
-- [ ] `/deploy`: nginx, systemd + cron timers, deploy.sh, postgres/setup.sql
-- [ ] `DEPLOYMENT.md` runbook
-- [ ] `.env.example` complete
-- [ ] Final: typecheck / lint / build green
+- [x] `/deploy`: nginx, systemd + cron timers, deploy.sh, postgres/setup.sql
+- [x] `DEPLOYMENT.md` runbook
+- [x] `.env.example` complete (includes RAZORPAY_*)
+- [ ] Final: typecheck / lint / build green (run at the end of each phase)
 
 ---
 
 ## Notes / decisions
 See `ASSUMPTIONS.md` for every decision taken while working autonomously.
-
