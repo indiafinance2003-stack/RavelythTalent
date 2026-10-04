@@ -8,6 +8,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 import { users } from "./auth";
@@ -195,6 +196,7 @@ export const blogPosts = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
+    uniqueIndex("blog_posts_slug_key").on(t.slug),
     index("blog_posts_status_idx").on(t.status),
     index("blog_posts_published_idx").on(t.publishedAt),
   ],

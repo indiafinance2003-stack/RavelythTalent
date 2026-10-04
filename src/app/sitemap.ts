@@ -11,7 +11,9 @@ export const revalidate = 3600;
 const STATIC_PATHS = [
   { path: "", priority: 1 },
   { path: "/jobs", priority: 0.9 },
+  { path: "/blog", priority: 0.6 },
   { path: "/companies", priority: 0.8 },
+  { path: "/salary-insights", priority: 0.5 },
   { path: "/pricing", priority: 0.7 },
   { path: "/about", priority: 0.5 },
   { path: "/faq", priority: 0.5 },

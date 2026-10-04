@@ -25,6 +25,8 @@ export default async function AdminLayout({
         <Link className="text-navy hover:text-royal" href="/admin/emails">Email</Link>
         <Link className="text-navy hover:text-royal" href="/admin/audit">Audit log</Link>
         <Link className="text-navy hover:text-royal" href="/admin/support">Support</Link>
+        <Link className="text-navy hover:text-royal" href="/admin/blog">Blog</Link>
+        <Link className="text-navy hover:text-royal" href="/admin/reviews">Reviews</Link>
         <Link className="text-navy hover:text-royal" href="/admin/billing">Billing</Link>
       </nav>
       {children}

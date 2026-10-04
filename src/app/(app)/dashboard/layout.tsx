@@ -27,6 +27,7 @@ const NAV = [
   { href: "/dashboard/interviews", label: "Interviews", icon: CalendarDays },
   { href: "/dashboard/saved", label: "Saved jobs", icon: Bookmark },
   { href: "/dashboard/resumes", label: "Resumes", icon: FileText },
+  { href: "/dashboard/resume-builder", label: "Resume Builder", icon: FileText },
   { href: "/dashboard/billing", label: "Billing", icon: CreditCard },
   { href: "/dashboard/alerts", label: "Job alerts", icon: Bell },
   { href: "/dashboard/profile", label: "My profile", icon: UserRound },

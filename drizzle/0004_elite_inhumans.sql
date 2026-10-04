@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "blog_posts_slug_key" ON "blog_posts" USING btree ("slug");

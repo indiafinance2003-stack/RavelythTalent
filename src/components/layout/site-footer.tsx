@@ -73,6 +73,9 @@ export async function SiteFooter() {
             <ul className="mt-3 space-y-2 text-sm">
               <li><Link href="/jobs" className="text-slate-600 hover:text-royal">Browse jobs</Link></li>
               <li><Link href="/companies" className="text-slate-600 hover:text-royal">Companies</Link></li>
+              {settings.featureSalaryInsights ? (
+                <li><Link href="/salary-insights" className="text-slate-600 hover:text-royal">Salary insights</Link></li>
+              ) : null}
               <li><Link href="/pricing" className="text-slate-600 hover:text-royal">Candidate plans</Link></li>
               {settings.featureBlog ? (
                 <li><Link href="/blog" className="text-slate-600 hover:text-royal">Career advice</Link></li>
