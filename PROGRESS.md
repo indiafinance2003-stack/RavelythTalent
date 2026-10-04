@@ -75,7 +75,12 @@ Legend: `[x]` done · `[~]` partially done / needs owner input · `[ ]` not star
 - [ ] Plan/promotion admin CRUD (deferred to Phase 5 admin panel)
 
 ## Phase 5 — Recruiter area, admin panel, blog, static pages (NEXT)
-- [ ] Recruiter area: company setup, job posting with entitlement checks, applicant pipeline
+- [~] Recruiter area: company setup, job posting with entitlement checks, applicant pipeline
+  - [x] Shell, overview, company, jobs list, new + edit job routes (`/recruiter/jobs/[id]`);
+        applicant pipeline UI (`/recruiter/applications` with job/status filters, inline
+        status changes via existing `changeApplicationStatus` service + resume viewer link);
+        `typecheck` + `lint` + `build` green
+  - [ ] Team management, interviews scheduling UI, reports UI
 - [ ] Admin dashboard KPIs; users, companies, job moderation, categories, plans, promotions
 - [ ] Admin: subscriptions, payments, invoices, add-ons, site settings, email log
 - [ ] Blog posts (public list/detail + admin CRUD)
