@@ -17,6 +17,13 @@ import {
   requireCompanyMembership,
 } from "@/lib/entitlements";
 import {
+  companyVerificationSubmittedEmail,
+} from "@/lib/email/templates/recruiter";
+import {
+  getEmailBrand,
+  queueRenderedEmail,
+} from "@/lib/email/send";
+import {
   readValidatedUpload,
   storeValidatedFile,
 } from "@/lib/storage";
@@ -167,6 +174,26 @@ export async function submitVerificationDocument(params: {
   docType: string;
 }): Promise<void> {
   await requireCompanyMembership(params.userId, params.companyId, "admin");
+  const companyRows = await db
+    .select({
+      name: companies.name,
+      status: companies.status,
+      ownerName: users.fullName,
+      ownerEmail: users.email,
+    })
+    .from(companies)
+    .innerJoin(users, eq(users.id, companies.ownerUserId))
+    .where(eq(companies.id, params.companyId))
+    .limit(1);
+  const company = companyRows.at(0);
+  if (!company) throw new AppError("Company not found.", 404, "not_found");
+  if (company.status === "approved" || company.status === "suspended") {
+    throw new AppError(
+      "This company cannot submit verification documents in its current status.",
+      409,
+      "invalid_company_status",
+    );
+  }
 
   const { buffer, mimeType } = await readValidatedUpload(params.file, {
     allowedMimes: [
@@ -197,6 +224,22 @@ export async function submitVerificationDocument(params: {
         inArray(companies.status, ["rejected", "pending"]),
       ),
     );
+
+  try {
+    const brand = await getEmailBrand();
+    await queueRenderedEmail({
+      to: company.ownerEmail,
+      toName: company.ownerName,
+      templateKey: "company_verification_submitted",
+      rendered: companyVerificationSubmittedEmail({
+        ownerName: company.ownerName,
+        companyName: company.name,
+        brand,
+      }),
+    });
+  } catch (error) {
+    console.error("[recruiter] could not queue verification email:", error);
+  }
 }
 
 /* -------------------------------------------------------------------------- */

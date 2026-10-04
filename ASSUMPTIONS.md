@@ -3,7 +3,7 @@
 Every decision taken while building Ravelyth Talent autonomously, with the
 reasoning. Anything marked **[OWNER ACTION]** needs a human.
 
-Last updated: Phase 1.
+Last updated: Phase 3.
 
 ---
 
@@ -165,7 +165,16 @@ tokens, skill links, application history).
 
 ---
 
-## 5. Payments & subscriptions
+## 5. Moderation
+
+- Company verification and job publishing decisions are restricted to
+  server-verified admins, recorded in `audit_logs`, and emailed through the
+  existing outbox. Rejected items require a reason; verification files are
+  only downloadable by an admin or an active company member.
+- Newly approved job postings expire after 30 days. This uses the existing
+  `expires_at` lifecycle and hourly expiry task; recruiters can repost later.
+
+## 6. Payments & subscriptions
 
 - **Razorpay Orders API only** (not the Subscriptions API), per the brief.
 - All currency handling is in paise; currency is fixed to `INR` (from settings).
@@ -193,4 +202,3 @@ tokens, skill links, application history).
   "tax not applicable" line. **[OWNER ACTION]** set the real GSTIN and rate.
 - **Add-ons** are seeded **inactive with `price_paise = NULL`** and cannot be
   purchased until an admin sets a price and activates them.
-
