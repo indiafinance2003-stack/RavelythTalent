@@ -157,7 +157,7 @@ export default async function AdminPlansPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Plans and promotions" description="Manage prices in paise, feature entitlements and offer windows." />
+      <PageHeader title="Plans and promotions" description="Manage prices in paise, feature entitlements and offer windows. The seeded employer_free plan is listed below; configure its company-wide lifetime post count in Site Settings." />
       <Card>
         <h2 className="mb-4 text-base font-bold text-navy">Create plan</h2>
         <PlanForm features={[]} />

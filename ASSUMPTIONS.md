@@ -158,6 +158,9 @@ tokens, skill links, application history).
   manual retry action.
 - Templates are built from a single shared layout (navy/blue/teal) with a
   plain-text alternative generated alongside the HTML.
+- Email headers use the absolute `APP_URL/logo.png` URL and the configured
+  brand name as the image alt text, rather than relying on SVG support or a
+  local-file existence check.
 - Header/footer contact details come from `site_settings` and render as nothing
   when empty.
 - **Test email**: an admin-only action sends a real message through the same
@@ -314,3 +317,12 @@ tokens, skill links, application history).
   matches, then uses Premium as the tie-breaker. Applicant lists also use
   Premium as the first ordering key and retain newest-application order within
   each tier.
+
+## 13. Moderation and free-post settings
+
+- `autoApproveCompanies` and `autoPublishJobs` default to `true`; either can be
+  disabled in `/admin/settings` to return the corresponding step to manual
+  review. Job safety holds and blocks remain in force regardless.
+- `freeJobPosts` defaults to one lifetime post per company and is adjustable
+  from `/admin/settings`; changing the value does not rewrite usage already
+  recorded for a company. `jurisdictionCity` is optional and empty by default.

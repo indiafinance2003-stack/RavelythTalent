@@ -75,6 +75,10 @@ export default async function AdminSettingsPage() {
             <TextField label="State" name="state" value={settings.state} />
             <TextField label="Postal code" name="postalCode" value={settings.postalCode} />
             <TextField label="Country" name="country" value={settings.country} />
+            <div>
+              <TextField label="Jurisdiction city (optional)" name="jurisdictionCity" value={settings.jurisdictionCity} />
+              <p className="mt-1 text-xs text-slate-500">Used for the courts-of-jurisdiction clause in the default Terms of Service.</p>
+            </div>
           </div>
         </Card>
         <Card>
@@ -127,6 +131,11 @@ export default async function AdminSettingsPage() {
             <label className="text-sm font-medium text-navy">
               Job-post warning threshold (%)
               <input className={inputClass} defaultValue={settings.jobPostWarningThreshold} max="100" min="1" name="jobPostWarningThreshold" required type="number" />
+            </label>
+            <label className="text-sm font-medium text-navy">
+              Free lifetime job posts per company
+              <input className={inputClass} defaultValue={settings.freeJobPosts} max="100" min="0" name="freeJobPosts" required type="number" />
+              <span className="mt-1 block text-xs font-normal text-slate-500">Default is 1. Changing this affects the lifetime allowance available to companies; it does not reset credits already used.</span>
             </label>
           </div>
         </Card>

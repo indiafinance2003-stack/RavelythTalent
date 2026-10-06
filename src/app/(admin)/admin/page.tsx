@@ -54,18 +54,19 @@ export default async function AdminPage() {
     { label: "Google OAuth", ready: googleConfigured() },
     { label: "Real SMS provider", ready: smsProviderAvailable() },
   ];
+  const missingSetupItems = setupItems.filter((item) => !item.ready);
 
   return (
     <div className="space-y-6">
       <PageHeader title="Admin overview" description="Review company verifications and job postings." />
-      {setupItems.some((item) => !item.ready) ? (
+      {missingSetupItems.length > 0 ? (
         <Card className="border-amber-300 bg-amber-50">
           <h2 className="font-bold text-navy">First-run launch checklist</h2>
           <p className="mt-1 text-sm text-slate-700">Complete these settings before opening the portal to customers.</p>
           <ul className="mt-3 grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
-            {setupItems.map((item) => (
-              <li className={item.ready ? "text-emerald-800" : "font-medium text-amber-950"} key={item.label}>
-                {item.ready ? "Ready" : "Not configured"}: {item.label}
+            {missingSetupItems.map((item) => (
+              <li className="font-medium text-amber-950" key={item.label}>
+                Not configured: {item.label}
               </li>
             ))}
           </ul>

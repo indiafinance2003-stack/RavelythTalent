@@ -94,10 +94,11 @@ describe("transactional email templates", () => {
       heading: "Logo check",
       brand: {
         brandName: "Ravelyth Talent",
-        logoUrl: "https://ravelyth.in/logo.svg",
+        logoUrl: "https://ravelyth.in/logo.png",
       },
     });
-    expect(email.html).toContain('src="https://ravelyth.in/logo.svg"');
+    expect(email.html).toContain('src="https://ravelyth.in/logo.png"');
+    expect(email.html).toContain('alt="Ravelyth Talent"');
     expect(email.html).toContain('alt="Ravelyth Talent"');
   });
 

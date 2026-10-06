@@ -36,7 +36,7 @@ task commit so work can resume without relying on conversation history.
 - [x] Commit locally.
 
 ## Task 6 — Small fixes and final gates
-- [ ] Email logo URL, admin settings controls, first-run checklist cleanup.
-- [ ] Update ASSUMPTIONS.md, KNOWN_ISSUES.md and TESTING.md.
-- [ ] Run typecheck, lint, build and all tests; note DB-backed coverage limits.
-- [ ] Commit locally.
+- [x] Email logo URL, admin settings controls, first-run checklist cleanup.
+- [x] Update ASSUMPTIONS.md, KNOWN_ISSUES.md and TESTING.md.
+- [x] Run typecheck, lint, build and all tests; note DB-backed coverage limits.
+- [x] Commit locally.
