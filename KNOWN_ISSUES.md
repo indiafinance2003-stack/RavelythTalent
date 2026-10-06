@@ -14,6 +14,10 @@
   concurrent outbox suppression and SMTP delivery still require staging
   verification. Additive migration `0009_flaky_colossus.sql` has not been
   applied locally.
+- **MEDIUM — salary insight SQL not exercised against PostgreSQL:** Task 3 adds
+  a generated-SQL regression check and retains the five-posting threshold, but
+  application database authentication is unavailable. The query and empty
+  state still need a staging/local PostgreSQL smoke test.
 - **BLOCKER — local PostgreSQL credentials:** PostgreSQL is installed and
   running, but application authentication to the local database fails. A prior
   bootstrap attempt changed the local `postgres` password before failing; its

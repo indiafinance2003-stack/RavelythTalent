@@ -47,43 +47,47 @@ working email and (for paid flows) Razorpay test credentials:
    weekly, then confirm the digest sends no more than once per candidate on the
    same India calendar day and contains an unsubscribe link. Click it, then
    verify email consent is off and no queued or later alert is delivered.
-3. While a candidate Premium subscription is active, convert and confirm its
+3. Enable the salary-insights feature flag and open `/salary-insights` with
+   fewer than five comparable disclosed jobs; verify the friendly empty state.
+   Add five comparable published INR salary postings and verify the aggregate
+   range and sample count render without a PostgreSQL grouping error.
+4. While a candidate Premium subscription is active, convert and confirm its
    expiry remains unchanged and the settings warning is shown. On
    `/recruiter/company`, try switching back with a published job, a held job,
    and an active employer subscription; each must show its precise blocker.
    Close/resolve those blockers and confirm switching back restores candidate
    visibility and existing applications/resumes.
-4. In `/admin/settings`, set the legal operator/contact details and
+5. In `/admin/settings`, set the legal operator/contact details and
    `jurisdictionCity`, set `freeJobPosts` to `1`, and enable automatic company
    approval and clean-job publishing. Save, then verify the public policy
    pages show configured details and omit empty ones.
-5. Register a candidate and a recruiter with distinct verified email
+6. Register a candidate and a recruiter with distinct verified email
    addresses. Confirm a candidate can browse and apply without payment. Confirm
    the recruiter company is approved after email verification.
-6. On `/pricing`, verify the employer Free card and legal links. Submit one
+7. On `/pricing`, verify the employer Free card and legal links. Submit one
    clean job for the company and confirm it publishes and consumes its single
    lifetime credit; try a second post and confirm the upgrade prompt. Check the
    recruiter dashboard count. Separately test a scan-blocked job and confirm
    the free credit remains available; verify rejected/closed/deleted jobs do
    not restore a consumed credit.
-7. Submit a clean job and representative scam/payment-request, discriminatory,
+8. Submit a clean job and representative scam/payment-request, discriminatory,
    adult, spam, and duplicate examples. Confirm publish, held and blocked
    decisions, the employer-facing reason/email, and held-job reasons in
    `/admin/jobs`. Toggle each automatic approval setting off and confirm the
    manual review flow returns.
-8. Report a published test job from three distinct reporters. Confirm the job
+9. Report a published test job from three distinct reporters. Confirm the job
    pauses, the report queue and overview counts update, and the admin notice is
    queued.
-9. In `/admin/billing`, search a candidate by email and a company by name.
+10. In `/admin/billing`, search a candidate by email and a company by name.
    Confirm only matching active plan types and priced periods are available.
    Activate a test offline subscription, then verify subscription, `offline`
    payment and audit entry. Submit a mismatched owner/plan and confirm the
    actual validation message appears inline.
-10. In Razorpay test mode, purchase candidate Premium and an employer plan.
+11. In Razorpay test mode, purchase candidate Premium and an employer plan.
    Confirm both browser verification and webhook replay result in one active
    owner-correct subscription; confirm candidate builder access, recruiter
    Premium badge/ranking, and removal after expiry.
-11. Inspect `/privacy`, `/terms`, and `/refund-policy` with settings populated
+12. Inspect `/privacy`, `/terms`, and `/refund-policy` with settings populated
    and cleared. Confirm the last-updated date, configured jurisdiction, no
    empty-setting placeholders, and policy links next to pricing/checkout.
    Send a test email and inspect that its image is an absolute

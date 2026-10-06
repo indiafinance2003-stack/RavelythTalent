@@ -14,7 +14,7 @@ export type SalaryInsight = {
   annualMaxPaise: number;
 };
 
-export async function listSalaryInsights(): Promise<SalaryInsight[]> {
+export function buildSalaryInsightsQuery() {
   const annualFactor = sql<number>`
     case ${jobs.salaryPeriod}
       when 'month' then 12
@@ -25,11 +25,11 @@ export async function listSalaryInsights(): Promise<SalaryInsight[]> {
   `;
   const cityGroup = sql`coalesce(${jobs.city}, '')`;
   const stateGroup = sql`coalesce(${jobs.state}, '')`;
-  const rows = await db
+  return db
     .select({
       title: sql<string>`min(${jobs.title})`,
       category: categories.name,
-      location: sql<string>`coalesce(nullif(trim(concat_ws(', ', ${jobs.city}, ${jobs.state})), ''), 'Location not specified')`,
+      location: sql<string>`coalesce(nullif(min(trim(concat_ws(', ', ${jobs.city}, ${jobs.state}))), ''), 'Location not specified')`,
       currency: jobs.salaryCurrency,
       sampleSize: sql<number>`count(*)::int`,
       annualMinPaise: sql<string>`floor(min(least(coalesce(${jobs.salaryMinPaise}, ${jobs.salaryMaxPaise}), coalesce(${jobs.salaryMaxPaise}, ${jobs.salaryMinPaise})) * ${annualFactor}))::bigint::text`,
@@ -57,7 +57,10 @@ export async function listSalaryInsights(): Promise<SalaryInsight[]> {
     .having(sql`count(*) >= ${SALARY_INSIGHT_MIN_SAMPLE}`)
     .orderBy(desc(sql`count(*)`), sql`min(${jobs.title})`)
     .limit(100);
+}
 
+export async function listSalaryInsights(): Promise<SalaryInsight[]> {
+  const rows = await buildSalaryInsightsQuery();
   return rows.map((row) => ({
     ...row,
     sampleSize: Number(row.sampleSize),
