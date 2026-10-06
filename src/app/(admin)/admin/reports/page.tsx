@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Card, EmptyState, PageHeader } from "@/components/ui/primitives";
 import { markJobReportReviewedAction } from "@/lib/admin/actions";
 import { listOpenJobReports } from "@/lib/jobs/reports";
+import { formatIndianDateTime } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Job reports" };
 
@@ -38,7 +39,7 @@ export default async function AdminReportsPage() {
                 </span>
               </div>
               <p className="mt-3 text-xs text-slate-500">
-                Reported by {report.reporterName ?? "Visitor"}{report.reporterEmail ? ` (${report.reporterEmail})` : ""} · {report.createdAt.toLocaleString("en-IN")}
+                Reported by {report.reporterName ?? "Visitor"}{report.reporterEmail ? ` (${report.reporterEmail})` : ""} · {formatIndianDateTime(report.createdAt)}
               </p>
               {report.note ? <p className="mt-3 whitespace-pre-wrap text-sm text-slate-700">{report.note}</p> : null}
               <form action={markJobReportReviewedAction} className="mt-4 border-t border-slate-200 pt-4">

@@ -94,8 +94,12 @@ through `sql` fragments in the query layer. Migration 0001 also creates
 `pg_trgm`, `unaccent` and the `invoice_number_seq` sequence.
 
 ### 2.6 Timestamps
-All timestamps are `timestamptz`. Application code stores UTC and formats with
-`Intl` for `en-IN`.
+All timestamps are `timestamptz` and remain stored in UTC. Display formatting
+uses the shared `formatIndianDateTime` helper in `src/lib/utils.ts`, explicitly
+converts to `Asia/Kolkata`, and renders `DD Mon YYYY, h:mm am/pm IST` (for
+example, `06 Oct 2026, 5:07 pm IST`). Existing `formatDate` and
+`formatDateTime` callers share this formatter so dashboards, admin pages,
+public date displays, emails and invoices use one unambiguous representation.
 
 ### 2.7 Money
 All money is stored as an integer number of **paise** (`bigint` in PostgreSQL,

@@ -7,6 +7,7 @@ import { Badge, Card, EmptyState, PageHeader } from "@/components/ui/primitives"
 import { db } from "@/lib/db";
 import { blogPosts } from "@/lib/db/schema";
 import { getSiteSettings } from "@/lib/settings";
+import { formatIndianDateTime } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -58,7 +59,7 @@ export default async function BlogIndexPage() {
                 </h2>
                 {post.excerpt ? <p className="mt-2 line-clamp-3 text-sm leading-6 text-slate-600">{post.excerpt}</p> : null}
                 <p className="mt-4 text-xs text-slate-500">
-                  {[post.authorName, post.publishedAt?.toLocaleDateString("en-IN")].filter(Boolean).join(" · ")}
+                  {[post.authorName, post.publishedAt ? formatIndianDateTime(post.publishedAt) : null].filter(Boolean).join(" · ")}
                 </p>
               </div>
             </Card>

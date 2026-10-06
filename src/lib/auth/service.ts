@@ -31,6 +31,7 @@ import {
 import { isDisposableEmail } from "@/lib/auth/disposable-email";
 import { getSiteSettings } from "@/lib/settings";
 import type { LoginInput, RegisterInput } from "@/lib/validation/auth";
+import { formatIndianDateTime } from "@/lib/utils";
 import { syncDefaultProfileAlert } from "@/lib/alerts/service";
 
 export const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
@@ -566,7 +567,7 @@ export async function resetPassword(
     templateKey: "password_changed",
     rendered: passwordChangedEmail({
       name: user.fullName,
-      at: new Date().toLocaleString("en-IN"),
+      at: formatIndianDateTime(new Date()),
       brand,
     }),
     metadata: { userId: user.id },

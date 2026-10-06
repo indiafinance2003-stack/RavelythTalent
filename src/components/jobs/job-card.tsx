@@ -4,10 +4,10 @@ import type { JobCard } from "@/lib/jobs/queries";
 import {
   JOB_TYPE_LABEL,
   WORK_MODE_LABEL,
+  formatIndianDateTime,
   formatExperience,
   formatSalaryRange,
   labelFor,
-  timeAgo,
 } from "@/lib/utils";
 import { Badge } from "@/components/ui/primitives";
 
@@ -91,7 +91,7 @@ export function JobCardView({ job, showApply = true }: { job: JobCard; showApply
             </div>
             <div className="flex items-center gap-1.5">
               <Clock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-              <dd>{timeAgo(job.publishedAt ?? job.createdAt)}</dd>
+              <dd>{formatIndianDateTime(job.publishedAt ?? job.createdAt)}</dd>
             </div>
           </dl>
 

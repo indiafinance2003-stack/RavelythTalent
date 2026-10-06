@@ -4,6 +4,7 @@ import { Badge, Card, PageHeader } from "@/components/ui/primitives";
 import { moderateCompanyReviewAction } from "@/lib/admin/review-actions";
 import { db } from "@/lib/db";
 import { companies, companyReviews } from "@/lib/db/schema";
+import { formatIndianDateTime } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Company review moderation" };
 
@@ -37,7 +38,7 @@ export default async function AdminReviewsPage() {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 className="font-bold text-navy">{review.companyName}</h2>
-              <p className="text-sm text-slate-600">Rating: {review.rating}/5 · {review.createdAt.toLocaleDateString("en-IN")}</p>
+              <p className="text-sm text-slate-600">Rating: {review.rating}/5 · {formatIndianDateTime(review.createdAt)}</p>
             </div>
             <Badge tone={review.status === "published" ? "success" : review.status === "rejected" ? "danger" : "warning"}>
               {review.status}

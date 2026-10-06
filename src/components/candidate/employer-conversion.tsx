@@ -7,6 +7,7 @@ import {
 } from "@/lib/auth/actions";
 import { initialFormState } from "@/lib/form-state";
 import { Alert, Button, Card, Field, Input, Select } from "@/components/ui/primitives";
+import { formatIndianDateTime } from "@/lib/utils";
 
 const COMPANY_SIZES = [
   "1-10",
@@ -35,7 +36,7 @@ export function BecomeEmployerForm({ premiumUntil }: { premiumUntil: Date | null
       {premiumUntil ? (
         <Alert className="mt-4" tone="warning">
           Your candidate Premium subscription remains active until{" "}
-          {premiumUntil.toLocaleDateString("en-IN", { dateStyle: "long", timeZone: "Asia/Kolkata" })}.
+          {formatIndianDateTime(premiumUntil)}.
           Converting does not cancel it.
         </Alert>
       ) : null}

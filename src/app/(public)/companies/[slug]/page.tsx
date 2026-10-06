@@ -8,6 +8,7 @@ import { getCurrentUser } from "@/lib/auth/current-user";
 import { db } from "@/lib/db";
 import { companies, companyReviews, jobs } from "@/lib/db/schema";
 import { getSiteSettings } from "@/lib/settings";
+import { formatIndianDateTime } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -116,7 +117,7 @@ export default async function CompanyDetailPage({ params }: { params: Params }) 
               <Link className="hover:text-royal" href={`/jobs/${job.slug}`}>{job.title}</Link>
             </h3>
             <p className="mt-1 text-sm text-slate-600">
-              {[job.city, job.state, job.workMode.replace("_", " "), job.publishedAt?.toLocaleDateString("en-IN")].filter(Boolean).join(" · ")}
+              {[job.city, job.state, job.workMode.replace("_", " "), job.publishedAt ? formatIndianDateTime(job.publishedAt) : null].filter(Boolean).join(" · ")}
             </p>
           </Card>
         )) : <Card><p className="text-sm text-slate-600">There are no published jobs at this time.</p></Card>}
@@ -136,7 +137,7 @@ export default async function CompanyDetailPage({ params }: { params: Params }) 
                   {review.cons ? <p><strong>Cons:</strong> {review.cons}</p> : null}
                 </div>
               ) : null}
-              <p className="mt-3 text-xs text-slate-500">{review.createdAt.toLocaleDateString("en-IN")}</p>
+              <p className="mt-3 text-xs text-slate-500">{formatIndianDateTime(review.createdAt)}</p>
             </Card>
           )) : <Card><p className="text-sm text-slate-600">No published reviews yet.</p></Card>}
 

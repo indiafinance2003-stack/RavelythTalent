@@ -5,6 +5,7 @@ import { getCompanyPlan } from "@/lib/entitlements";
 import { resolveRecruiterCompany } from "@/lib/recruiter/service";
 import { inviteCompanyMemberAction, removeCompanyMemberAction } from "@/lib/recruiter/team-actions";
 import { listCompanyTeam } from "@/lib/recruiter/team";
+import { formatIndianDateTime } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Company team" };
@@ -58,7 +59,7 @@ export default async function RecruiterTeamPage({
           <div>
             <p className="font-semibold text-navy">{member.fullName ?? member.invitedEmail ?? member.email ?? "Member"}</p>
             <p className="text-sm text-slate-600">{member.role} · {member.status}{member.email ? ` · ${member.email}` : ""}</p>
-            <p className="mt-1 text-xs text-slate-500">Added {member.createdAt.toLocaleDateString("en-IN")}</p>
+            <p className="mt-1 text-xs text-slate-500">Added {formatIndianDateTime(member.createdAt)}</p>
           </div>
           {member.role !== "owner" && member.status !== "removed" ? (
             <form action={removeCompanyMemberAction}>

@@ -4,6 +4,7 @@ import { Card, PageHeader } from "@/components/ui/primitives";
 import { changeUserStatusAction } from "@/lib/admin/user-actions";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
+import { formatIndianDateTime } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "User management" };
 
@@ -31,7 +32,7 @@ export default async function AdminUsersPage() {
           <div>
             <h2 className="font-bold text-navy">{user.fullName}</h2>
             <p className="text-sm text-slate-600">{user.email} · {user.role} · {user.status}</p>
-            <p className="mt-1 text-xs text-slate-500">Joined {user.createdAt.toLocaleDateString("en-IN")}</p>
+            <p className="mt-1 text-xs text-slate-500">Joined {formatIndianDateTime(user.createdAt)}</p>
           </div>
           <form action={changeUserStatusAction} className="flex items-center gap-2">
             <input name="userId" type="hidden" value={user.id} />

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Alert, Badge, ButtonLink, Card, EmptyState, PageHeader } from "@/components/ui/primitives";
 import { BuiltResumeForm } from "@/components/candidate/built-resume-form";
 import { requireRole } from "@/lib/auth/current-user";
+import { formatIndianDateTime } from "@/lib/utils";
 import {
   builtResumeDataFromRecord,
   candidateResumeBuilderAccess,
@@ -162,7 +163,7 @@ export default async function ResumeBuilderPage({
                   <Badge>{resume.templateKey}</Badge>
                 </div>
                 <p className="mt-1 text-sm text-slate-600">
-                  Updated {resume.updatedAt.toLocaleDateString("en-IN")}
+                  Updated {formatIndianDateTime(resume.updatedAt)}
                   {access.premium ? ` · ${resume.currentVersion} saved version${resume.currentVersion === 1 ? "" : "s"}` : " · Preview"}
                 </p>
               </div>

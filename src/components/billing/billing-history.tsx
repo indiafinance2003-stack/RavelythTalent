@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Download, ReceiptText } from "lucide-react";
 import { Badge, Card, EmptyState, PageHeader } from "@/components/ui/primitives";
-import { formatPaise } from "@/lib/utils";
+import { formatIndianDateTime, formatPaise } from "@/lib/utils";
 import type {
   InvoiceRow,
   PaymentRow,
@@ -29,13 +29,6 @@ const PAYMENT_TONE: Record<string, "success" | "warning" | "danger" | "neutral">
   refunded: "neutral",
   partial_refunded: "neutral",
 };
-
-const dateFmt = (value: Date) =>
-  value.toLocaleDateString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
 
 export function BillingHistory({
   subscriptions,
@@ -81,8 +74,8 @@ export function BillingHistory({
             </Badge>
             <p className="text-sm text-slate-600">
               {current.cancelledAt
-                ? `Ended ${dateFmt(current.cancelledAt)}`
-                : `Renews on ${dateFmt(current.currentPeriodEnd)}`}
+                ? `Ended ${formatIndianDateTime(current.cancelledAt)}`
+                : `Renews on ${formatIndianDateTime(current.currentPeriodEnd)}`}
             </p>
           </div>
         ) : (
@@ -120,7 +113,7 @@ export function BillingHistory({
                     {invoice.invoiceNumber}
                   </p>
                   <p className="text-sm text-slate-600">
-                    {invoice.planName} · {dateFmt(invoice.issuedAt)}
+                    {invoice.planName} · {formatIndianDateTime(invoice.issuedAt)}
                   </p>
                 </div>
                 <div className="flex items-center gap-4">
@@ -175,7 +168,7 @@ export function BillingHistory({
                 {payments.map((payment) => (
                   <tr key={payment.id}>
                     <td className="px-4 py-3 text-slate-600">
-                      {dateFmt(payment.createdAt)}
+                      {formatIndianDateTime(payment.createdAt)}
                     </td>
                     <td className="px-4 py-3 font-mono text-xs text-slate-600">
                       {payment.orderId}

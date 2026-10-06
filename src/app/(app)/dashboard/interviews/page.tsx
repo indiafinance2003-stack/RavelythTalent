@@ -3,6 +3,7 @@ import { Badge, Card, EmptyState, PageHeader } from "@/components/ui/primitives"
 import { confirmInterviewAction } from "@/lib/interviews/actions";
 import { listCandidateInterviews } from "@/lib/interviews/service";
 import { requireUser } from "@/lib/auth/current-user";
+import { formatIndianDateTime } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "My interviews" };
@@ -32,7 +33,7 @@ export default async function CandidateInterviewsPage() {
             <Badge tone={interview.status === "confirmed" ? "success" : "warning"}>{interview.status}</Badge>
           </div>
           <dl className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
-            <div><dt className="inline font-semibold text-navy">When: </dt><dd className="inline text-slate-700">{interview.scheduledAt.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}</dd></div>
+            <div><dt className="inline font-semibold text-navy">When: </dt><dd className="inline text-slate-700">{formatIndianDateTime(interview.scheduledAt)}</dd></div>
             <div><dt className="inline font-semibold text-navy">Duration: </dt><dd className="inline text-slate-700">{interview.durationMinutes} minutes</dd></div>
             {interview.meetingLink ? <div className="sm:col-span-2"><dt className="inline font-semibold text-navy">Meeting link: </dt><dd className="inline"><a className="break-all text-royal underline" href={interview.meetingLink} rel="noreferrer" target="_blank">{interview.meetingLink}</a></dd></div> : null}
             {interview.location ? <div className="sm:col-span-2"><dt className="inline font-semibold text-navy">Location: </dt><dd className="inline text-slate-700">{interview.location}</dd></div> : null}

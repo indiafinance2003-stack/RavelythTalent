@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth/current-user";
 import { listNotifications, markNotificationsRead } from "@/lib/notifications";
-import { timeAgo } from "@/lib/utils";
+import { formatIndianDateTime } from "@/lib/utils";
 import {
   Card,
   EmptyState,
@@ -37,7 +37,7 @@ export default async function NotificationsPage() {
                   {item.body ? (
                     <p className="mt-0.5 text-sm text-slate-600">{item.body}</p>
                   ) : null}
-                  <p className="mt-1 text-xs text-slate-400">{timeAgo(item.createdAt)}</p>
+                  <p className="mt-1 text-xs text-slate-400">{formatIndianDateTime(item.createdAt)}</p>
                 </>
               );
 

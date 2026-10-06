@@ -18,6 +18,10 @@
   a generated-SQL regression check and retains the five-posting threshold, but
   application database authentication is unavailable. The query and empty
   state still need a staging/local PostgreSQL smoke test.
+- **LOW — Indian date formatting has unit coverage only:** Task 4 tests the
+  required UTC-to-Asia/Kolkata format and invalid/absent values. A browser
+  walkthrough and visual inspection of real email/PDF output remain part of
+  staging verification; the formatter itself does not require database access.
 - **BLOCKER — local PostgreSQL credentials:** PostgreSQL is installed and
   running, but application authentication to the local database fails. A prior
   bootstrap attempt changed the local `postgres` password before failing; its

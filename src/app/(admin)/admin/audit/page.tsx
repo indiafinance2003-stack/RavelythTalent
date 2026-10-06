@@ -3,6 +3,7 @@ import { desc, eq } from "drizzle-orm";
 import { Card, PageHeader } from "@/components/ui/primitives";
 import { db } from "@/lib/db";
 import { auditLogs, users } from "@/lib/db/schema";
+import { formatIndianDateTime } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Admin audit log" };
 
@@ -32,7 +33,7 @@ export default async function AdminAuditPage() {
         <Card key={row.id}>
           <div className="flex flex-wrap justify-between gap-2">
             <p className="font-semibold text-navy">{row.action}</p>
-            <time className="text-xs text-slate-500">{row.createdAt.toLocaleString("en-IN")}</time>
+            <time className="text-xs text-slate-500">{formatIndianDateTime(row.createdAt)}</time>
           </div>
           <p className="mt-1 text-sm text-slate-700">{row.description ?? `${row.entityType ?? "record"} ${row.entityId ?? ""}`}</p>
           <p className="mt-1 break-all text-xs text-slate-500">

@@ -5,6 +5,7 @@ import { markContactMessageHandledAction } from "@/lib/admin/contact-actions";
 import { updateSupportRequestAction } from "@/lib/admin/support-actions";
 import { db } from "@/lib/db";
 import { companies, contactMessages, prioritySupportRequests, users } from "@/lib/db/schema";
+import { formatIndianDateTime } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Priority support" };
 
@@ -40,7 +41,7 @@ export default async function AdminSupportPage() {
               <h3 className="font-bold text-navy">{contact.subject || "Contact form message"}</h3>
               <p className="mt-1 text-sm text-slate-600">
                 {contact.name} · <a className="text-royal hover:underline" href={`mailto:${contact.email}`}>{contact.email}</a>
-                {contact.phone ? ` · ${contact.phone}` : ""} · {contact.createdAt.toLocaleString("en-IN")}
+                {contact.phone ? ` · ${contact.phone}` : ""} · {formatIndianDateTime(contact.createdAt)}
               </p>
             </div>
             <span className="text-xs font-semibold text-slate-500">{contact.handled ? "Handled" : "Needs reply"}</span>
@@ -62,7 +63,7 @@ export default async function AdminSupportPage() {
             <h2 className="font-bold text-navy">{row.subject}{row.isPriority ? " · Priority" : ""}</h2>
             <span className="text-xs font-semibold text-slate-500">{row.status}</span>
           </div>
-          <p className="mt-1 text-sm text-slate-600">{row.userName} ({row.userEmail}){row.companyName ? ` · ${row.companyName}` : ""} · {row.createdAt.toLocaleString("en-IN")}</p>
+          <p className="mt-1 text-sm text-slate-600">{row.userName} ({row.userEmail}){row.companyName ? ` · ${row.companyName}` : ""} · {formatIndianDateTime(row.createdAt)}</p>
           <p className="mt-3 whitespace-pre-wrap text-sm text-slate-700">{row.message}</p>
           <form action={updateSupportRequestAction} className="mt-4 grid gap-3 border-t border-slate-200 pt-4 md:grid-cols-2">
             <input name="id" type="hidden" value={row.id} />

@@ -4,6 +4,7 @@ import { Card, PageHeader } from "@/components/ui/primitives";
 import { retryFailedEmailAction, sendTestEmailAction } from "@/lib/admin/email-actions";
 import { db } from "@/lib/db";
 import { emailOutbox } from "@/lib/db/schema";
+import { formatIndianDateTime } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Email outbox" };
 
@@ -34,7 +35,7 @@ export default async function AdminEmailsPage() {
               <h2 className="font-bold text-navy">{message.subject}</h2>
               <p className="mt-1 text-sm text-slate-600">{message.toEmail}{message.toName ? ` · ${message.toName}` : ""}</p>
               <p className="mt-1 text-xs text-slate-500">
-                {message.templateKey ?? "custom"} · {message.status} · {message.attempts}/{message.maxAttempts} attempts · {message.createdAt.toLocaleString("en-IN")}
+                {message.templateKey ?? "custom"} · {message.status} · {message.attempts}/{message.maxAttempts} attempts · {formatIndianDateTime(message.createdAt)}
               </p>
               {message.lastError ? <p className="mt-2 whitespace-pre-wrap break-words text-sm text-rose-700">{message.lastError}</p> : null}
             </div>

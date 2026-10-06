@@ -6,6 +6,7 @@ import { Badge, Card } from "@/components/ui/primitives";
 import { db } from "@/lib/db";
 import { blogPosts } from "@/lib/db/schema";
 import { getSiteSettings } from "@/lib/settings";
+import { formatIndianDateTime } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -60,7 +61,7 @@ export default async function BlogPostPage({ params }: { params: Params }) {
       <header>
         <h1 className="text-3xl font-extrabold leading-tight text-navy sm:text-4xl">{post.title}</h1>
         <p className="mt-3 text-sm text-slate-600">
-          {[post.authorName, post.publishedAt?.toLocaleDateString("en-IN")].filter(Boolean).join(" · ")}
+          {[post.authorName, post.publishedAt ? formatIndianDateTime(post.publishedAt) : null].filter(Boolean).join(" · ")}
         </p>
       </header>
       {post.coverImagePath ? (

@@ -27,6 +27,12 @@ database authentication is unavailable. It was not rerun for this change.
 Razorpay SDK order creation and candidate/employer owner forwarding are unit
 tested with mocks; no live payment or webhook was performed.
 
+Task 4 checks: `npm run typecheck`, `npm run lint`, and
+`npm run test -- src/lib/utils.test.ts` passed after the shared timestamp
+formatter was applied. The formatter test verifies that
+`2026-10-06T11:37:00.000Z` renders exactly as `06 Oct 2026, 5:07 pm IST`;
+no database or external service is required for this check.
+
 ## Manual staging verification
 
 Use a staging deployment with the current additive migrations and seed data,
@@ -92,6 +98,9 @@ working email and (for paid flows) Razorpay test credentials:
    empty-setting placeholders, and policy links next to pricing/checkout.
    Send a test email and inspect that its image is an absolute
    `APP_URL/logo.png` URL with the text brand name as alt text.
+13. Verify timestamps in admin, candidate and recruiter pages, notification
+   cards, billing history, emails and downloaded invoices use the shared
+   `DD Mon YYYY, h:mm am/pm IST` format and reflect India Standard Time.
 
 Do not run the migration against production as a validation step. Apply
 migrations only through the server deployment procedure and after a database

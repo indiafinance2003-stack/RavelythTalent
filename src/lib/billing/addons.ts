@@ -16,7 +16,7 @@ import { invoiceDeliveryEmail } from "@/lib/email/templates/billing";
 import { appUrl } from "@/lib/email/urls";
 import { getSiteSettings } from "@/lib/settings";
 import { ensureBucket } from "@/lib/storage";
-import { formatPaise } from "@/lib/utils";
+import { formatIndianDateTime, formatPaise } from "@/lib/utils";
 import { renderInvoicePdf } from "./invoice";
 import { financialYear } from "./razorpay";
 
@@ -220,7 +220,7 @@ async function deliverAddonReceipt(params: {
       ].filter(Boolean).join(", ");
       const pdf = await renderInvoicePdf({
         invoiceNumber: row.invoiceNumber,
-        issuedOn: row.issuedAt.toLocaleDateString("en-IN"),
+        issuedOn: formatIndianDateTime(row.issuedAt),
         sellerName: settings.legalCompanyName ?? settings.brandName,
         sellerGstin: settings.gstin,
         sellerAddress: address || null,
@@ -233,8 +233,8 @@ async function deliverAddonReceipt(params: {
         taxPaise: row.taxPaise,
         totalPaise: row.totalPaise,
         currency: row.currency,
-        periodStart: row.periodStart?.toLocaleDateString("en-IN") ?? "",
-        periodEnd: row.periodEnd?.toLocaleDateString("en-IN") ?? "",
+        periodStart: row.periodStart ? formatIndianDateTime(row.periodStart) : "",
+        periodEnd: row.periodEnd ? formatIndianDateTime(row.periodEnd) : "",
         orderId: params.orderId,
       });
       const directory = await ensureBucket("invoices");
@@ -267,7 +267,7 @@ async function deliverAddonReceipt(params: {
         invoiceNumber: row.invoiceNumber,
         planName: row.planName,
         amount: formatPaise(row.totalPaise),
-        issuedOn: row.issuedAt.toLocaleDateString("en-IN"),
+        issuedOn: formatIndianDateTime(row.issuedAt),
         gstNote: Number(row.taxRate) > 0 ? `${row.taxRate}%` : null,
         downloadUrl: appUrl("/recruiter/billing"),
         hasAttachment: false,

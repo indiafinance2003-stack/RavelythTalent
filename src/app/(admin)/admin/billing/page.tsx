@@ -3,7 +3,7 @@ import { and, asc, desc, eq, ilike, isNull, or } from "drizzle-orm";
 import { Card, PageHeader } from "@/components/ui/primitives";
 import { db } from "@/lib/db";
 import { addons, companies, invoices, payments, plans, subscriptions, users } from "@/lib/db/schema";
-import { formatPaise } from "@/lib/utils";
+import { formatIndianDateTime, formatPaise } from "@/lib/utils";
 import { SubscriptionActivationForm } from "@/components/admin/subscription-activation-form";
 
 export const metadata: Metadata = { title: "Billing administration" };
@@ -142,7 +142,7 @@ export default async function AdminBillingPage({
           <Card className="flex flex-wrap justify-between gap-3" key={row.id}>
             <div>
               <p className="font-semibold text-navy">{row.planName} · {row.userName}</p>
-              <p className="text-sm text-slate-600">{row.userEmail} · {row.billingPeriod} · until {row.periodEnd.toLocaleDateString("en-IN")}</p>
+              <p className="text-sm text-slate-600">{row.userEmail} · {row.billingPeriod} · until {formatIndianDateTime(row.periodEnd)}</p>
             </div>
             <p className="text-sm font-semibold text-navy">{row.status} · {formatPaise(row.amountPaise)}</p>
           </Card>
@@ -154,7 +154,7 @@ export default async function AdminBillingPage({
           <Card className="flex flex-wrap justify-between gap-3" key={row.id}>
             <div>
               <p className="font-semibold text-navy">{row.planName ?? row.addonName ?? row.purpose} · {row.userName}</p>
-              <p className="text-sm text-slate-600">{row.userEmail} · {row.createdAt.toLocaleString("en-IN")}</p>
+              <p className="text-sm text-slate-600">{row.userEmail} · {formatIndianDateTime(row.createdAt)}</p>
               <p className="mt-1 break-all text-xs text-slate-500">Order: {row.orderId}{row.paymentId ? ` · Payment: ${row.paymentId}` : ""}</p>
             </div>
             <p className="text-sm font-semibold text-navy">{row.status} · {formatPaise(row.amountPaise)}</p>
@@ -167,7 +167,7 @@ export default async function AdminBillingPage({
           <Card className="flex flex-wrap justify-between gap-3" key={row.id}>
             <div>
               <p className="font-semibold text-navy">{row.invoiceNumber} · {row.customerName}</p>
-              <p className="text-sm text-slate-600">{row.customerEmail} · {row.issuedAt.toLocaleDateString("en-IN")}</p>
+              <p className="text-sm text-slate-600">{row.customerEmail} · {formatIndianDateTime(row.issuedAt)}</p>
               <p className="mt-1 text-xs text-slate-500">Owner: {row.userId}{row.companyId ? ` · Company: ${row.companyId}` : ""}</p>
             </div>
             <p className="text-sm font-semibold text-navy">{row.status} · {formatPaise(row.totalPaise)}</p>

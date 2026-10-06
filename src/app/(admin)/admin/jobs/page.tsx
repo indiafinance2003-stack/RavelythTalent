@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Card, EmptyState, PageHeader } from "@/components/ui/primitives";
 import { decideJobAction } from "@/lib/admin/actions";
 import { listJobReviewQueue } from "@/lib/admin/moderation";
+import { formatIndianDateTime } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Job moderation" };
 
@@ -35,7 +36,7 @@ export default async function AdminJobsPage() {
               <p className="mt-3 whitespace-pre-wrap text-sm text-slate-700">{job.description}</p>
               {job.responsibilities ? <p className="mt-3 text-sm"><strong>Responsibilities:</strong> {job.responsibilities}</p> : null}
               {job.requirements ? <p className="mt-2 text-sm"><strong>Requirements:</strong> {job.requirements}</p> : null}
-              <p className="mt-3 text-xs text-slate-500">Submitted {job.createdAt.toLocaleDateString("en-IN")}</p>
+              <p className="mt-3 text-xs text-slate-500">Submitted {formatIndianDateTime(job.createdAt)}</p>
               <div className="mt-5 grid gap-4 border-t border-slate-200 pt-4 sm:grid-cols-2">
                 <form action={decideJobAction}>
                   <input name="id" type="hidden" value={job.id} />

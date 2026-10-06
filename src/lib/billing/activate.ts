@@ -19,7 +19,7 @@ import {
   subscriptionActivatedEmail,
 } from "@/lib/email/templates/billing";
 import { appUrl } from "@/lib/email/urls";
-import { formatPaise } from "@/lib/utils";
+import { formatIndianDateTime, formatPaise } from "@/lib/utils";
 import { ensureBucket } from "@/lib/storage";
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -213,9 +213,9 @@ export async function sendPaymentEmails(
       name,
       planName: plan.name,
       periodLabel: input.billingPeriod === "yearly" ? "1 year" : "1 month",
-      endsOn: periodEnd.toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" }),
+      endsOn: formatIndianDateTime(periodEnd),
       ...(startsAt && startsAt > new Date()
-        ? { startsOn: startsAt.toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" }) }
+        ? { startsOn: formatIndianDateTime(startsAt) }
         : {}),
       manageUrl: appUrl(
         input.companyId ? "/recruiter/billing" : "/dashboard/billing",
@@ -305,7 +305,7 @@ export async function createInvoiceForSubscription(params: {
   try {
     const buffer = await renderInvoicePdf({
       invoiceNumber,
-      issuedOn: new Date().toLocaleDateString("en-IN"),
+      issuedOn: formatIndianDateTime(new Date()),
       sellerName: settings.legalCompanyName ?? settings.brandName,
       sellerGstin: settings.gstin,
       sellerAddress: addressLine || null,
@@ -318,8 +318,8 @@ export async function createInvoiceForSubscription(params: {
       taxPaise,
       totalPaise,
       currency: "INR",
-      periodStart: subscription.currentPeriodStart.toLocaleDateString("en-IN"),
-      periodEnd: subscription.currentPeriodEnd.toLocaleDateString("en-IN"),
+      periodStart: formatIndianDateTime(subscription.currentPeriodStart),
+      periodEnd: formatIndianDateTime(subscription.currentPeriodEnd),
       orderId: params.orderId,
     });
 
@@ -350,7 +350,7 @@ export async function createInvoiceForSubscription(params: {
         style: "currency",
         currency: "INR",
       }).format(totalPaise / 100),
-      issuedOn: new Date().toLocaleDateString("en-IN"),
+      issuedOn: formatIndianDateTime(new Date()),
       gstNote:
         taxRate > 0 ? `${taxRate}% on ${settings.gstin ?? "GSTIN not set"}` : null,
       downloadUrl: appUrl(`/dashboard/billing`),

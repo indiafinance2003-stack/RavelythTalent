@@ -108,25 +108,30 @@ function toDate(value: Date | string | null | undefined): Date | null {
 }
 
 export function formatDate(value: Date | string | null | undefined): string {
+  return formatIndianDateTime(value);
+}
+
+export function formatIndianDateTime(
+  value: Date | string | null | undefined,
+): string {
   const d = toDate(value);
   if (!d) return "—";
-  return new Intl.DateTimeFormat("en-IN", {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Kolkata",
     day: "2-digit",
     month: "short",
     year: "numeric",
-  }).format(d);
+    hour: "numeric",
+    minute: "2-digit",
+    hourCycle: "h12",
+  }).formatToParts(d);
+  const valueFor = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? "";
+  return `${valueFor("day")} ${valueFor("month")} ${valueFor("year")}, ${valueFor("hour")}:${valueFor("minute")} ${valueFor("dayPeriod").toLowerCase()} IST`;
 }
 
 export function formatDateTime(value: Date | string | null | undefined): string {
-  const d = toDate(value);
-  if (!d) return "—";
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(d);
+  return formatIndianDateTime(value);
 }
 
 export function timeAgo(value: Date | string | null | undefined): string {
@@ -247,5 +252,4 @@ export function buildQueryString(
   const s = sp.toString();
   return s ? `?${s}` : "";
 }
-
 

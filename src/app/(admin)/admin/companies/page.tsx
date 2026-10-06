@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Card, EmptyState, PageHeader } from "@/components/ui/primitives";
 import { changeCompanyStatusAction, decideCompanyAction } from "@/lib/admin/actions";
 import { listCompanyReviewQueue, listManagedCompanies } from "@/lib/admin/moderation";
+import { formatIndianDateTime } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Company reviews" };
 
@@ -23,7 +24,7 @@ export default async function AdminCompaniesPage() {
                 Owner: {company.ownerName} ({company.ownerEmail})
                 {company.website ? ` · ${company.website}` : ""}
               </p>
-              <p className="mt-1 text-xs text-slate-500">Submitted {company.createdAt.toLocaleDateString("en-IN")}</p>
+              <p className="mt-1 text-xs text-slate-500">Submitted {formatIndianDateTime(company.createdAt)}</p>
               <ul className="mt-4 space-y-2 text-sm">
                 {queue.documents.filter((doc) => doc.companyId === company.id).map((doc) => (
                   <li key={doc.id}>

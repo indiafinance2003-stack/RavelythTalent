@@ -14,6 +14,7 @@ import { getEmailBrand, queueRenderedEmail } from "@/lib/email/send";
 import { interviewScheduledEmail } from "@/lib/email/templates/product";
 import { appUrl } from "@/lib/email/urls";
 import { requireCompanyMembership } from "@/lib/entitlements";
+import { formatIndianDateTime } from "@/lib/utils";
 
 export async function getInterviewApplication(applicationId: string) {
   const [row] = await db
@@ -128,7 +129,7 @@ export async function scheduleApplicationInterview(params: {
       userId: context.candidateUserId,
       type: "interview_scheduled",
       title: `Interview scheduled: ${context.jobTitle}`,
-      body: `An interview with ${context.companyName} is scheduled for ${params.scheduledAt.toLocaleString("en-IN")}.`,
+      body: `An interview with ${context.companyName} is scheduled for ${formatIndianDateTime(params.scheduledAt)}.`,
       link: "/dashboard/interviews",
       metadata: { interviewId },
     });
@@ -146,7 +147,7 @@ export async function scheduleApplicationInterview(params: {
         jobTitle: context.jobTitle,
         companyName: context.companyName,
         mode: params.mode,
-        scheduledAt: params.scheduledAt.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),
+        scheduledAt: formatIndianDateTime(params.scheduledAt),
         durationMinutes: params.durationMinutes,
         meetingLink: params.meetingLink,
         location: params.location,
