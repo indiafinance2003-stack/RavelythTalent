@@ -31,9 +31,9 @@ task commit so work can resume without relying on conversation history.
 - [x] Add action tests and commit locally.
 
 ## Task 5 — Legal pages
-- [ ] Update data-driven default legal policies and settings contact rendering.
-- [ ] Add jurisdiction setting, updated date, pricing/checkout legal links.
-- [ ] Commit locally.
+- [x] Update data-driven default legal policies and settings contact rendering.
+- [x] Add jurisdiction setting, updated date, pricing/checkout legal links.
+- [x] Commit locally.
 
 ## Task 6 — Small fixes and final gates
 - [ ] Email logo URL, admin settings controls, first-run checklist cleanup.

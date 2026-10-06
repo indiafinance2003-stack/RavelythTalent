@@ -50,6 +50,13 @@
       "when": 1791257304953,
       "tag": "0006_calm_talkback",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791258682268,
+      "tag": "0007_late_fabian_cortez",
+      "breakpoints": true
     }
   ]
 }

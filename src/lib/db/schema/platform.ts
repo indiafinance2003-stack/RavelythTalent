@@ -41,6 +41,7 @@ export const siteSettings = pgTable("site_settings", {
   state: text("state"),
   postalCode: text("postal_code"),
   country: text("country").default("India"),
+  jurisdictionCity: text("jurisdiction_city"),
 
   gstin: text("gstin"),
   gstRate: numeric("gst_rate", { precision: 5, scale: 2 }).notNull().default("0"),

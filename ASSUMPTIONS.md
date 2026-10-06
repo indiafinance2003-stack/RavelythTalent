@@ -265,8 +265,11 @@ tokens, skill links, application history).
   blog, and salary pages expose only their intended approved/published/
   threshold-qualified data.
 - Legal policy pages use plain-text admin overrides from `site_settings` when
-  provided; otherwise they use general India-aware starter language and the
-  configured legal name, address, and contact details. The exact
+  provided; otherwise they use India-aware policy text generated from the
+  platform's current job-portal-only model and configured legal name, address,
+  support/contact email and phone. Empty contact settings are omitted rather
+  than replaced with placeholder values. Terms use `jurisdictionCity` when
+  configured and otherwise refer to courts in India. The exact
   "Draft: to be reviewed by legal counsel" notice is visible to admins in
   `/admin/settings`, not to public visitors. **[OWNER ACTION]** complete legal
   details and have counsel review/replace the starter text before launch.

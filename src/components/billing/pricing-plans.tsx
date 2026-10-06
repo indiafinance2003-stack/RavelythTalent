@@ -288,6 +288,12 @@ export function PricingPlans({
           );
         })}
       </div>
+      <p className="mx-auto mt-8 max-w-3xl text-center text-xs leading-6 text-slate-600">
+        Before checkout, please read our{" "}
+        <Link className="font-semibold text-royal hover:underline" href="/terms">Terms of Service</Link>,{" "}
+        <Link className="font-semibold text-royal hover:underline" href="/privacy">Privacy Policy</Link>, and{" "}
+        <Link className="font-semibold text-royal hover:underline" href="/refund-policy">Refund and Cancellation Policy</Link>.
+      </p>
     </div>
   );
 }

@@ -24,6 +24,7 @@ export const FALLBACK_SETTINGS: SiteSettings = {
   state: null,
   postalCode: null,
   country: "India",
+  jurisdictionCity: null,
   gstin: null,
   gstRate: "0",
   currency: "INR",
