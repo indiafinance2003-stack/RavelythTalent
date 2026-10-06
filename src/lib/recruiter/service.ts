@@ -12,6 +12,7 @@ import {
 } from "@/lib/db/schema";
 import { AppError } from "@/lib/errors";
 import {
+  activeCandidatePremiumSql,
   checkJobQuota,
   listUserCompanies,
   quotaPeriodKey,
@@ -901,6 +902,7 @@ export type PipelineRow = {
   headline: string | null;
   location: string | null;
   resumeId: string | null;
+  isPremium: boolean;
 };
 
 export async function listCompanyApplications(params: {
@@ -929,13 +931,14 @@ export async function listCompanyApplications(params: {
       headline: candidateProfiles.headline,
       location: candidateProfiles.currentLocation,
       resumeId: applications.resumeId,
+      isPremium: activeCandidatePremiumSql(users.id),
     })
     .from(applications)
     .innerJoin(jobs, eq(jobs.id, applications.jobId))
     .innerJoin(users, eq(users.id, applications.candidateUserId))
     .leftJoin(candidateProfiles, eq(candidateProfiles.userId, users.id))
     .where(and(...conditions))
-    .orderBy(desc(applications.createdAt))
+    .orderBy(desc(activeCandidatePremiumSql(users.id)), desc(applications.createdAt))
     .limit(300);
 }
 

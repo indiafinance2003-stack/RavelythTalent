@@ -8,6 +8,7 @@ import { handleApi, jsonOk, readJson } from "@/lib/http";
 import { requireApiVerifiedUser } from "@/lib/auth/current-user";
 import { requireCompanyMembership } from "@/lib/entitlements";
 import { createRazorpayOrder, publicKeyId, razorpayCheckoutConfigured } from "@/lib/billing/razorpay";
+import { resolveSubscriptionCompanyId } from "@/lib/billing/subscription-owner";
 import { AppError } from "@/lib/errors";
 
 export const runtime = "nodejs";
@@ -183,23 +184,23 @@ export const POST = handleApi(async (request: Request) => {
   }
 
   // Employers pay on behalf of their company; membership is verified here.
-  let companyId: string | null = null;
-  if (plan.audience === "employer") {
-    if (!subscription.companyId) {
-      throw new AppError("Choose a company to subscribe.", 400, "company_required");
-    }
-    await requireCompanyMembership(user.id, subscription.companyId);
+  const companyId = resolveSubscriptionCompanyId({
+    audience: plan.audience,
+    userRole: user.role,
+    requestedCompanyId: subscription.companyId,
+  });
+  if (companyId) {
+    await requireCompanyMembership(user.id, companyId);
     const company = (
       await db
         .select({ status: companies.status })
         .from(companies)
-        .where(eq(companies.id, subscription.companyId))
+        .where(eq(companies.id, companyId))
         .limit(1)
     ).at(0);
     if (company?.status !== "approved") {
       throw new AppError("Your company must be approved before purchasing an employer plan.", 403, "company_not_approved");
     }
-    companyId = subscription.companyId;
   }
 
   const receipt = `rcpt_${Date.now().toString(36)}_${user.id.slice(0, 8)}`;

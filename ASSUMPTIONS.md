@@ -300,3 +300,14 @@ tokens, skill links, application history).
 - A published job is automatically paused after reports from three distinct
   reporters; user reporters are deduplicated by account and anonymous reporters
   by a SHA-256 hash of the trusted requester IP.
+
+## 12. Candidate premium
+
+- Candidate Premium is derived from an unexpired active candidate subscription
+  with the `resume_builder` entitlement enabled. The same server-side
+  entitlement controls the resume builder and recruiter-visible badges; expiry
+  removes those perks without client state.
+- Recruiter candidate search ranks exact name/headline matches before partial
+  matches, then uses Premium as the tie-breaker. Applicant lists also use
+  Premium as the first ordering key and retain newest-application order within
+  each tier.

@@ -3,7 +3,8 @@ import { db } from "@/lib/db";
 import { payments, webhookEvents } from "@/lib/db/schema";
 import { jsonOk } from "@/lib/http";
 import { verifyWebhookSignature } from "@/lib/billing/razorpay";
-import { activateSubscription, recordFailedPayment } from "@/lib/billing/activate";
+import { recordFailedPayment } from "@/lib/billing/activate";
+import { activateSubscriptionFromPayment } from "@/lib/billing/payment-activation";
 import { activateAddonPayment } from "@/lib/billing/addons";
 import { AppError } from "@/lib/errors";
 
@@ -137,7 +138,7 @@ async function handleCaptured(event: RazorpayEvent): Promise<void> {
     userId?: string;
   };
 
-  await activateSubscription({
+  await activateSubscriptionFromPayment({
     orderId,
     paymentId: entity.id,
     amountPaise: entity.amount ?? payment.amountPaise,
@@ -146,7 +147,6 @@ async function handleCaptured(event: RazorpayEvent): Promise<void> {
     planId: payment.planId,
     billingPeriod: resolveBillingPeriod(notes.billingPeriod, payment.notes),
     method: entity.method ?? null,
-    signatureVerified: true,
   });
 }
 

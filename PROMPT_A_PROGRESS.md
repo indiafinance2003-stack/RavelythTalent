@@ -20,10 +20,10 @@ task commit so work can resume without relying on conversation history.
 - [x] Add decision/report tests and commit locally.
 
 ## Task 3 — Candidate premium perks
-- [ ] Enforce premium subscription server-side for builder, badges and ranking.
-- [ ] Add upgrade/perk display and ensure expiry removes perks.
-- [ ] Verify Razorpay candidate and employer owner activation in tests.
-- [ ] Commit locally.
+- [x] Enforce premium subscription server-side for builder, badges and ranking.
+- [x] Add upgrade/perk display and ensure expiry removes perks.
+- [x] Verify Razorpay candidate and employer owner activation in tests.
+- [x] Commit locally.
 
 ## Task 4 — Admin subscription activation
 - [ ] Inline billing form errors and owner-type plan/period filtering.

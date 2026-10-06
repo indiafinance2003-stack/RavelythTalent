@@ -7,7 +7,7 @@ import { handleApi, jsonOk, readJson } from "@/lib/http";
 import { requireApiVerifiedUser } from "@/lib/auth/current-user";
 import { AppError } from "@/lib/errors";
 import { verifyCheckoutSignature } from "@/lib/billing/razorpay";
-import { activateSubscription } from "@/lib/billing/activate";
+import { activateSubscriptionFromPayment } from "@/lib/billing/payment-activation";
 import { activateAddonPayment } from "@/lib/billing/addons";
 
 export const runtime = "nodejs";
@@ -75,7 +75,7 @@ export const POST = handleApi(async (request: Request) => {
   };
   const billingPeriod = notes.billingPeriod === "yearly" ? "yearly" : "monthly";
 
-  const result = await activateSubscription({
+  const result = await activateSubscriptionFromPayment({
     orderId: payment.orderId,
     paymentId: body.razorpay_payment_id,
     amountPaise: payment.amountPaise,
@@ -83,7 +83,6 @@ export const POST = handleApi(async (request: Request) => {
     companyId: payment.companyId,
     planId: payment.planId,
     billingPeriod,
-    signatureVerified: true,
   });
 
   return jsonOk({

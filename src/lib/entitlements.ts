@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, lte, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, lte, sql, type SQLWrapper } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   companies,
@@ -60,6 +60,24 @@ export type ActivePlan = {
 
 export function emptyEntitlements(): Map<FeatureKey, Entitlement> {
   return new Map();
+}
+
+/** SQL predicate for an unexpired candidate premium entitlement. */
+export function activeCandidatePremiumSql(userId: SQLWrapper) {
+  return sql<boolean>`exists (
+    select 1
+    from subscriptions premium_subscription
+    inner join plans premium_plan on premium_plan.id = premium_subscription.plan_id
+    inner join plan_features premium_feature on premium_feature.plan_id = premium_plan.id
+    where premium_subscription.user_id = ${userId}
+      and premium_subscription.company_id is null
+      and premium_subscription.status = 'active'
+      and premium_subscription.current_period_start <= now()
+      and premium_subscription.current_period_end > now()
+      and premium_plan.audience = 'candidate'
+      and premium_feature.feature_key = 'resume_builder'
+      and premium_feature.is_enabled = true
+  )`;
 }
 
 async function loadPlanBySubscriptionId(subscriptionId: string): Promise<ActivePlan | null> {

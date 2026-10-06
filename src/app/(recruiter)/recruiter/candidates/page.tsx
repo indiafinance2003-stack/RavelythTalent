@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { and, asc, eq, ilike, inArray, isNull, or } from "drizzle-orm";
-import { Card, EmptyState, PageHeader } from "@/components/ui/primitives";
+import { and, asc, desc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
+import { Badge, Card, EmptyState, PageHeader } from "@/components/ui/primitives";
 import { requireUser } from "@/lib/auth/current-user";
 import { db } from "@/lib/db";
 import {
@@ -11,7 +11,7 @@ import {
   users,
 } from "@/lib/db/schema";
 import { getSiteSettings } from "@/lib/settings";
-import { getCompanyPlan } from "@/lib/entitlements";
+import { activeCandidatePremiumSql, getCompanyPlan } from "@/lib/entitlements";
 import { resolveRecruiterCompany } from "@/lib/recruiter/service";
 import { saveCandidateAction } from "@/lib/recruiter/candidate-actions";
 
@@ -47,6 +47,14 @@ export default async function RecruiterCandidatesPage({
   }
 
   const query = rawQuery?.trim().slice(0, 100) ?? "";
+  const premium = activeCandidatePremiumSql(users.id);
+  const relevance = query
+    ? sql<number>`case
+        when ${users.fullName} ilike ${query} then 3
+        when ${candidateProfiles.headline} ilike ${query} then 2
+        else 1
+      end`
+    : sql<number>`0`;
   const conditions = [
     eq(candidateProfiles.discoverable, true),
     eq(users.role, "job_seeker"),
@@ -71,11 +79,12 @@ export default async function RecruiterCandidatesPage({
       location: candidateProfiles.currentLocation,
       experienceMonths: candidateProfiles.totalExperienceMonths,
       profileCompleteness: candidateProfiles.profileCompleteness,
+      isPremium: premium,
     })
       .from(candidateProfiles)
       .innerJoin(users, eq(users.id, candidateProfiles.userId))
       .where(and(...conditions))
-      .orderBy(asc(users.fullName))
+      .orderBy(desc(relevance), desc(premium), asc(users.fullName))
       .limit(50),
     db.select({ candidateUserId: savedCandidates.candidateUserId })
       .from(savedCandidates)
@@ -118,7 +127,10 @@ export default async function RecruiterCandidatesPage({
         return (
           <Card className="flex flex-wrap items-start justify-between gap-4" key={candidate.userId}>
             <div className="min-w-0 flex-1">
-              <h2 className="font-bold text-navy">{candidate.fullName}</h2>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="font-bold text-navy">{candidate.fullName}</h2>
+                {candidate.isPremium ? <Badge tone="success">Premium</Badge> : null}
+              </div>
               <p className="text-sm text-slate-600">{candidate.headline ?? "Candidate"}{candidate.location ? ` · ${candidate.location}` : ""}</p>
               <p className="mt-2 line-clamp-3 whitespace-pre-wrap text-sm text-slate-700">{candidate.summary?.slice(0, 400) || "No profile summary provided."}</p>
               <p className="mt-2 text-xs text-slate-500">

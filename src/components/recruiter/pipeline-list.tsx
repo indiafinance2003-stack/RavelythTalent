@@ -72,7 +72,10 @@ export function PipelineList({
             <li key={a.id} className="surface space-y-3 p-4 sm:p-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="truncate font-semibold text-navy">{a.candidateName}</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="truncate font-semibold text-navy">{a.candidateName}</p>
+                    {a.isPremium ? <Badge tone="success">Premium</Badge> : null}
+                  </div>
                   <p className="text-sm text-slate-600">{a.headline ?? "Candidate"}{a.location ? ` · ${a.location}` : ""}</p>
                   <p className="mt-1 text-xs text-slate-500">
                     Applied to <Link href={`/recruiter/jobs/${a.jobId}`} className="font-semibold text-royal hover:underline">{a.jobTitle}</Link>
