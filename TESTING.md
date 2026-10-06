@@ -42,6 +42,14 @@ unverified, deleted and unknown addresses. The generated
 existing email-status enum. Database-backed password token/outbox delivery was
 not exercised because local database authentication is unavailable.
 
+Task 6 checks: `npm run typecheck`, `npm run lint`, and
+`npm run test -- src/lib/admin/user-deletion-policy.test.ts` passed. The policy
+tests verify that an admin cannot delete themselves or another administrator,
+that paid payment/invoice records block deletion, and that a company is deleted
+only when it has no other active user-members. The transactional cascade,
+ownership transfer and on-disk cleanup remain unverified against PostgreSQL
+and real uploaded files.
+
 ## Manual staging verification
 
 Use a staging deployment with the current additive migrations and seed data,
@@ -116,6 +124,17 @@ working email and (for paid flows) Razorpay test credentials:
    suspended, deactivated and soft-deleted accounts and an unknown address;
    confirm the response stays identical, no reset email is queued, and
    `/admin/emails` shows a `suppressed` row with the specific reason.
+15. In `/admin/users`, expand Delete account for a non-admin account, confirm
+   the displayed data summary, enter the account email and submit. Confirm the
+   account and associated profile/resume/application/notification/session/
+   alert/built-resume data are gone and uploaded files are removed. Try an
+   incorrect email, the logged-in admin, another admin, and an account with a
+   captured/refunded payment or invoice; each must be refused with the reason,
+   including the instruction to suspend financial accounts instead. Delete a
+   recruiter with no other active company members and verify its company,
+   jobs, reports, verification documents and company-identity fields are gone.
+   Delete a recruiter with active teammates and verify the company remains
+   with ownership transferred to an active teammate.
 
 Do not run the migration against production as a validation step. Apply
 migrations only through the server deployment procedure and after a database

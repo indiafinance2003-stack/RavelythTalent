@@ -144,6 +144,16 @@ tokens, skill links, application history).
   same email is **linked** instead of duplicated.
 - **Account lockout**: 10 consecutive failed logins locks the account for 15
   minutes; the counter resets on success.
+- **Admin account deletion**: account-owned relational data is removed by a
+  single PostgreSQL transaction and its foreign-key cascades. A company with
+  other active user-members remains and its owner role transfers to an active
+  teammate; a company without one is deleted with its jobs, reports and
+  verification records. Company identity deduplication data is stored directly
+  on the company row and is removed with that row. Captured/refunded payments
+  or any invoice associated with the account or a company it owns block
+  deletion; suspend the account instead. Local files are removed after the
+  database transaction commits, with any cleanup failure explicitly shown to
+  the admin.
 - **Rate limiting**: fixed-window counters in the `rate_limits` table keyed by
   `bucket_key` (for example `login:ip:1.2.3.4`). Limits are declared in one
   place (`src/lib/rate-limit.ts`) and documented in code comments. A DB-backed

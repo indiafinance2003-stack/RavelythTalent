@@ -262,3 +262,26 @@ export async function deleteStoredFile(storagePath: string): Promise<void> {
     console.warn(`[storage] could not delete ${storagePath}:`, error);
   }
 }
+
+export async function deleteStoredFiles(
+  storagePaths: readonly string[],
+): Promise<number> {
+  let failed = 0;
+  for (const storagePath of new Set(storagePaths)) {
+    try {
+      await fs.unlink(await resolveStoredPath(storagePath));
+    } catch (error) {
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        "code" in error &&
+        error.code === "ENOENT"
+      ) {
+        continue;
+      }
+      failed += 1;
+      console.error("[storage] account-deletion file cleanup failed:", error);
+    }
+  }
+  return failed;
+}

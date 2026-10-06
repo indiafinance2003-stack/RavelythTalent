@@ -28,6 +28,11 @@
   lookup, password token/outbox transaction, and suppressed-reason rendering
   still require a staging/local PostgreSQL smoke test because local database
   authentication is unavailable.
+- **MEDIUM — account deletion needs database/filesystem walkthrough:** Task 6
+  policy tests cover self/admin guards, paid-payment/invoice blocks and the
+  owned-company deletion decision. PostgreSQL cascade/ownership-transfer
+  behavior and successful/failed local-file cleanup need a staging test; local
+  PostgreSQL authentication is unavailable.
 - **BLOCKER — local PostgreSQL credentials:** PostgreSQL is installed and
   running, but application authentication to the local database fails. A prior
   bootstrap attempt changed the local `postgres` password before failing; its
