@@ -13,6 +13,7 @@ import {
   computeCompleteness,
   ensureCandidateProfile,
 } from "./profile";
+import { syncDefaultProfileAlert } from "@/lib/alerts/service";
 import {
   deleteResume,
   setDefaultResume,
@@ -132,6 +133,7 @@ export async function updateProfileAction(
       .update(candidateProfiles)
       .set({ profileCompleteness: completeness })
       .where(eq(candidateProfiles.id, profileId));
+    await syncDefaultProfileAlert(user.id);
 
     revalidatePath("/dashboard/profile");
     revalidatePath("/dashboard");

@@ -35,6 +35,8 @@ export const users = pgTable(
     avatarPath: text("avatar_path"),
     employerConversionUsed: boolean("employer_conversion_used").notNull().default(false),
     candidateDiscoverableBeforeEmployer: boolean("candidate_discoverable_before_employer"),
+    jobAlertEmailConsent: boolean("job_alert_email_consent").notNull().default(false),
+    jobAlertLastEmailAt: timestamp("job_alert_last_email_at", { withTimezone: true }),
     lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
     failedLoginAttempts: integer("failed_login_attempts").notNull().default(0),
     lockedUntil: timestamp("locked_until", { withTimezone: true }),

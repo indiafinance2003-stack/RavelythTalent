@@ -1,5 +1,6 @@
 import type { jobs } from "@/lib/db/schema";
+import { notifyMatchingCandidatesOfPublishedJob } from "@/lib/alerts/service";
 
-export async function onJobPublished(_job: typeof jobs.$inferSelect): Promise<void> {
-  // Intentionally empty; integrations may attach to this hook later.
+export async function onJobPublished(job: typeof jobs.$inferSelect): Promise<void> {
+  await notifyMatchingCandidatesOfPublishedJob(job.id);
 }

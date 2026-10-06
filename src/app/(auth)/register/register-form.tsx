@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Briefcase, UserRound } from "lucide-react";
 import { registerAction } from "@/lib/auth/actions";
 import { initialFormState } from "@/lib/form-state";
-import { Alert, Button, Field, Input } from "@/components/ui/primitives";
+import { Alert, Button, Checkbox, Field, Input } from "@/components/ui/primitives";
 
 export function RegisterForm() {
   const [state, formAction, pending] = useActionState(
@@ -121,6 +121,13 @@ export function RegisterForm() {
         </div>
 
         {role === "recruiter" ? <CompanyFields errors={state.fieldErrors} /> : null}
+        {role === "job_seeker" ? (
+          <Checkbox
+            id="jobAlertConsent"
+            name="jobAlertConsent"
+            label="Email me new jobs that match my profile"
+          />
+        ) : null}
 
         <Button type="submit" size="lg" className="w-full" disabled={pending}>
           {pending ? "Creating account..." : "Create account"}

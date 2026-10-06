@@ -64,6 +64,13 @@
       "when": 1791288904351,
       "tag": "0008_flimsy_black_tarantula",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1791289390791,
+      "tag": "0009_flaky_colossus",
+      "breakpoints": true
     }
   ]
 }

@@ -74,7 +74,10 @@ export async function registerAction(
     await assertSameOrigin();
     await limitByIp("register");
 
-    const parsed = registerSchema.safeParse(formDataToObject(formData));
+    const parsed = registerSchema.safeParse({
+      ...formDataToObject(formData),
+      jobAlertConsent: formData.get("jobAlertConsent") === "on",
+    });
     if (!parsed.success) {
       return {
         status: "error",

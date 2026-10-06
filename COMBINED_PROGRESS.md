@@ -1,7 +1,7 @@
 # Combined task progress
 
 - [x] Task 1: Candidate-to-employer conversion and switch-back
-- [ ] Task 2: Opt-in job-alert notifications and unsubscribe
+- [x] Task 2: Opt-in job-alert notifications and unsubscribe
 - [ ] Task 3: Salary insights grouping fix and regression coverage
 - [ ] Task 4: Shared Asia/Kolkata date/time formatting
 - [ ] Task 5: Role/status-safe password reset email reliability
@@ -12,7 +12,8 @@
 
 ## Current task
 
-Task 1 is complete and locally committed. Task 2 is next: trace candidate
-registration, existing job-alert preferences and matching, publication hooks,
-notifications, and daily/weekly digest delivery; implement explicit consent,
-matching notifications, unsubscribe handling, tests, and a local commit.
+Task 1 is complete and locally committed (`5cd61f9`). Task 2 implementation and
+policy tests are complete; its local commit is pending. Task 3 is next: inspect
+salary-insights aggregation and raw SQL GROUP BY queries, fix selected/grouped
+columns without weakening the five-posting threshold, add regression tests, and
+attempt a local PostgreSQL exercise without changing production configuration.

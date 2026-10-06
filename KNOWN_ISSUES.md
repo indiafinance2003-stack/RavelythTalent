@@ -8,6 +8,12 @@
   company creation, and queued confirmation email still need staging
   verification. Additive migration `0008_flimsy_black_tarantula.sql` has not
   been applied locally.
+- **MEDIUM — job-alert flow needs provider/database verification:** Task 2
+  tests matching, consent, India-day delivery caps and unsubscribe policy as
+  pure logic. Registration-to-alert persistence, publish-hook notifications,
+  concurrent outbox suppression and SMTP delivery still require staging
+  verification. Additive migration `0009_flaky_colossus.sql` has not been
+  applied locally.
 - **BLOCKER — local PostgreSQL credentials:** PostgreSQL is installed and
   running, but application authentication to the local database fails. A prior
   bootstrap attempt changed the local `postgres` password before failing; its

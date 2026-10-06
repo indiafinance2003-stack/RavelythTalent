@@ -31,6 +31,7 @@ import {
 import { isDisposableEmail } from "@/lib/auth/disposable-email";
 import { getSiteSettings } from "@/lib/settings";
 import type { LoginInput, RegisterInput } from "@/lib/validation/auth";
+import { syncDefaultProfileAlert } from "@/lib/alerts/service";
 
 export const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
 export const PASSWORD_RESET_TTL_MS = 60 * 60 * 1000;
@@ -226,6 +227,8 @@ export async function registerUser(input: RegisterInput): Promise<string> {
       phone: input.phone ?? null,
       passwordHash,
       role: input.role,
+      jobAlertEmailConsent:
+        input.role === "job_seeker" && input.jobAlertConsent,
     })
     .returning({ id: users.id, email: users.email, fullName: users.fullName });
 
@@ -234,6 +237,9 @@ export async function registerUser(input: RegisterInput): Promise<string> {
   // Every job seeker gets a profile row so the rest of the app can assume it.
   if (input.role === "job_seeker") {
     await db.insert(candidateProfiles).values({ userId: user.id });
+    if (input.jobAlertConsent) {
+      await syncDefaultProfileAlert(user.id, { frequency: "daily", enable: true });
+    }
   }
 
   if (input.role === "recruiter" && input.companyName) {

@@ -4,7 +4,9 @@ import { useActionState } from "react";
 import {
   createAlertAction,
   deleteAlertAction,
+  saveAlertPreferencesAction,
   toggleAlertAction,
+  updateAlertAction,
 } from "@/lib/alerts/actions";
 import { initialFormState } from "@/lib/form-state";
 import { formatDate } from "@/lib/utils";
@@ -13,10 +15,52 @@ import {
   Badge,
   Button,
   Card,
+  Checkbox,
   Field,
   Input,
   Select,
 } from "@/components/ui/primitives";
+
+export function JobAlertPreferencesForm({
+  consent,
+  frequency,
+}: {
+  consent: boolean;
+  frequency: "daily" | "weekly";
+}) {
+  const [state, formAction, pending] = useActionState(
+    saveAlertPreferencesAction,
+    initialFormState,
+  );
+  return (
+    <Card>
+      <h2 className="text-base font-bold text-navy">Job-alert email preferences</h2>
+      <p className="mt-1 text-sm text-slate-600">
+        Email consent is optional. Turning it off prevents future job-alert emails;
+        you can still manage saved alerts and in-app notifications.
+      </p>
+      <form action={formAction} className="mt-4 space-y-4">
+        {state.status === "success" ? <Alert tone="success">{state.message}</Alert> : null}
+        {state.status === "error" ? <Alert tone="error">{state.message}</Alert> : null}
+        <Checkbox
+          id="job-alert-email-consent"
+          name="consent"
+          label="Email me new jobs that match my profile"
+          defaultChecked={consent}
+        />
+        <Field label="Email frequency" htmlFor="job-alert-frequency">
+          <Select id="job-alert-frequency" name="frequency" defaultValue={frequency}>
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+          </Select>
+        </Field>
+        <Button type="submit" disabled={pending}>
+          {pending ? "Saving..." : "Save job-alert preferences"}
+        </Button>
+      </form>
+    </Card>
+  );
+}
 
 export function CreateAlertForm({
   categories,
@@ -77,7 +121,7 @@ export function CreateAlertForm({
 export type AlertRow = {
   id: string;
   name: string;
-  criteria: Record<string, string>;
+  criteria: Record<string, unknown>;
   frequency: string;
   isActive: boolean;
   lastSentAt: Date | null;
@@ -102,9 +146,10 @@ export function AlertList({ alerts }: { alerts: AlertRow[] }) {
               <p className="truncate text-sm font-semibold text-navy">{alert.name}</p>
               <p className="text-xs text-slate-600">
                 {[
-                  alert.criteria.q,
-                  alert.criteria.location,
-                  alert.criteria.category,
+                  stringValue(alert.criteria.q),
+                  stringValue(alert.criteria.location) ||
+                    stringValue((alert.criteria.locations as string[] | undefined)?.[0]),
+                  stringValue(alert.criteria.category),
                 ]
                   .filter(Boolean)
                   .join(" | ") || "All jobs"}
@@ -140,10 +185,54 @@ export function AlertList({ alerts }: { alerts: AlertRow[] }) {
                   Delete
                 </button>
               </form>
+              <UpdateAlertForm alert={alert} />
             </div>
           </li>
         ))}
       </ul>
     </Card>
   );
+}
+
+function UpdateAlertForm({ alert }: { alert: AlertRow }) {
+  const [state, formAction, pending] = useActionState(
+    updateAlertAction,
+    initialFormState,
+  );
+  const location = stringValue(alert.criteria.location) ||
+    stringValue((alert.criteria.locations as string[] | undefined)?.[0]);
+  return (
+    <details className="basis-full">
+      <summary className="cursor-pointer text-xs font-semibold text-royal">Edit alert</summary>
+      <form action={formAction} className="mt-3 grid gap-3 sm:grid-cols-2">
+        <input type="hidden" name="alertId" value={alert.id} />
+        <Field label="Alert name" htmlFor={`alert-name-${alert.id}`}>
+          <Input id={`alert-name-${alert.id}`} name="name" defaultValue={alert.name} />
+        </Field>
+        <Field label="Keywords" htmlFor={`alert-q-${alert.id}`}>
+          <Input id={`alert-q-${alert.id}`} name="q" defaultValue={stringValue(alert.criteria.q)} />
+        </Field>
+        <Field label="Location" htmlFor={`alert-location-${alert.id}`}>
+          <Input id={`alert-location-${alert.id}`} name="location" defaultValue={location} />
+        </Field>
+        <Field label="Category" htmlFor={`alert-category-${alert.id}`}>
+          <Input id={`alert-category-${alert.id}`} name="category" defaultValue={stringValue(alert.criteria.category)} />
+        </Field>
+        <Field label="Frequency" htmlFor={`alert-frequency-${alert.id}`}>
+          <Select id={`alert-frequency-${alert.id}`} name="frequency" defaultValue={alert.frequency}>
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+          </Select>
+        </Field>
+        {state.message ? (
+          <Alert tone={state.status === "success" ? "success" : "error"}>{state.message}</Alert>
+        ) : null}
+        <div><Button type="submit" size="sm" disabled={pending}>{pending ? "Saving..." : "Save changes"}</Button></div>
+      </form>
+    </details>
+  );
+}
+
+function stringValue(value: unknown): string {
+  return typeof value === "string" ? value : "";
 }

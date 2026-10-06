@@ -32,49 +32,58 @@ tested with mocks; no live payment or webhook was performed.
 Use a staging deployment with the current additive migrations and seed data,
 working email and (for paid flows) Razorpay test credentials:
 
-1. Apply `0008_flimsy_black_tarantula.sql`, then register and verify a candidate.
+1. Apply `0008_flimsy_black_tarantula.sql` and `0009_flaky_colossus.sql`, then
+   register and verify a candidate.
    In `/dashboard/settings`, convert with company details and the exact typed
    confirmation. Confirm role/session refresh, company approval behavior,
    conversion email, preserved candidate data, and that recruiter search cannot
    find the hidden profile. Repeat conversion after switching back and verify
    the second company does not receive a fresh free-post allowance.
-2. While a candidate Premium subscription is active, convert and confirm its
+2. Register one candidate with the job-alert checkbox unticked and another
+   with it selected. Confirm only the selected account gets a profile alert.
+   Edit its headline, skills and preferred locations and verify the default
+   alert updates. Publish a matching and non-matching job; confirm only the
+   matching job creates an in-app notification. Set one alert daily and another
+   weekly, then confirm the digest sends no more than once per candidate on the
+   same India calendar day and contains an unsubscribe link. Click it, then
+   verify email consent is off and no queued or later alert is delivered.
+3. While a candidate Premium subscription is active, convert and confirm its
    expiry remains unchanged and the settings warning is shown. On
    `/recruiter/company`, try switching back with a published job, a held job,
    and an active employer subscription; each must show its precise blocker.
    Close/resolve those blockers and confirm switching back restores candidate
    visibility and existing applications/resumes.
-3. In `/admin/settings`, set the legal operator/contact details and
+4. In `/admin/settings`, set the legal operator/contact details and
    `jurisdictionCity`, set `freeJobPosts` to `1`, and enable automatic company
    approval and clean-job publishing. Save, then verify the public policy
    pages show configured details and omit empty ones.
-4. Register a candidate and a recruiter with distinct verified email
+5. Register a candidate and a recruiter with distinct verified email
    addresses. Confirm a candidate can browse and apply without payment. Confirm
    the recruiter company is approved after email verification.
-5. On `/pricing`, verify the employer Free card and legal links. Submit one
+6. On `/pricing`, verify the employer Free card and legal links. Submit one
    clean job for the company and confirm it publishes and consumes its single
    lifetime credit; try a second post and confirm the upgrade prompt. Check the
    recruiter dashboard count. Separately test a scan-blocked job and confirm
    the free credit remains available; verify rejected/closed/deleted jobs do
    not restore a consumed credit.
-6. Submit a clean job and representative scam/payment-request, discriminatory,
+7. Submit a clean job and representative scam/payment-request, discriminatory,
    adult, spam, and duplicate examples. Confirm publish, held and blocked
    decisions, the employer-facing reason/email, and held-job reasons in
    `/admin/jobs`. Toggle each automatic approval setting off and confirm the
    manual review flow returns.
-7. Report a published test job from three distinct reporters. Confirm the job
+8. Report a published test job from three distinct reporters. Confirm the job
    pauses, the report queue and overview counts update, and the admin notice is
    queued.
-8. In `/admin/billing`, search a candidate by email and a company by name.
+9. In `/admin/billing`, search a candidate by email and a company by name.
    Confirm only matching active plan types and priced periods are available.
    Activate a test offline subscription, then verify subscription, `offline`
    payment and audit entry. Submit a mismatched owner/plan and confirm the
    actual validation message appears inline.
-9. In Razorpay test mode, purchase candidate Premium and an employer plan.
+10. In Razorpay test mode, purchase candidate Premium and an employer plan.
    Confirm both browser verification and webhook replay result in one active
    owner-correct subscription; confirm candidate builder access, recruiter
    Premium badge/ranking, and removal after expiry.
-10. Inspect `/privacy`, `/terms`, and `/refund-policy` with settings populated
+11. Inspect `/privacy`, `/terms`, and `/refund-policy` with settings populated
    and cleared. Confirm the last-updated date, configured jurisdiction, no
    empty-setting placeholders, and policy links next to pricing/checkout.
    Send a test email and inspect that its image is an absolute

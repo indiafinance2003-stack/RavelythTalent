@@ -1,8 +1,9 @@
 import { and, asc, eq, inArray, lte } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { emailOutbox } from "@/lib/db/schema";
+import { emailOutbox, jobAlerts, users } from "@/lib/db/schema";
 import { AppError } from "@/lib/errors";
 import { fromAddress, getTransport } from "./smtp";
+import { mayEmailJobAlerts } from "@/lib/alerts/matching";
 
 /**
  * Email outbox.
@@ -116,7 +117,54 @@ export type OutboxRunResult = {
   picked: number;
   sent: number;
   failed: number;
+  suppressed: number;
 };
+
+async function suppressUnconsentedJobAlert(row: OutboxRow): Promise<boolean> {
+  if (row.templateKey !== "job_alert") return false;
+  let userId = typeof row.metadata?.jobAlertUserId === "string"
+    ? row.metadata.jobAlertUserId
+    : null;
+  if (!userId && typeof row.metadata?.alertId === "string") {
+    const [alert] = await db
+      .select({ userId: jobAlerts.userId })
+      .from(jobAlerts)
+      .where(eq(jobAlerts.id, row.metadata.alertId))
+      .limit(1);
+    userId = alert?.userId ?? null;
+  }
+  if (!userId) {
+    await suppressJobAlertRow(row);
+    return true;
+  }
+  const [user] = await db
+    .select({
+      role: users.role,
+      status: users.status,
+      emailVerifiedAt: users.emailVerifiedAt,
+      deletedAt: users.deletedAt,
+      jobAlertEmailConsent: users.jobAlertEmailConsent,
+    })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  if (user && mayEmailJobAlerts(user)) return false;
+  await suppressJobAlertRow(row);
+  return true;
+}
+
+async function suppressJobAlertRow(row: OutboxRow): Promise<void> {
+  await db
+    .update(emailOutbox)
+    .set({
+      status: "failed",
+      attempts: row.maxAttempts,
+      lastError: "Suppressed: candidate job-alert consent is off or the account is inactive.",
+      nextAttemptAt: new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000),
+      updatedAt: new Date(),
+    })
+    .where(eq(emailOutbox.id, row.id));
+}
 
 /** Drains up to `limit` due messages. Safe to call on every cron tick. */
 export async function processEmailOutbox(
@@ -136,9 +184,14 @@ export async function processEmailOutbox(
 
   let sent = 0;
   let failed = 0;
+  let suppressed = 0;
 
   for (const row of rows) {
     try {
+      if (await suppressUnconsentedJobAlert(row)) {
+        suppressed += 1;
+        continue;
+      }
       await deliver(row);
       sent += 1;
     } catch (error) {
@@ -148,7 +201,7 @@ export async function processEmailOutbox(
     }
   }
 
-  return { picked: rows.length, sent, failed };
+  return { picked: rows.length, sent, failed, suppressed };
 }
 
 /** Admin "retry" action for a failed message. */

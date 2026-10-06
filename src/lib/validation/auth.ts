@@ -54,6 +54,7 @@ export const registerSchema = z
       .optional()
       .transform((v) => (v ? v : undefined)),
     role: z.enum(["job_seeker", "recruiter"]).default("job_seeker"),
+    jobAlertConsent: z.boolean().default(false),
     companyName: z
       .string()
       .trim()

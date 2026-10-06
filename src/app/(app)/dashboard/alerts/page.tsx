@@ -29,7 +29,7 @@ export default async function AlertsPage() {
         alerts={alerts.map((a) => ({
           id: a.id,
           name: a.name,
-          criteria: (a.criteria ?? {}) as Record<string, string>,
+          criteria: (a.criteria ?? {}) as Record<string, unknown>,
           frequency: a.frequency,
           isActive: a.isActive,
           lastSentAt: a.lastSentAt,

@@ -8,8 +8,10 @@ import { formatDate } from "@/lib/utils";
 import { BecomeEmployerForm } from "@/components/candidate/employer-conversion";
 import { db } from "@/lib/db";
 import { subscriptions } from "@/lib/db/schema";
+import { jobAlerts, users } from "@/lib/db/schema";
 import { and, desc, eq, gt, isNull } from "drizzle-orm";
 import { retainedCandidatePremiumExpiry } from "@/lib/auth/employer-conversion";
+import { JobAlertPreferencesForm } from "@/components/candidate/alert-manager";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +30,20 @@ export default async function SettingsPage() {
         .orderBy(desc(subscriptions.currentPeriodEnd))
         .limit(1)
     : [];
+  const [alertPreference] = await db
+    .select({ consent: users.jobAlertEmailConsent })
+    .from(users)
+    .where(eq(users.id, user.id))
+    .limit(1);
+  const alerts = user.role === "job_seeker"
+    ? await db
+        .select({ criteria: jobAlerts.criteria, frequency: jobAlerts.frequency })
+        .from(jobAlerts)
+        .where(eq(jobAlerts.userId, user.id))
+    : [];
+  const profileAlert = alerts.find(
+    (alert) => alert.criteria?.source === "candidate_profile",
+  );
 
   return (
     <div className="space-y-6">
@@ -58,11 +74,17 @@ export default async function SettingsPage() {
       </Card>
 
       {user.role === "job_seeker" ? (
-        <BecomeEmployerForm premiumUntil={retainedCandidatePremiumExpiry(
-          premium
-            ? { status: "active", companyId: null, currentPeriodEnd: premium.expiresAt }
-            : null,
-        )} />
+        <>
+          <JobAlertPreferencesForm
+            consent={alertPreference?.consent ?? false}
+            frequency={profileAlert?.frequency ?? "daily"}
+          />
+          <BecomeEmployerForm premiumUntil={retainedCandidatePremiumExpiry(
+            premium
+              ? { status: "active", companyId: null, currentPeriodEnd: premium.expiresAt }
+              : null,
+          )} />
+        </>
       ) : null}
 
       <Card>

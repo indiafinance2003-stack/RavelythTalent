@@ -327,6 +327,24 @@ tokens, skill links, application history).
   from `/admin/settings`; changing the value does not rewrite usage already
   recorded for a company. `jurisdictionCity` is optional and empty by default.
 
+## 15. Job-alert consent and delivery
+
+- Job-alert email consent is explicit, defaults to off, and is stored separately
+  from whether an alert is active. Turning consent off stops email delivery but
+  preserves alerts for in-app matches. The public unsubscribe capability turns
+  off consent and all active alerts for that account.
+- A consented profile alert is generated from headline/designation, skills,
+  preferred locations and selected frequency, then refreshed when the profile
+  changes. The default frequency is daily; weekly delivery is on Mondays in
+  Asia/Kolkata.
+- The existing daily cron groups all due alerts for one candidate into a single
+  digest. An account-row lock and the user's last-alert-email timestamp enforce
+  at most one digest per Asia/Kolkata calendar day. The outbox rechecks consent,
+  account role, verification and status immediately before SMTP delivery.
+- Published-job notifications are in-app only and are deduplicated by user and
+  job. They require an active matching alert but do not themselves grant email
+  consent.
+
 ## 14. Candidate-to-employer conversion
 
 - Employer conversion requires an active, email-verified candidate account and
