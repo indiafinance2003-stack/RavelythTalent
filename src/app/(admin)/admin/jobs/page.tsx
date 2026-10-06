@@ -22,6 +22,16 @@ export default async function AdminJobsPage() {
                 {job.companyName} · Submitted by {job.recruiterName ?? "Recruiter"}{job.recruiterEmail ? ` (${job.recruiterEmail})` : ""}
                 {job.city || job.state ? ` · ${[job.city, job.state].filter(Boolean).join(", ")}` : ""}
               </p>
+              {job.moderationNotes ? (
+                <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+                  <strong>Safety scan / review reasons:</strong>
+                  <ul className="mt-1 list-disc space-y-1 pl-5">
+                    {job.moderationNotes.split("\n").filter(Boolean).map((reason) => (
+                      <li key={reason}>{reason}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
               <p className="mt-3 whitespace-pre-wrap text-sm text-slate-700">{job.description}</p>
               {job.responsibilities ? <p className="mt-3 text-sm"><strong>Responsibilities:</strong> {job.responsibilities}</p> : null}
               {job.requirements ? <p className="mt-2 text-sm"><strong>Requirements:</strong> {job.requirements}</p> : null}

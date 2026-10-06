@@ -80,6 +80,16 @@ export default async function EditJobPage({
           {job.moderationNotes}
         </Alert>
       ) : null}
+      {job.status === "pending_approval" && job.moderationNotes ? (
+        <Alert tone="warning" title="Under review">
+          The job is not visible to candidates while it is under review.
+          <ul className="mt-2 list-disc space-y-1 pl-5">
+            {job.moderationNotes.split("\n").filter(Boolean).map((reason) => (
+              <li key={reason}>{reason}</li>
+            ))}
+          </ul>
+        </Alert>
+      ) : null}
       {job.status === "published" ? (
         <Alert tone="info" title="Live posting">
           Edits apply immediately to the public listing. To unpublish, use Pause

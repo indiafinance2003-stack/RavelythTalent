@@ -30,6 +30,7 @@ import {
   labelFor,
 } from "@/lib/utils";
 import { ApplyPanel } from "@/components/jobs/apply-panel";
+import { ReportJobButton } from "@/components/jobs/report-job-button";
 import { JobCardView } from "@/components/jobs/job-card";
 import {
   Badge,
@@ -295,6 +296,7 @@ export default async function JobDetailPage({ params }: { params: Params }) {
                 saved={saved}
                 resumes={resumeOptions}
               />
+              <ReportJobButton jobId={job.id} />
 
               <Card>
                 <h2 className="text-sm font-bold text-navy">Job details</h2>

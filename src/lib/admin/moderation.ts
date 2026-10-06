@@ -16,6 +16,7 @@ import {
   jobRejectedEmail,
 } from "@/lib/email/templates/recruiter";
 import { appUrl } from "@/lib/email/urls";
+import { publishJob } from "@/lib/jobs/publishing";
 
 export async function listCompanyReviewQueue() {
   const [companyRows, documents] = await Promise.all([
@@ -80,6 +81,7 @@ export async function listJobReviewQueue() {
       description: jobs.description,
       responsibilities: jobs.responsibilities,
       requirements: jobs.requirements,
+      moderationNotes: jobs.moderationNotes,
       city: jobs.city,
       state: jobs.state,
       createdAt: jobs.createdAt,
@@ -225,6 +227,41 @@ async function updateJobDecision(
   decision: "approved" | "rejected",
   reason: string | null,
 ): Promise<JobDecision> {
+  if (decision === "approved") {
+    const [job] = await db
+      .select({
+        jobId: jobs.id,
+        companyId: companies.id,
+        companyStatus: companies.status,
+        title: jobs.title,
+        slug: jobs.slug,
+        recruiterName: users.fullName,
+        recruiterEmail: users.email,
+      })
+      .from(jobs)
+      .innerJoin(companies, eq(companies.id, jobs.companyId))
+      .leftJoin(users, eq(users.id, jobs.postedByUserId))
+      .where(and(eq(jobs.id, jobId), eq(jobs.status, "pending_approval")))
+      .limit(1);
+    if (!job) throw new AppError("Pending job not found.", 404, "not_found");
+    if (job.companyStatus !== "approved") {
+      throw new AppError(
+        "The company is no longer approved; this job cannot be reviewed.",
+        409,
+        "company_not_approved",
+      );
+    }
+    await publishJob({ id: jobId }, { role: "admin", userId: adminId });
+    return {
+      jobId: job.jobId,
+      companyId: job.companyId,
+      title: job.title,
+      slug: job.slug,
+      recruiterName: job.recruiterName ?? "Recruiter",
+      recruiterEmail: job.recruiterEmail ?? "",
+    };
+  }
+
   return db.transaction(async (tx) => {
     const rows = await tx
       .select({
@@ -255,15 +292,12 @@ async function updateJobDecision(
     await tx
       .update(jobs)
       .set({
-        status: decision === "approved" ? "published" : "rejected",
-        moderationNotes: decision === "rejected" ? reason : null,
+        status: "rejected",
+        moderationNotes: reason,
         approvedByUserId: adminId,
         approvedAt: now,
-        publishedAt: decision === "approved" ? now : null,
-        expiresAt:
-          decision === "approved"
-            ? new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
-            : null,
+        publishedAt: null,
+        expiresAt: null,
         updatedAt: now,
       })
       .where(eq(jobs.id, jobId));
@@ -271,7 +305,7 @@ async function updateJobDecision(
     await tx.insert(auditLogs).values({
       actorUserId: adminId,
       actorRole: "admin",
-      action: `job.${decision}`,
+      action: "job.rejected",
       entityType: "job",
       entityId: jobId,
       description: `"${job.title}" was ${decision}.`,

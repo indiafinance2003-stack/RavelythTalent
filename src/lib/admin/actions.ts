@@ -19,6 +19,7 @@ import {
   companySuspendedEmail,
 } from "@/lib/email/templates/recruiter";
 import { decideCompanyReview, decideJobReview } from "./moderation";
+import { markJobReportReviewed } from "@/lib/jobs/reports";
 
 const decisionSchema = z.object({
   id: z.uuid(),
@@ -70,6 +71,18 @@ export async function decideJobAction(formData: FormData): Promise<void> {
   revalidatePath("/admin/jobs");
   revalidatePath("/recruiter/jobs");
   revalidatePath("/jobs");
+}
+
+export async function markJobReportReviewedAction(formData: FormData): Promise<void> {
+  await assertSameOrigin();
+  const admin = await requireApiAdmin();
+  const reportId = z.uuid().safeParse(formData.get("reportId"));
+  if (!reportId.success) {
+    throw new AppError("Choose a valid job report.", 422, "invalid_report");
+  }
+  await markJobReportReviewed(reportId.data, admin.id);
+  revalidatePath("/admin/reports");
+  revalidatePath("/admin");
 }
 
 const companyStatusSchema = z.object({

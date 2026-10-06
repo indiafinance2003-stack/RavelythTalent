@@ -123,6 +123,39 @@ export const jobs = pgTable(
 );
 
 /* -------------------------------------------------------------------------- */
+/* job_reports                                                                */
+/* -------------------------------------------------------------------------- */
+
+export const jobReports = pgTable(
+  "job_reports",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    jobId: uuid("job_id")
+      .notNull()
+      .references(() => jobs.id, { onDelete: "cascade" }),
+    reporterUserId: uuid("reporter_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    /** Stable per-job reporter identifier; anonymous IPs are stored as hashes. */
+    reporterKey: text("reporter_key").notNull(),
+    reason: text("reason").notNull(),
+    note: text("note"),
+    status: text("status").notNull().default("open"),
+    reviewedByUserId: uuid("reviewed_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("job_reports_job_reporter_key").on(t.jobId, t.reporterKey),
+    index("job_reports_status_idx").on(t.status),
+    index("job_reports_job_idx").on(t.jobId),
+    index("job_reports_created_idx").on(t.createdAt),
+  ],
+);
+
+/* -------------------------------------------------------------------------- */
 /* job_skills                                                                 */
 /* -------------------------------------------------------------------------- */
 
@@ -317,4 +350,3 @@ export const jobViews = pgTable(
     index("job_views_created_idx").on(t.createdAt),
   ],
 );
-

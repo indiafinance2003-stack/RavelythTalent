@@ -290,3 +290,13 @@ tokens, skill links, application history).
   phone. Recruiter registration rejects domains listed in the maintained
   `src/lib/auth/disposable-email-domains.txt` denylist and has a separate
   three-per-hour-per-IP registration limit.
+
+## 11. Moderation automation and reports
+
+- New company accounts default to automatic approval after owner email
+  verification; new jobs that score below 35 on the safety scan publish
+  immediately. Scan scores 35-69 are held for review, scores of 70+ or
+  hard-block rules are rejected. Admin settings can restore manual approval.
+- A published job is automatically paused after reports from three distinct
+  reporters; user reporters are deduplicated by account and anonymous reporters
+  by a SHA-256 hash of the trusted requester IP.

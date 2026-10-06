@@ -40,6 +40,8 @@ const settingsSchema = z.object({
   featureResumeDatabase: z.boolean(),
   resumeDbViewLimit: z.coerce.number().int().min(1).max(100000),
   jobPostWarningThreshold: z.coerce.number().int().min(1).max(100),
+  autoApproveCompanies: z.boolean(),
+  autoPublishJobs: z.boolean(),
   maintenanceMode: z.boolean(),
 });
 
@@ -77,6 +79,8 @@ export async function saveSiteSettingsAction(formData: FormData): Promise<void> 
     featureResumeDatabase: formData.get("featureResumeDatabase") === "on",
     resumeDbViewLimit: formData.get("resumeDbViewLimit"),
     jobPostWarningThreshold: formData.get("jobPostWarningThreshold"),
+    autoApproveCompanies: formData.get("autoApproveCompanies") === "on",
+    autoPublishJobs: formData.get("autoPublishJobs") === "on",
     maintenanceMode: formData.get("maintenanceMode") === "on",
   });
   if (!parsed.success) {

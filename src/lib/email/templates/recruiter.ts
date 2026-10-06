@@ -24,15 +24,15 @@ export function companyVerificationSubmittedEmail(params: {
     subject: `We are reviewing ${params.companyName}`,
     preheader: "Your company verification is in the queue.",
     heading: "Verification submitted",
-    intro: `Hi ${params.ownerName}, thank you. We have received the verification documents for ${params.companyName}.`,
+    intro: `Hi ${params.ownerName}, we have received the company details for ${params.companyName}.`,
     blocks: [
       {
         type: "paragraph",
-        text: "Our team reviews every company manually, usually within 1-2 working days. We will email you as soon as a decision is made.",
+        text: "Verify your email address to complete company setup. Verification documents are optional and may be provided from your company profile if requested.",
       },
       {
         type: "note",
-        text: "You can complete your company profile while you wait. Posting jobs unlocks right after approval.",
+        text: "You can complete your company profile now. We will email you when your company is ready to post jobs.",
       },
     ],
     cta: { label: "Complete my company profile", url: appUrl("/recruiter/company") },
@@ -359,6 +359,57 @@ export function freeJobCreditLimitReachedEmail(params: {
       },
     ],
     cta: { label: "Upgrade to an employer plan", url: params.upgradeUrl },
+    brand: params.brand,
+  });
+}
+
+export function jobModerationDecisionEmail(params: {
+  recruiterName: string;
+  jobTitle: string;
+  decision: "held" | "blocked";
+  reasons: string[];
+  editUrl: string;
+  brand?: EmailBrand;
+}): RenderedEmail {
+  const held = params.decision === "held";
+  return render({
+    subject: held ? "Your job post is under review" : "Your job post needs changes",
+    preheader: held
+      ? "Your job post is being reviewed for platform safety."
+      : "Please review the reason before submitting this job again.",
+    heading: held ? "Job post under review" : "Job post blocked",
+    intro: `Hi ${params.recruiterName}, "${params.jobTitle}" was ${held ? "held for a safety review" : "blocked by the automatic safety scan"}.`,
+    blocks: [
+      { type: "bullets", items: params.reasons },
+      {
+        type: "note",
+        text: held
+          ? "The job is not visible to candidates while it is under review. An administrator will review it."
+          : "This job has not been published and its free-post credit was not consumed. Update the job details before trying again.",
+      },
+    ],
+    cta: { label: held ? "View job status" : "Edit job", url: params.editUrl },
+    brand: params.brand,
+  });
+}
+
+export function jobReportThresholdEmail(params: {
+  jobTitle: string;
+  jobId: string;
+  reportCount: number;
+  adminUrl: string;
+  brand?: EmailBrand;
+}): RenderedEmail {
+  return render({
+    subject: `Job paused after ${params.reportCount} distinct reports`,
+    preheader: "A published job was paused after community reports.",
+    heading: "Job reports require review",
+    intro: `"${params.jobTitle}" was automatically paused after ${params.reportCount} distinct reporters flagged it.`,
+    blocks: [
+      { type: "paragraph", text: `Job ID: ${params.jobId}` },
+      { type: "note", text: "Review the reports and determine whether the job may be restored or should be removed." },
+    ],
+    cta: { label: "Review job reports", url: params.adminUrl },
     brand: params.brand,
   });
 }

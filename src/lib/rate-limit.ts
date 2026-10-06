@@ -39,6 +39,8 @@ export const RATE_LIMITS = {
   otpRequest: { limit: 3, windowSeconds: 15 * 60 },
   otpVerify: { limit: 10, windowSeconds: 15 * 60 },
   contactForm: { limit: 5, windowSeconds: 60 * 60 },
+  jobReportIp: { limit: 5, windowSeconds: 60 * 60 },
+  jobReportUser: { limit: 5, windowSeconds: 60 * 60 },
   checkout: { limit: 20, windowSeconds: 15 * 60 },
 } satisfies Record<string, RateRule>;
 

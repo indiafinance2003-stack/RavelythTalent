@@ -105,6 +105,14 @@ export default async function AdminSettingsPage() {
         <Card className="space-y-4">
           <h2 className="text-base font-bold text-navy">Feature flags and operating settings</h2>
           <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <Toggle checked={settings.autoApproveCompanies} label="Auto-approve companies after email verification" name="autoApproveCompanies" />
+              <p className="mt-1 text-xs text-slate-500">When off, companies remain pending for the existing manual admin review.</p>
+            </div>
+            <div>
+              <Toggle checked={settings.autoPublishJobs} label="Auto-publish jobs that pass the safety scan" name="autoPublishJobs" />
+              <p className="mt-1 text-xs text-slate-500">Safety holds and blocks still apply; when off, clean jobs wait for manual review.</p>
+            </div>
             <Toggle checked={settings.featureBlog} label="Blog enabled" name="featureBlog" />
             <Toggle checked={settings.featureReviews} label="Company reviews enabled" name="featureReviews" />
             <Toggle checked={settings.featureSalaryInsights} label="Salary insights enabled" name="featureSalaryInsights" />

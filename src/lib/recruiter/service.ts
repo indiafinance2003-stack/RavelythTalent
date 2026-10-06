@@ -1,7 +1,8 @@
-import { and, count, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   applications,
+  auditLogs,
   candidateProfiles,
   companies,
   companyMembers,
@@ -26,12 +27,22 @@ import {
   companyVerificationSubmittedEmail,
   freeJobCreditLimitReachedEmail,
   freeJobCreditWarningEmail,
+  jobApprovedEmail,
+  jobModerationDecisionEmail,
 } from "@/lib/email/templates/recruiter";
 import {
   getEmailBrand,
   queueRenderedEmail,
 } from "@/lib/email/send";
 import { appUrl } from "@/lib/email/urls";
+import {
+  resolveJobScanDecision,
+  scanJob,
+  type JobScanInput,
+  type JobScanResult,
+} from "@/lib/moderation/job-scan";
+import { getSiteSettings } from "@/lib/settings";
+import { publishJob } from "@/lib/jobs/publishing";
 import {
   readValidatedUpload,
   storeValidatedFile,
@@ -396,16 +407,19 @@ function jobValuesForInsert(
   };
 }
 
-/**
- * Creates a job as a draft, or submits it straight for approval.
- * Submitting checks: company approved + monthly job-post quota.
- */
+export type JobSubmissionResult = {
+  id: string;
+  status: "draft" | "pending_approval" | "published" | "rejected";
+  reasons: string[];
+};
+
+/** Creates a draft, or scans and submits a job through the moderation path. */
 export async function createCompanyJob(params: {
   userId: string;
   companyId: string;
   input: JobFormInput;
   submit: boolean;
-}): Promise<string> {
+}): Promise<JobSubmissionResult> {
   await requireCompanyMembership(params.userId, params.companyId);
   if (!params.submit) {
     const inserted = await db
@@ -415,7 +429,40 @@ export async function createCompanyJob(params: {
         status: "draft",
       })
       .returning({ id: jobs.id });
-    return inserted[0]!.id;
+    return { id: inserted[0]!.id, status: "draft", reasons: [] };
+  }
+
+  await assertCompanyApproved(params.companyId);
+  await assertJobQuotaAvailable(params.companyId);
+  const scan = await scanCompanyJob(params.companyId, params.input);
+  const settings = await getSiteSettings();
+  const decision = resolveJobScanDecision(scan, settings.autoPublishJobs);
+  if (decision.status === "rejected") {
+    const [job] = await db
+      .insert(jobs)
+      .values({
+        ...jobValuesForInsert(params.companyId, params.userId, params.input),
+        status: "rejected",
+        moderationNotes: decision.reasons.join("\n"),
+      })
+      .returning({ id: jobs.id });
+    if (!job) throw new AppError("Could not save the blocked job post.", 500);
+    await db.insert(auditLogs).values({
+      actorRole: "system",
+      action: "job.auto_blocked",
+      entityType: "job",
+      entityId: job.id,
+      description: `The safety scan blocked "${params.input.title}".`,
+      metadata: { score: scan.score, reasons: decision.reasons },
+    });
+    await sendJobModerationEmail({
+      companyId: params.companyId,
+      jobId: job.id,
+      title: params.input.title,
+      decision: "blocked",
+      reasons: decision.reasons,
+    });
+    return { id: job.id, status: "rejected", reasons: decision.reasons };
   }
 
   const allowance = await assertCanSubmit(params.companyId);
@@ -427,13 +474,28 @@ export async function createCompanyJob(params: {
       .insert(jobs)
       .values({
         ...jobValuesForInsert(params.companyId, params.userId, params.input),
-        status: allowance.status,
+        status: "pending_approval",
+        moderationNotes: decision.reasons.length ? decision.reasons.join("\n") : null,
         quotaPeriodKey: quotaPeriodKey(),
       })
       .returning({ id: jobs.id });
     if (!job) throw new AppError("Could not create the job post.", 500);
     return { id: job.id, freeUsed };
   });
+  let finalStatus: JobSubmissionResult["status"] = "pending_approval";
+  if (decision.status === "published") {
+    await publishJob({ id: result.id }, { role: "system" });
+    finalStatus = "published";
+    await sendJobPublishedEmail(params.companyId, result.id, params.input.title);
+  } else {
+    await sendJobModerationEmail({
+      companyId: params.companyId,
+      jobId: result.id,
+      title: params.input.title,
+      decision: "held",
+      reasons: decision.reasons,
+    });
+  }
   if (result.freeUsed !== null) {
     await notifyFreeJobCreditUsage(
       params.companyId,
@@ -442,15 +504,15 @@ export async function createCompanyJob(params: {
       allowance.warningThreshold,
     );
   }
-  return result.id;
+  return { id: result.id, status: finalStatus, reasons: decision.reasons };
 }
 
-/** Submits an existing draft / rejected job for admin approval. */
+/** Submits an existing draft or scan-blocked job through the moderation path. */
 export async function submitCompanyJob(
   userId: string,
   companyId: string,
   jobId: string,
-): Promise<void> {
+): Promise<JobSubmissionResult> {
   const job = await getCompanyJob(userId, companyId, jobId);
   if (job.status !== "draft" && job.status !== "rejected") {
     throw new AppError(
@@ -459,6 +521,49 @@ export async function submitCompanyJob(
       "invalid_status",
     );
   }
+  await assertCompanyApproved(companyId);
+  await assertJobQuotaAvailable(companyId);
+  const scan = await scanCompanyJob(companyId, {
+    title: job.title,
+    description: job.description,
+    responsibilities: job.responsibilities,
+    requirements: job.requirements,
+    salaryMinPaise: job.salaryMinPaise,
+    salaryMaxPaise: job.salaryMaxPaise,
+    salaryPeriod: job.salaryPeriod,
+    experienceMinYears: job.experienceMinYears,
+    experienceMaxYears: job.experienceMaxYears,
+  }, job.id);
+  const decision = resolveJobScanDecision(scan, (await getSiteSettings()).autoPublishJobs);
+  if (decision.status === "rejected") {
+    await db.transaction(async (tx) => {
+      await tx
+        .update(jobs)
+        .set({
+          status: "rejected",
+          moderationNotes: decision.reasons.join("\n"),
+          updatedAt: new Date(),
+        })
+        .where(eq(jobs.id, jobId));
+      await tx.insert(auditLogs).values({
+        actorRole: "system",
+        action: "job.auto_blocked",
+        entityType: "job",
+        entityId: jobId,
+        description: `The safety scan blocked "${job.title}".`,
+        metadata: { score: scan.score, reasons: decision.reasons },
+      });
+    });
+    await sendJobModerationEmail({
+      companyId,
+      jobId,
+      title: job.title,
+      decision: "blocked",
+      reasons: decision.reasons,
+    });
+    return { id: jobId, status: "rejected", reasons: decision.reasons };
+  }
+
   const allowance = await assertCanSubmit(companyId);
   const freeUsed = await db.transaction(async (tx) => {
     const consumed = allowance.usesFreeCredit
@@ -467,14 +572,28 @@ export async function submitCompanyJob(
     await tx
       .update(jobs)
       .set({
-        status: allowance.status,
-        moderationNotes: null,
+        status: "pending_approval",
+        moderationNotes: decision.reasons.length ? decision.reasons.join("\n") : null,
         quotaPeriodKey: quotaPeriodKey(),
         updatedAt: new Date(),
       })
       .where(eq(jobs.id, jobId));
     return consumed;
   });
+  let finalStatus: JobSubmissionResult["status"] = "pending_approval";
+  if (decision.status === "published") {
+    await publishJob({ id: jobId }, { role: "system" });
+    finalStatus = "published";
+    await sendJobPublishedEmail(companyId, jobId, job.title);
+  } else {
+    await sendJobModerationEmail({
+      companyId,
+      jobId,
+      title: job.title,
+      decision: "held",
+      reasons: decision.reasons,
+    });
+  }
   if (freeUsed !== null) {
     await notifyFreeJobCreditUsage(
       companyId,
@@ -483,6 +602,7 @@ export async function submitCompanyJob(
       allowance.warningThreshold,
     );
   }
+  return { id: jobId, status: finalStatus, reasons: decision.reasons };
 }
 
 type SubmissionAllowance = {
@@ -493,6 +613,28 @@ type SubmissionAllowance = {
 };
 
 async function assertCanSubmit(companyId: string): Promise<SubmissionAllowance> {
+  await assertCompanyApproved(companyId);
+
+  const decision = await checkJobQuota(companyId);
+  if (!decision.allowed) {
+    throw new AppError(decision.reason, 403, "quota_exceeded");
+  }
+  return {
+    status: "pending_approval",
+    usesFreeCredit: decision.quota.usesFreeCredit,
+    limit: decision.quota.limit ?? 0,
+    warningThreshold: decision.quota.warningThreshold,
+  };
+}
+
+async function assertJobQuotaAvailable(companyId: string): Promise<void> {
+  const decision = await checkJobQuota(companyId);
+  if (!decision.allowed) {
+    throw new AppError(decision.reason, 403, "quota_exceeded");
+  }
+}
+
+async function assertCompanyApproved(companyId: string): Promise<void> {
   const companyRows = await db
     .select({ status: companies.status })
     .from(companies)
@@ -505,17 +647,111 @@ async function assertCanSubmit(companyId: string): Promise<SubmissionAllowance> 
       "company_not_approved",
     );
   }
+}
 
-  const decision = await checkJobQuota(companyId);
-  if (!decision.allowed) {
-    throw new AppError(decision.reason, 403, "quota_exceeded");
+async function scanCompanyJob(
+  companyId: string,
+  input: JobFormInput | JobScanInput,
+  exceptJobId?: string,
+): Promise<JobScanResult> {
+  const conditions = [
+    eq(jobs.companyId, companyId),
+    isNull(jobs.deletedAt),
+    sql`${jobs.status} <> 'draft'`,
+    or(
+      sql`lower(${jobs.title}) = lower(${input.title})`,
+      sql`similarity(${jobs.description}, ${input.description}) > 0.85`,
+    ),
+  ];
+  if (exceptJobId) conditions.push(ne(jobs.id, exceptJobId));
+  const duplicates = await db
+    .select({ id: jobs.id })
+    .from(jobs)
+    .where(and(...conditions))
+    .limit(1);
+  return scanJob({
+    title: input.title,
+    description: input.description,
+    responsibilities: input.responsibilities,
+    requirements: input.requirements,
+    salaryMinPaise: "salaryMinRupees" in input
+      ? input.salaryMinRupees === null ? null : Math.round((input.salaryMinRupees ?? 0) * 100)
+      : input.salaryMinPaise,
+    salaryMaxPaise: "salaryMaxRupees" in input
+      ? input.salaryMaxRupees === null ? null : Math.round((input.salaryMaxRupees ?? 0) * 100)
+      : input.salaryMaxPaise,
+    salaryPeriod: input.salaryPeriod,
+    experienceMinYears: input.experienceMinYears,
+    experienceMaxYears: input.experienceMaxYears,
+    duplicateByCompany: duplicates.length > 0,
+  });
+}
+
+async function sendJobModerationEmail(params: {
+  companyId: string;
+  jobId: string;
+  title: string;
+  decision: "held" | "blocked";
+  reasons: string[];
+}): Promise<void> {
+  try {
+    const [company] = await db
+      .select({ email: users.email, name: users.fullName })
+      .from(companies)
+      .innerJoin(users, eq(users.id, companies.ownerUserId))
+      .where(eq(companies.id, params.companyId))
+      .limit(1);
+    if (!company) return;
+    const brand = await getEmailBrand();
+    await queueRenderedEmail({
+      to: company.email,
+      toName: company.name,
+      templateKey: params.decision === "held" ? "job_held_for_review" : "job_auto_blocked",
+      rendered: jobModerationDecisionEmail({
+        recruiterName: company.name || company.email,
+        jobTitle: params.title,
+        decision: params.decision,
+        reasons: params.reasons,
+        editUrl: appUrl(`/recruiter/jobs/${params.jobId}`),
+        brand,
+      }),
+      metadata: { companyId: params.companyId, jobId: params.jobId },
+    });
+  } catch (error) {
+    console.error("[recruiter] could not queue job moderation email:", error);
   }
-  return {
-    status: "pending_approval",
-    usesFreeCredit: decision.quota.usesFreeCredit,
-    limit: decision.quota.limit ?? 0,
-    warningThreshold: decision.quota.warningThreshold,
-  };
+}
+
+async function sendJobPublishedEmail(
+  companyId: string,
+  jobId: string,
+  title: string,
+): Promise<void> {
+  try {
+    const [company] = await db
+      .select({ email: users.email, name: users.fullName, slug: jobs.slug })
+      .from(jobs)
+      .innerJoin(companies, eq(companies.id, jobs.companyId))
+      .innerJoin(users, eq(users.id, companies.ownerUserId))
+      .where(and(eq(jobs.id, jobId), eq(companies.id, companyId)))
+      .limit(1);
+    if (!company) return;
+    const brand = await getEmailBrand();
+    await queueRenderedEmail({
+      to: company.email,
+      toName: company.name,
+      templateKey: "job_approved",
+      rendered: jobApprovedEmail({
+        recruiterName: company.name || company.email,
+        jobTitle: title,
+        jobUrl: appUrl(`/jobs/${company.slug}`),
+        brand,
+      }),
+      metadata: { companyId, jobId },
+    });
+  } catch (error) {
+    console.error("[recruiter] could not queue job published email:", error);
+  }
 }
 
 async function claimFreeJobCredit(
@@ -641,10 +877,10 @@ export async function changeJobLifecycle(
       throw new AppError(decision.reason, 403, "quota_exceeded");
     }
   }
-  await db
-    .update(jobs)
-    .set({ status: "published", quotaPeriodKey: currentKey, updatedAt: new Date() })
-    .where(eq(jobs.id, jobId));
+  await publishJob(
+    { id: jobId, quotaPeriodKey: currentKey },
+    { role: "recruiter", userId },
+  );
 }
 
 /* -------------------------------------------------------------------------- */

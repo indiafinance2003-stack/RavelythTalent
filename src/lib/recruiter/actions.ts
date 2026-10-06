@@ -274,7 +274,7 @@ export async function saveJobAction(
       return formSuccess("Job updated.");
     }
 
-    await createCompanyJob({
+    const result = await createCompanyJob({
       userId: user.id,
       companyId,
       input: jobInputFrom(parsed.data),
@@ -282,9 +282,14 @@ export async function saveJobAction(
     });
 
     revalidatePath("/recruiter/jobs");
-    return submit
-      ? formSuccess("Job submitted for approval. You will be emailed once it is reviewed.")
-      : formSuccess("Draft saved.");
+    if (!submit) return formSuccess("Draft saved.");
+    if (result.status === "published") return formSuccess("Your job is now live.");
+    if (result.status === "rejected") {
+      return formError(`The safety scan blocked this job: ${result.reasons.join(" ")}`);
+    }
+    return formSuccess(
+      `Your job is under review. ${result.reasons.join(" ")}`.trim(),
+    );
   } catch (error) {
     if (error instanceof AppError) return formError(error.message);
     console.error("[recruiter] job save failed:", error);

@@ -2,9 +2,9 @@ import { eq, and, isNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   candidateProfiles,
+  auditLogs,
   companies,
   companyMembers,
-  companyVerificationDocuments,
   emailVerificationTokens,
   oauthAccounts,
   passwordResetTokens,
@@ -16,7 +16,10 @@ import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { generateToken, sha256Hex } from "@/lib/auth/crypto";
 import { getEmailBrand, queueRenderedEmail } from "@/lib/email/send";
 import { emailVerificationEmail, passwordResetEmail } from "@/lib/email/templates/auth";
-import { companyVerificationSubmittedEmail } from "@/lib/email/templates/recruiter";
+import {
+  companyVerificationApprovedEmail,
+  companyVerificationSubmittedEmail,
+} from "@/lib/email/templates/recruiter";
 import { appUrl } from "@/lib/email/urls";
 import { slugify } from "@/lib/utils";
 import {
@@ -26,6 +29,7 @@ import {
   normalizeWebsiteDomain,
 } from "@/lib/company-identity";
 import { isDisposableEmail } from "@/lib/auth/disposable-email";
+import { getSiteSettings } from "@/lib/settings";
 import type { LoginInput, RegisterInput } from "@/lib/validation/auth";
 
 export const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
@@ -120,7 +124,63 @@ export async function consumeEmailVerificationToken(token: string): Promise<bool
     .set({ emailVerifiedAt: new Date(), updatedAt: new Date() })
     .where(eq(users.id, row.userId));
 
+  await autoApproveVerifiedCompany(row.userId);
   return true;
+}
+
+async function autoApproveVerifiedCompany(userId: string): Promise<void> {
+  if (!(await getSiteSettings()).autoApproveCompanies) return;
+  const approved = await db.transaction(async (tx) => {
+    const [company] = await tx
+      .select({
+        id: companies.id,
+        name: companies.name,
+        ownerName: users.fullName,
+        ownerEmail: users.email,
+      })
+      .from(companies)
+      .innerJoin(users, eq(users.id, companies.ownerUserId))
+      .where(and(eq(companies.ownerUserId, userId), eq(companies.status, "pending")))
+      .limit(1);
+    if (!company) return null;
+
+    const now = new Date();
+    const updated = await tx
+      .update(companies)
+      .set({
+        status: "approved",
+        statusReason: null,
+        reviewedByUserId: null,
+        reviewedAt: now,
+        verifiedAt: now,
+        updatedAt: now,
+      })
+      .where(and(eq(companies.id, company.id), eq(companies.status, "pending")))
+      .returning({ id: companies.id });
+    if (!updated[0]) return null;
+    await tx.insert(auditLogs).values({
+      actorRole: "system",
+      action: "company.auto_approved",
+      entityType: "company",
+      entityId: company.id,
+      description: `${company.name} was automatically approved after recruiter email verification.`,
+    });
+    return company;
+  });
+
+  if (!approved) return;
+  const brand = await getEmailBrand();
+  await queueRenderedEmail({
+    to: approved.ownerEmail,
+    toName: approved.ownerName,
+    templateKey: "company_verification_approved",
+    rendered: companyVerificationApprovedEmail({
+      ownerName: approved.ownerName,
+      companyName: approved.name,
+      brand,
+    }),
+    metadata: { companyId: approved.id, userId },
+  });
 }
 
 /* -------------------------------------------------------------------------- */
@@ -201,18 +261,6 @@ export async function registerUser(input: RegisterInput): Promise<string> {
       role: "owner",
       status: "active",
       joinedAt: new Date(),
-    });
-
-    // Placeholder verification record - the real document is uploaded by the
-    // owner from /recruiter/company/verification.
-    await db.insert(companyVerificationDocuments).values({
-      companyId: company[0]!.id,
-      docType: "company_registration",
-      originalName: "pending",
-      storagePath: "pending",
-      mimeType: "application/octet-stream",
-      sizeBytes: 0,
-      status: "pending",
     });
 
     const brand = await getEmailBrand();

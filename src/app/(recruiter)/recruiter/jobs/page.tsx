@@ -148,7 +148,12 @@ export default async function RecruiterJobsPage({
                   ) : null}
                   {job.status === "pending_approval" ? (
                     <p className="mt-2 text-sm text-slate-600">
-                      Submitted - awaiting admin review.
+                      Under review by the Ravelyth team.
+                    </p>
+                  ) : null}
+                  {job.status === "pending_approval" && job.moderationNotes ? (
+                    <p className="mt-2 whitespace-pre-wrap rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-950">
+                      Review reasons: {job.moderationNotes}
                     </p>
                   ) : null}
                 </div>

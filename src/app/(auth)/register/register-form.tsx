@@ -195,8 +195,8 @@ function CompanyFields({ errors }: { errors?: Record<string, string> }) {
         />
       </Field>
       <p className="text-xs text-slate-600">
-        Your first job post is free. Your company is reviewed before you can
-        submit it; we will email you when verification is complete.
+        Your first job post is free. Verify your email to activate your company;
+        verification documents are optional.
       </p>
     </div>
   );

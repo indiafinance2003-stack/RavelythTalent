@@ -1,8 +1,8 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { and, count, desc, eq, sql } from "drizzle-orm";
+import { and, count, desc, eq, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { companies, emailOutbox, jobs, subscriptions, users } from "@/lib/db/schema";
+import { companies, emailOutbox, jobReports, jobs, subscriptions, users } from "@/lib/db/schema";
 import { Card, PageHeader } from "@/components/ui/primitives";
 import { getSiteSettings } from "@/lib/settings";
 import { existsSync } from "node:fs";
@@ -14,7 +14,7 @@ import { smsProviderAvailable } from "@/lib/sms";
 export const metadata: Metadata = { title: "Admin overview" };
 
 export default async function AdminPage() {
-  const [companyRows, jobRows, userRows, approvedCompanies, activeSubscriptions, settings, smtpTest] = await Promise.all([
+  const [companyRows, jobRows, heldJobs, openReports, userRows, approvedCompanies, activeSubscriptions, settings, smtpTest] = await Promise.all([
     db
       .select({ value: count() })
       .from(companies)
@@ -23,6 +23,9 @@ export default async function AdminPage() {
       .select({ value: count() })
       .from(jobs)
       .where(eq(jobs.status, "pending_approval")),
+    db.select({ value: count() }).from(jobs)
+      .where(and(eq(jobs.status, "pending_approval"), isNotNull(jobs.moderationNotes))),
+    db.select({ value: count() }).from(jobReports).where(eq(jobReports.status, "open")),
     db.select({ value: count() }).from(users),
     db.select({ value: count() }).from(companies).where(eq(companies.status, "approved")),
     db.select({ value: count() }).from(subscriptions).where(
@@ -102,6 +105,16 @@ export default async function AdminPage() {
           <Link className="mt-4 inline-block text-sm font-semibold text-royal hover:underline" href="/admin/jobs">
             Review jobs
           </Link>
+        </Card>
+        <Card>
+          <p className="text-sm text-slate-600">Held jobs</p>
+          <p className="mt-2 text-3xl font-bold text-navy">{heldJobs[0]?.value ?? 0}</p>
+          <Link className="mt-4 inline-block text-sm font-semibold text-royal hover:underline" href="/admin/jobs">Review held jobs</Link>
+        </Card>
+        <Card>
+          <p className="text-sm text-slate-600">Open job reports</p>
+          <p className="mt-2 text-3xl font-bold text-navy">{openReports[0]?.value ?? 0}</p>
+          <Link className="mt-4 inline-block text-sm font-semibold text-royal hover:underline" href="/admin/reports">Review reports</Link>
         </Card>
       </div>
     </div>

@@ -12,12 +12,12 @@ task commit so work can resume without relying on conversation history.
 - [x] Add focused tests and commit locally.
 
 ## Task 2 — Auto-approval and safety checks
-- [ ] Additive settings/report schema migration.
-- [ ] Company auto-approval on recruiter email verification.
-- [ ] Rule-based job scan with documented data-driven rules and tests.
-- [ ] Central `publishJob(job, actor)` path for automatic/admin/repost publishing.
-- [ ] Report flow, thresholds, admin queue/counts, held-job reasons.
-- [ ] Add decision/report tests and commit locally.
+- [x] Additive settings/report schema migration.
+- [x] Company auto-approval on recruiter email verification.
+- [x] Rule-based job scan with documented data-driven rules and tests.
+- [x] Central `publishJob(job, actor)` path for automatic/admin/repost publishing.
+- [x] Report flow, thresholds, admin queue/counts, held-job reasons.
+- [x] Add decision/report tests and commit locally.
 
 ## Task 3 — Candidate premium perks
 - [ ] Enforce premium subscription server-side for builder, badges and ranking.
