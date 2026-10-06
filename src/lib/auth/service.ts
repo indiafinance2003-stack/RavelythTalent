@@ -5,6 +5,7 @@ import {
   auditLogs,
   companies,
   companyMembers,
+  emailOutbox,
   emailVerificationTokens,
   oauthAccounts,
   passwordResetTokens,
@@ -33,6 +34,10 @@ import { getSiteSettings } from "@/lib/settings";
 import type { LoginInput, RegisterInput } from "@/lib/validation/auth";
 import { formatIndianDateTime } from "@/lib/utils";
 import { syncDefaultProfileAlert } from "@/lib/alerts/service";
+import {
+  normalizePasswordResetEmail,
+  passwordResetSuppressionReason,
+} from "./password-reset-policy";
 
 export const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
 export const PASSWORD_RESET_TTL_MS = 60 * 60 * 1000;
@@ -478,13 +483,35 @@ export async function signInWithGoogle(profile: {
 
 /** Always succeeds from the caller's point of view (no user enumeration). */
 export async function requestPasswordReset(email: string): Promise<void> {
+  const normalizedEmail = normalizePasswordResetEmail(email);
   const rows = await db
-    .select({ id: users.id, email: users.email, fullName: users.fullName })
+    .select({
+      id: users.id,
+      email: users.email,
+      fullName: users.fullName,
+      role: users.role,
+      status: users.status,
+      emailVerifiedAt: users.emailVerifiedAt,
+      deletedAt: users.deletedAt,
+    })
     .from(users)
-    .where(and(eq(users.email, email), isNull(users.deletedAt)))
+    .where(sql`lower(${users.email}) = ${normalizedEmail}`)
     .limit(1);
 
   const user = rows.at(0);
+  const suppressionReason = passwordResetSuppressionReason(user ?? null);
+  if (suppressionReason) {
+    await db.insert(emailOutbox).values({
+      toEmail: normalizedEmail,
+      subject: "Password reset request",
+      html: "<p>A password reset request was suppressed. No email was sent.</p>",
+      text: "A password reset request was suppressed. No email was sent.",
+      templateKey: "password_reset",
+      status: "suppressed",
+      lastError: suppressionReason,
+    });
+    return;
+  }
   if (!user) return;
 
   const token = generateToken(32);

@@ -17,7 +17,7 @@ export default async function AdminEmailsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Email outbox" description="Delivery history, failure details and retry controls." />
+      <PageHeader title="Email outbox" description="Delivery history, suppressed requests, failure details and retry controls." />
       <Card>
         <h2 className="mb-3 text-base font-bold text-navy">Send test email</h2>
         <form action={sendTestEmailAction} className="flex flex-wrap items-end gap-3">
@@ -37,7 +37,11 @@ export default async function AdminEmailsPage() {
               <p className="mt-1 text-xs text-slate-500">
                 {message.templateKey ?? "custom"} · {message.status} · {message.attempts}/{message.maxAttempts} attempts · {formatIndianDateTime(message.createdAt)}
               </p>
-              {message.lastError ? <p className="mt-2 whitespace-pre-wrap break-words text-sm text-rose-700">{message.lastError}</p> : null}
+              {message.lastError ? (
+                <p className="mt-2 whitespace-pre-wrap break-words text-sm text-rose-700">
+                  {message.status === "suppressed" ? "Suppression reason: " : "Error: "}{message.lastError}
+                </p>
+              ) : null}
             </div>
             {message.status === "failed" ? (
               <form action={retryFailedEmailAction}>

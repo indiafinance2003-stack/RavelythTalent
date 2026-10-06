@@ -132,6 +132,11 @@ tokens, skill links, application history).
   is rate limited.
 - **Password reset**: `password_reset_tokens`, single use, 1 hour expiry; using
   one revokes all other sessions and sends a "password changed" email.
+  Reset requests look up normalized email addresses case-insensitively and
+  queue a link only for verified, active accounts of any role. Unknown,
+  unverified, deleted, suspended and deactivated requests are recorded as
+  `suppressed` email-outbox rows with a reason; the public response remains
+  generic and the admin email page exposes the suppression reason.
 - **OTP**: 6 digits, SHA-256 hashed at rest, 5 minute expiry, max 5 attempts,
   60 second resend cooldown, rate limited per phone and per IP.
 - **Google OAuth**: `oauth_accounts` keyed by `(provider, provider_account_id)`.

@@ -170,6 +170,7 @@ export const emailStatusEnum = pgEnum("email_status", [
   "queued",
   "sent",
   "failed",
+  "suppressed",
 ]);
 
 export const contentStatusEnum = pgEnum("content_status", [

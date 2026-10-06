@@ -33,6 +33,15 @@ formatter was applied. The formatter test verifies that
 `2026-10-06T11:37:00.000Z` renders exactly as `06 Oct 2026, 5:07 pm IST`;
 no database or external service is required for this check.
 
+Task 5 checks: `npm run typecheck`, `npm run lint`, and focused Vitest runs
+covering password-reset policy, employer conversion, alerts and salary insights
+passed. Password-reset policy cases cover job-seeker, recruiter and admin
+accounts across active, suspended and deactivated statuses, as well as
+unverified, deleted and unknown addresses. The generated
+`0010_regular_darwin.sql` migration only adds the `suppressed` value to the
+existing email-status enum. Database-backed password token/outbox delivery was
+not exercised because local database authentication is unavailable.
+
 ## Manual staging verification
 
 Use a staging deployment with the current additive migrations and seed data,
@@ -101,6 +110,12 @@ working email and (for paid flows) Razorpay test credentials:
 13. Verify timestamps in admin, candidate and recruiter pages, notification
    cards, billing history, emails and downloaded invoices use the shared
    `DD Mon YYYY, h:mm am/pm IST` format and reflect India Standard Time.
+14. Submit password reset requests for verified active job-seeker, recruiter
+   and admin accounts, using mixed-case address input. Confirm each gets the
+   generic success response and a queued link. Repeat with unverified,
+   suspended, deactivated and soft-deleted accounts and an unknown address;
+   confirm the response stays identical, no reset email is queued, and
+   `/admin/emails` shows a `suppressed` row with the specific reason.
 
 Do not run the migration against production as a validation step. Apply
 migrations only through the server deployment procedure and after a database

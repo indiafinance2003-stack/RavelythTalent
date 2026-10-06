@@ -71,6 +71,13 @@
       "when": 1791289390791,
       "tag": "0009_flaky_colossus",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791289883316,
+      "tag": "0010_regular_darwin",
+      "breakpoints": true
     }
   ]
 }

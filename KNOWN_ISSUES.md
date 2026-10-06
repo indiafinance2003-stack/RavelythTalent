@@ -22,6 +22,12 @@
   required UTC-to-Asia/Kolkata format and invalid/absent values. A browser
   walkthrough and visual inspection of real email/PDF output remain part of
   staging verification; the formatter itself does not require database access.
+- **MEDIUM — password-reset email persistence needs database verification:**
+  Task 5 policy tests cover all account roles and active/suspended/deactivated
+  statuses, plus unverified, deleted and unknown addresses. The case-insensitive
+  lookup, password token/outbox transaction, and suppressed-reason rendering
+  still require a staging/local PostgreSQL smoke test because local database
+  authentication is unavailable.
 - **BLOCKER — local PostgreSQL credentials:** PostgreSQL is installed and
   running, but application authentication to the local database fails. A prior
   bootstrap attempt changed the local `postgres` password before failing; its
