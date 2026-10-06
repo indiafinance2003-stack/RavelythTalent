@@ -23,10 +23,18 @@ and formatter unit tests passed. Task 5 is complete and locally committed
 address lookup, and unknown/unverified/deleted/inactive requests are recorded
 as suppressed outbox rows with admin-visible reasons. Migration
 `0010_regular_darwin.sql` only adds the `suppressed` email status. Task 6 is
-implemented and ready for its local commit: the admin form requires the typed
+complete and locally committed (`eee4fa1`). The admin form requires the typed
 email; the transaction blocks admins/self and financial records, removes user
 data, removes a sole-member company or transfers ownership to an active
 teammate, and writes a minimal audit row. Resume, built-resume and verification
 files are cleaned after commit with visible failure reporting. Typecheck, lint
-and deletion policy tests passed. Next: Task 7, build the admin-only assistant
-inbox, CRM, campaigns, optional AI, and required systemd timers.
+and deletion policy tests passed.
+
+Task 7 is next; no Task 7 implementation changes have been made yet. Start with
+7.1: add the optional inbox variables to `src/lib/env.ts` and `.env.example`
+(never `.env`), install/use `imapflow` and `mailparser`, and implement an
+environment-only account resolver for support and Gmail that shows
+“Not configured” when absent. Do not access noreply@ and never store, log or
+display credentials. Then proceed through 7.2 inbox/sync, 7.3 CRM, 7.4
+campaigns, 7.5 mocked optional AI, and 7.6 privacy/compliance/tests. Task 8 and
+final quality gates remain after Task 7.
