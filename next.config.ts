@@ -39,7 +39,7 @@ const securityHeaders = [
     value: "camera=(), microphone=(), geolocation=(), payment=(self)",
   },
   { key: "X-DNS-Prefetch-Control", value: "on" },
-  { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+  { key: "Cross-Origin-Opener-Policy", value: "same-origin-allow-popups" },
 ];
 
 if (isProd) {
