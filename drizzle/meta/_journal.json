@@ -57,6 +57,13 @@
       "when": 1791258682268,
       "tag": "0007_late_fabian_cortez",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791288904351,
+      "tag": "0008_flimsy_black_tarantula",
+      "breakpoints": true
     }
   ]
 }

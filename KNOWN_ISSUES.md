@@ -2,6 +2,12 @@
 
 ## Blocked or incomplete
 
+- **MEDIUM — conversion needs database-backed verification:** Task 1 adds
+  candidate/employer conversion and switch-back policy tests, but PostgreSQL
+  authentication remains unavailable, so the transaction, session rotation,
+  company creation, and queued confirmation email still need staging
+  verification. Additive migration `0008_flimsy_black_tarantula.sql` has not
+  been applied locally.
 - **BLOCKER — local PostgreSQL credentials:** PostgreSQL is installed and
   running, but application authentication to the local database fails. A prior
   bootstrap attempt changed the local `postgres` password before failing; its

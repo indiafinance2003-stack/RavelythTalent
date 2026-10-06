@@ -8,6 +8,10 @@ import {
   type CompanyFormValues,
 } from "@/components/recruiter/company-form";
 import { Alert, Badge, Card, PageHeader } from "@/components/ui/primitives";
+import {
+  SwitchToCandidateForm,
+} from "@/components/candidate/employer-conversion";
+import { getSwitchBackBlockReason } from "@/lib/auth/employer-conversion";
 
 export const dynamic = "force-dynamic";
 
@@ -110,6 +114,10 @@ export default async function CompanyPage({
           .
         </p>
       </Card>
+
+      {detail.ownerUserId === user.id ? (
+        <SwitchToCandidateForm reason={await getSwitchBackBlockReason(user.id)} />
+      ) : null}
     </div>
   );
 }

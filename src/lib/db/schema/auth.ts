@@ -1,4 +1,5 @@
 import {
+  boolean,
   bigserial,
   index,
   integer,
@@ -32,6 +33,8 @@ export const users = pgTable(
     phone: text("phone"),
     phoneVerifiedAt: timestamp("phone_verified_at", { withTimezone: true }),
     avatarPath: text("avatar_path"),
+    employerConversionUsed: boolean("employer_conversion_used").notNull().default(false),
+    candidateDiscoverableBeforeEmployer: boolean("candidate_discoverable_before_employer"),
     lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
     failedLoginAttempts: integer("failed_login_attempts").notNull().default(0),
     lockedUntil: timestamp("locked_until", { withTimezone: true }),

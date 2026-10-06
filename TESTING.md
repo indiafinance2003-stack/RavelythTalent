@@ -32,37 +32,49 @@ tested with mocks; no live payment or webhook was performed.
 Use a staging deployment with the current additive migrations and seed data,
 working email and (for paid flows) Razorpay test credentials:
 
-1. In `/admin/settings`, set the legal operator/contact details and
+1. Apply `0008_flimsy_black_tarantula.sql`, then register and verify a candidate.
+   In `/dashboard/settings`, convert with company details and the exact typed
+   confirmation. Confirm role/session refresh, company approval behavior,
+   conversion email, preserved candidate data, and that recruiter search cannot
+   find the hidden profile. Repeat conversion after switching back and verify
+   the second company does not receive a fresh free-post allowance.
+2. While a candidate Premium subscription is active, convert and confirm its
+   expiry remains unchanged and the settings warning is shown. On
+   `/recruiter/company`, try switching back with a published job, a held job,
+   and an active employer subscription; each must show its precise blocker.
+   Close/resolve those blockers and confirm switching back restores candidate
+   visibility and existing applications/resumes.
+3. In `/admin/settings`, set the legal operator/contact details and
    `jurisdictionCity`, set `freeJobPosts` to `1`, and enable automatic company
    approval and clean-job publishing. Save, then verify the public policy
    pages show configured details and omit empty ones.
-2. Register a candidate and a recruiter with distinct verified email
+4. Register a candidate and a recruiter with distinct verified email
    addresses. Confirm a candidate can browse and apply without payment. Confirm
    the recruiter company is approved after email verification.
-3. On `/pricing`, verify the employer Free card and legal links. Submit one
+5. On `/pricing`, verify the employer Free card and legal links. Submit one
    clean job for the company and confirm it publishes and consumes its single
    lifetime credit; try a second post and confirm the upgrade prompt. Check the
    recruiter dashboard count. Separately test a scan-blocked job and confirm
    the free credit remains available; verify rejected/closed/deleted jobs do
    not restore a consumed credit.
-4. Submit a clean job and representative scam/payment-request, discriminatory,
+6. Submit a clean job and representative scam/payment-request, discriminatory,
    adult, spam, and duplicate examples. Confirm publish, held and blocked
    decisions, the employer-facing reason/email, and held-job reasons in
    `/admin/jobs`. Toggle each automatic approval setting off and confirm the
    manual review flow returns.
-5. Report a published test job from three distinct reporters. Confirm the job
+7. Report a published test job from three distinct reporters. Confirm the job
    pauses, the report queue and overview counts update, and the admin notice is
    queued.
-6. In `/admin/billing`, search a candidate by email and a company by name.
+8. In `/admin/billing`, search a candidate by email and a company by name.
    Confirm only matching active plan types and priced periods are available.
    Activate a test offline subscription, then verify subscription, `offline`
    payment and audit entry. Submit a mismatched owner/plan and confirm the
    actual validation message appears inline.
-7. In Razorpay test mode, purchase candidate Premium and an employer plan.
+9. In Razorpay test mode, purchase candidate Premium and an employer plan.
    Confirm both browser verification and webhook replay result in one active
    owner-correct subscription; confirm candidate builder access, recruiter
    Premium badge/ranking, and removal after expiry.
-8. Inspect `/privacy`, `/terms`, and `/refund-policy` with settings populated
+10. Inspect `/privacy`, `/terms`, and `/refund-policy` with settings populated
    and cleared. Confirm the last-updated date, configured jurisdiction, no
    empty-setting placeholders, and policy links next to pricing/checkout.
    Send a test email and inspect that its image is an absolute

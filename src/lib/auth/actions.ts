@@ -1,8 +1,9 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
-import { ZodError } from "zod";
+import { z, ZodError } from "zod";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { assertSameOrigin, getRequestIp } from "@/lib/security";
@@ -23,6 +24,10 @@ import {
 } from "@/lib/validation/auth";
 import { createEmailTicket, readEmailTicket } from "./email-ticket";
 import {
+  convertCandidateToEmployer,
+  switchEmployerBackToCandidate,
+} from "./employer-conversion";
+import {
   authenticate,
   consumeEmailVerificationToken,
   issueEmailVerification,
@@ -36,6 +41,8 @@ import {
   getSessionUser,
   revokeAllSessions,
 } from "./session";
+import { requireApiVerifiedUser } from "./current-user";
+import { phoneSchema } from "@/lib/validation/auth";
 
 /** Only same-origin relative paths are accepted as post-login redirects. */
 function safeNext(next: string | null | undefined): string | null {
@@ -180,6 +187,88 @@ export async function logoutAllDevicesAction(): Promise<void> {
   const user = await getSessionUser();
   if (user) await revokeAllSessions(user.id);
   redirect("/login");
+}
+
+const employerConversionSchema = z.object({
+  confirmation: z.literal("BECOME AN EMPLOYER", {
+    error: "Type BECOME AN EMPLOYER to confirm.",
+  }),
+  companyName: z.string().trim().min(2, "Enter a company name.").max(160),
+  website: z.union([
+    z.string().trim().max(200).url("Enter a valid company website."),
+    z.literal(""),
+  ]),
+  phone: z.union([phoneSchema, z.literal("")]),
+  industry: z.string().trim().max(120),
+  size: z.enum(["", "1-10", "11-50", "51-200", "201-500", "501-1000", "1001-5000", "5001-10000", "10000+"]),
+  city: z.string().trim().min(2, "Enter a city.").max(120),
+});
+
+export async function convertToEmployerAction(
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  try {
+    await assertSameOrigin();
+    const user = await requireApiVerifiedUser();
+    const parsed = employerConversionSchema.safeParse({
+      confirmation: String(formData.get("confirmation") ?? ""),
+      companyName: String(formData.get("companyName") ?? ""),
+      website: String(formData.get("website") ?? ""),
+      phone: String(formData.get("phone") ?? ""),
+      industry: String(formData.get("industry") ?? ""),
+      size: String(formData.get("size") ?? ""),
+      city: String(formData.get("city") ?? ""),
+    });
+    if (!parsed.success) {
+      return {
+        status: "error",
+        fieldErrors: fieldErrorsFromIssues(parsed.error.issues),
+        message: parsed.error.issues[0]?.message ?? "Please check the company details.",
+      };
+    }
+    await convertCandidateToEmployer(user.id, {
+      name: parsed.data.companyName,
+      website: parsed.data.website || null,
+      phone: parsed.data.phone || null,
+      industry: parsed.data.industry || null,
+      size: parsed.data.size || null,
+      city: parsed.data.city,
+    });
+    await revokeAllSessions(user.id);
+    await createSession(user.id);
+    revalidatePath("/dashboard");
+    revalidatePath("/recruiter");
+    redirect("/recruiter");
+  } catch (error) {
+    if (error instanceof CsrfError) return formError(error.message);
+    if (error instanceof AppError) return formError(error.message);
+    if (isRedirectError(error)) throw error;
+    console.error("[auth] employer conversion failed:", error);
+    return formError("We could not convert your account. Please try again.");
+  }
+}
+
+export async function switchToCandidateAction(
+  _prev: FormState,
+  _formData: FormData,
+): Promise<FormState> {
+  try {
+    await assertSameOrigin();
+    const user = await requireApiVerifiedUser();
+    await switchEmployerBackToCandidate(user.id);
+    await revokeAllSessions(user.id);
+    await createSession(user.id);
+    revalidatePath("/recruiter");
+    revalidatePath("/dashboard");
+    redirect("/dashboard");
+  } catch (error) {
+    if (error instanceof CsrfError) return formError(error.message);
+    if (error instanceof AppError) return formError(error.message);
+    if (isRedirectError(error)) throw error;
+    console.error("[auth] switch to candidate failed:", error);
+    return formError("We could not switch your account. Please try again.");
+  }
 }
 
 /* -------------------------------------------------------------------------- */

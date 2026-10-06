@@ -40,6 +40,34 @@ export function companyVerificationSubmittedEmail(params: {
   });
 }
 
+export function companyConversionConfirmationEmail(params: {
+  ownerName: string;
+  companyName: string;
+  approved: boolean;
+  brand?: EmailBrand;
+}): RenderedEmail {
+  return render({
+    subject: "Your Ravelyth Talent account is now an employer account",
+    preheader: "Your candidate information remains saved privately.",
+    heading: "Employer account enabled",
+    intro: `Hi ${params.ownerName}, your account has been converted for ${params.companyName}.`,
+    blocks: [
+      {
+        type: "paragraph",
+        text: "Your candidate profile, resumes and applications remain stored and are hidden from recruiter search while this account is an employer.",
+      },
+      {
+        type: "note",
+        text: params.approved
+          ? "Your company was automatically approved. You can continue to the recruiter dashboard."
+          : "Your company is awaiting review. You can complete the company profile while approval is pending.",
+      },
+    ],
+    cta: { label: "Open recruiter dashboard", url: appUrl("/recruiter") },
+    brand: params.brand,
+  });
+}
+
 export function companyVerificationApprovedEmail(params: {
   ownerName: string;
   companyName: string;

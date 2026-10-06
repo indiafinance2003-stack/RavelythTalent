@@ -5,11 +5,29 @@ import {
   PageHeader,
 } from "@/components/ui/primitives";
 import { formatDate } from "@/lib/utils";
+import { BecomeEmployerForm } from "@/components/candidate/employer-conversion";
+import { db } from "@/lib/db";
+import { subscriptions } from "@/lib/db/schema";
+import { and, desc, eq, gt, isNull } from "drizzle-orm";
+import { retainedCandidatePremiumExpiry } from "@/lib/auth/employer-conversion";
 
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
   const user = await requireUser("/dashboard/settings");
+  const [premium] = user.role === "job_seeker"
+    ? await db
+        .select({ expiresAt: subscriptions.currentPeriodEnd })
+        .from(subscriptions)
+        .where(and(
+          eq(subscriptions.userId, user.id),
+          isNull(subscriptions.companyId),
+          eq(subscriptions.status, "active"),
+          gt(subscriptions.currentPeriodEnd, new Date()),
+        ))
+        .orderBy(desc(subscriptions.currentPeriodEnd))
+        .limit(1)
+    : [];
 
   return (
     <div className="space-y-6">
@@ -38,6 +56,14 @@ export default async function SettingsPage() {
           </div>
         </dl>
       </Card>
+
+      {user.role === "job_seeker" ? (
+        <BecomeEmployerForm premiumUntil={retainedCandidatePremiumExpiry(
+          premium
+            ? { status: "active", companyId: null, currentPeriodEnd: premium.expiresAt }
+            : null,
+        )} />
+      ) : null}
 
       <Card>
         <h2 className="text-base font-bold text-navy">Security</h2>

@@ -326,3 +326,22 @@ tokens, skill links, application history).
 - `freeJobPosts` defaults to one lifetime post per company and is adjustable
   from `/admin/settings`; changing the value does not rewrite usage already
   recorded for a company. `jurisdictionCity` is optional and empty by default.
+
+## 14. Candidate-to-employer conversion
+
+- Employer conversion requires an active, email-verified candidate account and
+  reuses the recruiter disposable-email and company-identity checks. The
+  company is immediately approved only when `autoApproveCompanies` is enabled;
+  otherwise it enters the existing pending review flow.
+- Conversion preserves the candidate profile, resumes, applications and any
+  candidate subscription. The profile's recruiter-search visibility is saved
+  and disabled while the account has the recruiter role, then restored if the
+  account switches back.
+- The conversion free-post allowance is account-lifetime limited: a subsequent
+  conversion initializes the new company with the configured free-post
+  allowance already consumed. Existing companies remain in place when an
+  owner switches back, preserving company-identity deduplication.
+- Switching back is allowed only when the current company has no published or
+  pending-approval jobs and no unexpired active employer subscription. The
+  owner membership is removed, not deleted, and the company and hiring history
+  remain intact.
