@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { requireAdmin } from "@/lib/auth/current-user";
+import { AdminActionError } from "@/components/admin/admin-action-error";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +32,9 @@ export default async function AdminLayout({
         <Link className="text-navy hover:text-royal" href="/admin/reviews">Reviews</Link>
         <Link className="text-navy hover:text-royal" href="/admin/billing">Billing</Link>
       </nav>
+      <Suspense fallback={null}>
+        <AdminActionError />
+      </Suspense>
       {children}
     </main>
   );

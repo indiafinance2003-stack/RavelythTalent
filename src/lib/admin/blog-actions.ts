@@ -8,6 +8,7 @@ import { db } from "@/lib/db";
 import { auditLogs, blogPosts } from "@/lib/db/schema";
 import { AppError } from "@/lib/errors";
 import { assertSameOrigin } from "@/lib/security";
+import { runAdminFormAction } from "@/lib/admin/form-errors";
 import { deleteStoredFile, readValidatedUpload, storeValidatedFile } from "@/lib/storage";
 
 const schema = z.object({
@@ -26,7 +27,7 @@ const schema = z.object({
 
 const COVER_MIMES = ["image/jpeg", "image/png", "image/webp"];
 
-export async function saveBlogPostAction(formData: FormData): Promise<void> {
+async function saveBlogPostActionImpl(formData: FormData): Promise<void> {
   await assertSameOrigin();
   const admin = await requireApiAdmin();
   const parsed = schema.safeParse({
@@ -130,7 +131,7 @@ export async function saveBlogPostAction(formData: FormData): Promise<void> {
   revalidatePath("/sitemap.xml");
 }
 
-export async function deleteBlogPostAction(formData: FormData): Promise<void> {
+async function deleteBlogPostActionImpl(formData: FormData): Promise<void> {
   await assertSameOrigin();
   const admin = await requireApiAdmin();
   const id = z.uuid().parse(formData.get("id"));
@@ -164,4 +165,12 @@ function isUniqueViolation(error: unknown): boolean {
     "code" in error &&
     (error as { code?: unknown }).code === "23505"
   );
+}
+
+export async function saveBlogPostAction(formData: FormData): Promise<void> {
+  return runAdminFormAction("/admin/blog", () => saveBlogPostActionImpl(formData));
+}
+
+export async function deleteBlogPostAction(formData: FormData): Promise<void> {
+  return runAdminFormAction("/admin/blog", () => deleteBlogPostActionImpl(formData));
 }

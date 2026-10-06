@@ -8,6 +8,7 @@ import { db } from "@/lib/db";
 import { auditLogs, categories } from "@/lib/db/schema";
 import { AppError } from "@/lib/errors";
 import { assertSameOrigin } from "@/lib/security";
+import { runAdminFormAction } from "@/lib/admin/form-errors";
 
 const schema = z.object({
   id: z.string().optional(),
@@ -19,7 +20,7 @@ const schema = z.object({
   isActive: z.boolean(),
 });
 
-export async function saveCategoryAction(formData: FormData): Promise<void> {
+async function saveCategoryActionImpl(formData: FormData): Promise<void> {
   await assertSameOrigin();
   const admin = await requireApiAdmin();
   const parsed = schema.safeParse({
@@ -67,4 +68,8 @@ export async function saveCategoryAction(formData: FormData): Promise<void> {
   revalidatePath("/admin/categories");
   revalidatePath("/jobs");
   revalidatePath("/recruiter/jobs/new");
+}
+
+export async function saveCategoryAction(formData: FormData): Promise<void> {
+  return runAdminFormAction("/admin/categories", () => saveCategoryActionImpl(formData));
 }

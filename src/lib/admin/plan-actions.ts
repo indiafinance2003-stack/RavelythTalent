@@ -8,6 +8,7 @@ import { db } from "@/lib/db";
 import { auditLogs, planFeatures, planPromotions, plans } from "@/lib/db/schema";
 import { AppError } from "@/lib/errors";
 import { assertSameOrigin } from "@/lib/security";
+import { runAdminFormAction } from "@/lib/admin/form-errors";
 
 const MAX_SAFE_PAISA = Number.MAX_SAFE_INTEGER;
 
@@ -63,7 +64,7 @@ function parseFeatures(input: string) {
   return rows;
 }
 
-export async function savePlanAction(formData: FormData): Promise<void> {
+async function savePlanActionImpl(formData: FormData): Promise<void> {
   await assertSameOrigin();
   const admin = await requireApiAdmin();
   const parsed = planSchema.safeParse({
@@ -156,7 +157,7 @@ function parseOptionalDate(value: string | undefined): Date | null {
   return date;
 }
 
-export async function savePromotionAction(formData: FormData): Promise<void> {
+async function savePromotionActionImpl(formData: FormData): Promise<void> {
   await assertSameOrigin();
   const admin = await requireApiAdmin();
   const parsed = promotionSchema.safeParse({
@@ -220,4 +221,12 @@ export async function savePromotionAction(formData: FormData): Promise<void> {
   });
   revalidatePath("/admin/plans");
   revalidatePath("/pricing");
+}
+
+export async function savePlanAction(formData: FormData): Promise<void> {
+  return runAdminFormAction("/admin/plans", () => savePlanActionImpl(formData));
+}
+
+export async function savePromotionAction(formData: FormData): Promise<void> {
+  return runAdminFormAction("/admin/plans", () => savePromotionActionImpl(formData));
 }

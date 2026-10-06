@@ -20,6 +20,7 @@ import {
 } from "@/lib/email/templates/recruiter";
 import { decideCompanyReview, decideJobReview } from "./moderation";
 import { markJobReportReviewed } from "@/lib/jobs/reports";
+import { runAdminFormAction } from "@/lib/admin/form-errors";
 
 const decisionSchema = z.object({
   id: z.uuid(),
@@ -42,7 +43,7 @@ async function parseDecision(formData: FormData) {
   return parsed.data;
 }
 
-export async function decideCompanyAction(formData: FormData): Promise<void> {
+async function decideCompanyActionImpl(formData: FormData): Promise<void> {
   await assertSameOrigin();
   const admin = await requireApiAdmin();
   const decision = await parseDecision(formData);
@@ -57,7 +58,11 @@ export async function decideCompanyAction(formData: FormData): Promise<void> {
   revalidatePath("/recruiter/company");
 }
 
-export async function decideJobAction(formData: FormData): Promise<void> {
+export async function decideCompanyAction(formData: FormData): Promise<void> {
+  return runAdminFormAction("/admin/companies", () => decideCompanyActionImpl(formData));
+}
+
+async function decideJobActionImpl(formData: FormData): Promise<void> {
   await assertSameOrigin();
   const admin = await requireApiAdmin();
   const decision = await parseDecision(formData);
@@ -73,7 +78,11 @@ export async function decideJobAction(formData: FormData): Promise<void> {
   revalidatePath("/jobs");
 }
 
-export async function markJobReportReviewedAction(formData: FormData): Promise<void> {
+export async function decideJobAction(formData: FormData): Promise<void> {
+  return runAdminFormAction("/admin/jobs", () => decideJobActionImpl(formData));
+}
+
+async function markJobReportReviewedActionImpl(formData: FormData): Promise<void> {
   await assertSameOrigin();
   const admin = await requireApiAdmin();
   const reportId = z.uuid().safeParse(formData.get("reportId"));
@@ -85,13 +94,17 @@ export async function markJobReportReviewedAction(formData: FormData): Promise<v
   revalidatePath("/admin");
 }
 
+export async function markJobReportReviewedAction(formData: FormData): Promise<void> {
+  return runAdminFormAction("/admin/reports", () => markJobReportReviewedActionImpl(formData));
+}
+
 const companyStatusSchema = z.object({
   id: z.uuid(),
   status: z.enum(["approved", "suspended"]),
   reason: z.string().trim().max(1000).optional(),
 });
 
-export async function changeCompanyStatusAction(formData: FormData): Promise<void> {
+async function changeCompanyStatusActionImpl(formData: FormData): Promise<void> {
   await assertSameOrigin();
   const admin = await requireApiAdmin();
   const parsed = companyStatusSchema.safeParse({
@@ -185,4 +198,8 @@ export async function changeCompanyStatusAction(formData: FormData): Promise<voi
   revalidatePath("/admin/companies");
   revalidatePath("/recruiter");
   revalidatePath("/jobs");
+}
+
+export async function changeCompanyStatusAction(formData: FormData): Promise<void> {
+  return runAdminFormAction("/admin/companies", () => changeCompanyStatusActionImpl(formData));
 }

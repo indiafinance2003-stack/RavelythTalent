@@ -8,6 +8,7 @@ import { db } from "@/lib/db";
 import { addons, auditLogs } from "@/lib/db/schema";
 import { AppError } from "@/lib/errors";
 import { assertSameOrigin } from "@/lib/security";
+import { runAdminFormAction } from "@/lib/admin/form-errors";
 
 const addonSchema = z.object({
   id: z.string().optional(),
@@ -24,7 +25,7 @@ const addonSchema = z.object({
   isActive: z.boolean(),
 });
 
-export async function saveAddonAction(formData: FormData): Promise<void> {
+async function saveAddonActionImpl(formData: FormData): Promise<void> {
   await assertSameOrigin();
   const admin = await requireApiAdmin();
   const parsed = addonSchema.safeParse({
@@ -81,4 +82,8 @@ export async function saveAddonAction(formData: FormData): Promise<void> {
   });
   revalidatePath("/admin/add-ons");
   revalidatePath("/recruiter/add-ons");
+}
+
+export async function saveAddonAction(formData: FormData): Promise<void> {
+  return runAdminFormAction("/admin/add-ons", () => saveAddonActionImpl(formData));
 }

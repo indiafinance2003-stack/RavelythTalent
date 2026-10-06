@@ -8,6 +8,7 @@ import { db } from "@/lib/db";
 import { auditLogs, prioritySupportRequests } from "@/lib/db/schema";
 import { AppError } from "@/lib/errors";
 import { assertSameOrigin } from "@/lib/security";
+import { runAdminFormAction } from "@/lib/admin/form-errors";
 
 const schema = z.object({
   id: z.uuid(),
@@ -15,7 +16,7 @@ const schema = z.object({
   response: z.string().trim().max(5000).optional(),
 });
 
-export async function updateSupportRequestAction(formData: FormData): Promise<void> {
+async function updateSupportRequestActionImpl(formData: FormData): Promise<void> {
   await assertSameOrigin();
   const admin = await requireApiAdmin();
   const parsed = schema.safeParse({
@@ -43,4 +44,8 @@ export async function updateSupportRequestAction(formData: FormData): Promise<vo
     description: `Support request "${request.subject}" moved to ${parsed.data.status}.`,
   });
   revalidatePath("/admin/support");
+}
+
+export async function updateSupportRequestAction(formData: FormData): Promise<void> {
+  return runAdminFormAction("/admin/support", () => updateSupportRequestActionImpl(formData));
 }

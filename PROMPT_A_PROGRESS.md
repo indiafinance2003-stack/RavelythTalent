@@ -26,9 +26,9 @@ task commit so work can resume without relying on conversation history.
 - [x] Commit locally.
 
 ## Task 4 — Admin subscription activation
-- [ ] Inline billing form errors and owner-type plan/period filtering.
-- [ ] Audit and repair other admin validation form error handling.
-- [ ] Add action tests and commit locally.
+- [x] Inline billing form errors and owner-type plan/period filtering.
+- [x] Audit and repair other admin validation form error handling.
+- [x] Add action tests and commit locally.
 
 ## Task 5 — Legal pages
 - [ ] Update data-driven default legal policies and settings contact rendering.

@@ -8,8 +8,9 @@ import { getEmailBrand, queueRenderedEmail } from "@/lib/email/send";
 import { composeEmail } from "@/lib/email/layout";
 import { retryOutboxEmail } from "@/lib/email/queue";
 import { assertSameOrigin } from "@/lib/security";
+import { runAdminFormAction } from "@/lib/admin/form-errors";
 
-export async function retryFailedEmailAction(formData: FormData): Promise<void> {
+async function retryFailedEmailActionImpl(formData: FormData): Promise<void> {
   await assertSameOrigin();
   await requireApiAdmin();
   const parsed = z.coerce.number().int().positive().safeParse(formData.get("id"));
@@ -18,7 +19,7 @@ export async function retryFailedEmailAction(formData: FormData): Promise<void> 
   revalidatePath("/admin/emails");
 }
 
-export async function sendTestEmailAction(formData: FormData): Promise<void> {
+async function sendTestEmailActionImpl(formData: FormData): Promise<void> {
   await assertSameOrigin();
   const admin = await requireApiAdmin();
   const parsed = z.string().email().max(254).safeParse(formData.get("email"));
@@ -40,4 +41,12 @@ export async function sendTestEmailAction(formData: FormData): Promise<void> {
     metadata: { requestedBy: admin.id },
   });
   revalidatePath("/admin/emails");
+}
+
+export async function retryFailedEmailAction(formData: FormData): Promise<void> {
+  return runAdminFormAction("/admin/emails", () => retryFailedEmailActionImpl(formData));
+}
+
+export async function sendTestEmailAction(formData: FormData): Promise<void> {
+  return runAdminFormAction("/admin/emails", () => sendTestEmailActionImpl(formData));
 }

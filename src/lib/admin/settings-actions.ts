@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { auditLogs, siteSettings } from "@/lib/db/schema";
 import { AppError } from "@/lib/errors";
 import { assertSameOrigin } from "@/lib/security";
+import { runAdminFormAction } from "@/lib/admin/form-errors";
 
 const optionalUrl = z.string().url().max(500).nullable();
 const optionalEmail = z.string().email().max(254).nullable();
@@ -45,7 +46,7 @@ const settingsSchema = z.object({
   maintenanceMode: z.boolean(),
 });
 
-export async function saveSiteSettingsAction(formData: FormData): Promise<void> {
+async function saveSiteSettingsActionImpl(formData: FormData): Promise<void> {
   await assertSameOrigin();
   const admin = await requireApiAdmin();
   const nullable = (name: string) => String(formData.get(name) ?? "").trim() || null;
@@ -118,4 +119,8 @@ export async function saveSiteSettingsAction(formData: FormData): Promise<void> 
   });
   revalidatePath("/admin/settings");
   revalidatePath("/", "layout");
+}
+
+export async function saveSiteSettingsAction(formData: FormData): Promise<void> {
+  return runAdminFormAction("/admin/settings", () => saveSiteSettingsActionImpl(formData));
 }

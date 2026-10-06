@@ -8,8 +8,9 @@ import { db } from "@/lib/db";
 import { auditLogs, contactMessages } from "@/lib/db/schema";
 import { AppError } from "@/lib/errors";
 import { assertSameOrigin } from "@/lib/security";
+import { runAdminFormAction } from "@/lib/admin/form-errors";
 
-export async function markContactMessageHandledAction(formData: FormData): Promise<void> {
+async function markContactMessageHandledActionImpl(formData: FormData): Promise<void> {
   await assertSameOrigin();
   const admin = await requireApiAdmin();
   const id = z.uuid().parse(formData.get("id"));
@@ -29,4 +30,8 @@ export async function markContactMessageHandledAction(formData: FormData): Promi
     description: `Contact message from ${message.email} ${handled ? "marked handled" : "reopened"}.`,
   });
   revalidatePath("/admin/support");
+}
+
+export async function markContactMessageHandledAction(formData: FormData): Promise<void> {
+  return runAdminFormAction("/admin/support", () => markContactMessageHandledActionImpl(formData));
 }

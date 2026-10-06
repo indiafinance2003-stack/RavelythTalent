@@ -11,6 +11,11 @@ import { db } from "@/lib/db";
 import { auditLogs, companies, payments, plans, subscriptions, users } from "@/lib/db/schema";
 import { AppError } from "@/lib/errors";
 import { assertSameOrigin } from "@/lib/security";
+import { runAdminFormAction } from "@/lib/admin/form-errors";
+import {
+  assertOfflinePlanOwner,
+  paidPriceForPeriod,
+} from "@/lib/admin/offline-subscription-validation";
 
 const formSchema = z.object({
   target: z.string().refine((target) => {
@@ -34,7 +39,7 @@ function parseStartDate(date: string): Date {
   return value;
 }
 
-export async function grantOfflineSubscriptionAction(formData: FormData): Promise<void> {
+async function grantOfflineSubscriptionActionImpl(formData: FormData): Promise<void> {
   await assertSameOrigin();
   const admin = await requireApiAdmin();
   const parsed = formSchema.safeParse({
@@ -54,9 +59,8 @@ export async function grantOfflineSubscriptionAction(formData: FormData): Promis
   const value = parsed.data;
   const [targetType, targetId] = value.target.split(":") as ["candidate" | "company", string];
   const [plan] = await db.select().from(plans).where(and(eq(plans.id, value.planId), eq(plans.isActive, true))).limit(1);
-  if (!plan || plan.audience !== (targetType === "company" ? "employer" : "candidate")) {
-    throw new AppError("Choose an active plan that matches the subscription owner.", 422);
-  }
+  assertOfflinePlanOwner(plan, targetType);
+  const amountPaise = paidPriceForPeriod(plan, value.billingPeriod);
 
   let userId: string;
   let companyId: string | null = null;
@@ -94,7 +98,6 @@ export async function grantOfflineSubscriptionAction(formData: FormData): Promis
     if (current.currentPeriodEnd > startsAt) startsAt = current.currentPeriodEnd;
   }
   const endsAt = periodEndFor(startsAt, value.billingPeriod);
-  const amountPaise = value.billingPeriod === "yearly" ? plan.priceYearlyPaise : plan.priceMonthlyPaise;
   const offlineOrderId = `offline_${randomUUID()}`;
   const paymentNotes = JSON.stringify({
     paymentReference: value.paymentReference ?? null,
@@ -187,4 +190,8 @@ export async function grantOfflineSubscriptionAction(formData: FormData): Promis
   revalidatePath("/admin/billing");
   revalidatePath(companyId ? "/recruiter/billing" : "/dashboard/billing");
   redirect("/admin/billing?activated=1");
+}
+
+export async function grantOfflineSubscriptionAction(formData: FormData): Promise<void> {
+  await runAdminFormAction("/admin/billing", () => grantOfflineSubscriptionActionImpl(formData));
 }

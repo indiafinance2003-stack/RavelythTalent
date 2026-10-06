@@ -1,19 +1,25 @@
 import type { Metadata } from "next";
-import { asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, isNull, or } from "drizzle-orm";
 import { Card, PageHeader } from "@/components/ui/primitives";
 import { db } from "@/lib/db";
 import { addons, companies, invoices, payments, plans, subscriptions, users } from "@/lib/db/schema";
 import { formatPaise } from "@/lib/utils";
-import { grantOfflineSubscriptionAction } from "@/lib/admin/offline-subscription-action";
+import { SubscriptionActivationForm } from "@/components/admin/subscription-activation-form";
 
 export const metadata: Metadata = { title: "Billing administration" };
 
 export default async function AdminBillingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ activated?: string }>;
+  searchParams: Promise<{ activated?: string; ownerType?: string; ownerQuery?: string }>;
 }) {
-  const { activated } = await searchParams;
+  const params = await searchParams;
+  const { activated } = params;
+  const ownerType = params.ownerType === "candidate" || params.ownerType === "company"
+    ? params.ownerType
+    : null;
+  const ownerQuery = params.ownerQuery?.trim().slice(0, 100) ?? "";
+  const pattern = `%${ownerQuery.replace(/[%_]/g, "\\$&")}%`;
   const [subscriptionRows, paymentRows, invoiceRows, availablePlans, candidates, companyOptions] = await Promise.all([
     db.select({
       id: subscriptions.id,
@@ -60,13 +66,42 @@ export default async function AdminBillingPage({
       userId: invoices.userId,
       companyId: invoices.companyId,
     }).from(invoices).orderBy(desc(invoices.issuedAt)).limit(100),
-    db.select({ id: plans.id, name: plans.name, audience: plans.audience })
+    db.select({
+      id: plans.id,
+      name: plans.name,
+      audience: plans.audience,
+      priceMonthlyPaise: plans.priceMonthlyPaise,
+      priceYearlyPaise: plans.priceYearlyPaise,
+    })
       .from(plans).where(eq(plans.isActive, true)).orderBy(asc(plans.name)),
-    db.select({ id: users.id, name: users.fullName, email: users.email })
-      .from(users).where(eq(users.role, "job_seeker")).orderBy(asc(users.fullName)).limit(500),
-    db.select({ id: companies.id, name: companies.name })
-      .from(companies).orderBy(asc(companies.name)).limit(500),
+    ownerType === "candidate" && ownerQuery
+      ? db.select({ id: users.id, name: users.fullName, email: users.email })
+          .from(users)
+          .where(and(
+            eq(users.role, "job_seeker"),
+            isNull(users.deletedAt),
+            or(ilike(users.email, pattern), ilike(users.fullName, pattern)),
+          ))
+          .orderBy(asc(users.fullName))
+          .limit(30)
+      : Promise.resolve([]),
+    ownerType === "company" && ownerQuery
+      ? db.select({ id: companies.id, name: companies.name })
+          .from(companies)
+          .where(and(isNull(companies.deletedAt), ilike(companies.name, pattern)))
+          .orderBy(asc(companies.name))
+          .limit(30)
+      : Promise.resolve([]),
   ]);
+  const targets = ownerType === "candidate"
+    ? candidates
+    : ownerType === "company"
+      ? companyOptions
+      : [];
+  const matchingPlans = availablePlans.filter((plan) =>
+    plan.audience === (ownerType === "company" ? "employer" : "candidate") &&
+    (plan.priceMonthlyPaise > 0 || plan.priceYearlyPaise > 0),
+  );
 
   return (
     <div className="space-y-6">
@@ -79,60 +114,27 @@ export default async function AdminBillingPage({
       <Card>
         <h2 className="text-lg font-bold text-navy">Grant or extend a subscription</h2>
         <p className="mt-1 text-sm text-slate-600">Offline bank-transfer or UPI activations are recorded as offline payments and audited. An extension starts after the current period when possible.</p>
-        <form action={grantOfflineSubscriptionAction} className="mt-4 grid gap-4 md:grid-cols-2">
+        <form className="mt-4 flex flex-wrap items-end gap-3" method="get">
           <label className="text-sm font-medium text-navy">
-            Candidate or company
-            <select className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2" name="target" required>
-              <option value="">Select an account</option>
-              <optgroup label="Candidates">
-                {candidates.map((candidate) => <option key={candidate.id} value={`candidate:${candidate.id}`}>{candidate.name} · {candidate.email}</option>)}
-              </optgroup>
-              <optgroup label="Companies">
-                {companyOptions.map((company) => <option key={company.id} value={`company:${company.id}`}>{company.name}</option>)}
-              </optgroup>
+            Owner type
+            <select className="mt-1 block rounded-lg border border-slate-300 bg-white px-3 py-2" defaultValue={ownerType ?? "candidate"} name="ownerType">
+              <option value="candidate">Candidate</option>
+              <option value="company">Company</option>
             </select>
           </label>
-          <label className="text-sm font-medium text-navy">
-            Plan
-            <select className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2" name="planId" required>
-              <option value="">Select a plan</option>
-              {availablePlans.map((plan) => <option key={plan.id} value={plan.id}>{plan.name} · {plan.audience}</option>)}
-            </select>
+          <label className="min-w-64 flex-1 text-sm font-medium text-navy">
+            Search by candidate name/email or company name
+            <input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" defaultValue={ownerQuery} maxLength={100} name="ownerQuery" required />
           </label>
-          <label className="text-sm font-medium text-navy">
-            Billing period
-            <select className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2" name="billingPeriod" required>
-              <option value="monthly">Monthly</option>
-              <option value="yearly">Yearly</option>
-            </select>
-          </label>
-          <label className="text-sm font-medium text-navy">
-            Start date
-            <input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" name="startDate" required type="date" />
-          </label>
-          <label className="text-sm font-medium text-navy">
-            Action
-            <select className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2" name="mode" required>
-              <option value="grant">Grant / replace</option>
-              <option value="extend">Extend the current plan</option>
-            </select>
-          </label>
-          <label className="text-sm font-medium text-navy">
-            Offline payment reference (optional)
-            <input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" maxLength={200} name="paymentReference" />
-          </label>
-          <label className="text-sm font-medium text-navy md:col-span-2">
-            Admin notes (optional)
-            <textarea className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" maxLength={2000} name="notes" rows={3} />
-          </label>
-          <label className="flex items-center gap-2 text-sm font-medium text-navy">
-            <input name="generateInvoice" type="checkbox" />
-            Generate and email an invoice
-          </label>
-          <div className="md:col-span-2">
-            <button className="rounded-lg bg-royal px-4 py-2 text-sm font-semibold text-white hover:bg-navy" type="submit">Activate subscription</button>
-          </div>
+          <button className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-navy hover:border-royal" type="submit">
+            Search owners
+          </button>
         </form>
+        {ownerType && ownerQuery ? targets.length ? (
+          <SubscriptionActivationForm ownerType={ownerType} plans={matchingPlans} targets={targets} />
+        ) : (
+          <p className="mt-4 text-sm text-slate-600">No matching {ownerType === "company" ? "companies" : "candidates"} found.</p>
+        ) : null}
       </Card>
       <section className="space-y-3">
         <h2 className="text-lg font-bold text-navy">Subscriptions</h2>

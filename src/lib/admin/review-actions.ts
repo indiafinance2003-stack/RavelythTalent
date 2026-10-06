@@ -8,6 +8,7 @@ import { db } from "@/lib/db";
 import { auditLogs, companies, companyReviews } from "@/lib/db/schema";
 import { AppError } from "@/lib/errors";
 import { assertSameOrigin } from "@/lib/security";
+import { runAdminFormAction } from "@/lib/admin/form-errors";
 
 const schema = z.object({
   reviewId: z.uuid(),
@@ -15,7 +16,7 @@ const schema = z.object({
   notes: z.string().trim().max(1000),
 });
 
-export async function moderateCompanyReviewAction(formData: FormData): Promise<void> {
+async function moderateCompanyReviewActionImpl(formData: FormData): Promise<void> {
   await assertSameOrigin();
   const admin = await requireApiAdmin();
   const parsed = schema.safeParse({
@@ -72,4 +73,8 @@ export async function moderateCompanyReviewAction(formData: FormData): Promise<v
   revalidatePath("/admin/reviews");
   if (companySlug) revalidatePath(`/companies/${companySlug}`);
   revalidatePath("/companies");
+}
+
+export async function moderateCompanyReviewAction(formData: FormData): Promise<void> {
+  return runAdminFormAction("/admin/reviews", () => moderateCompanyReviewActionImpl(formData));
 }

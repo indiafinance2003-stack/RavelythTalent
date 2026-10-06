@@ -8,13 +8,14 @@ import { db } from "@/lib/db";
 import { auditLogs, users } from "@/lib/db/schema";
 import { AppError } from "@/lib/errors";
 import { assertSameOrigin } from "@/lib/security";
+import { runAdminFormAction } from "@/lib/admin/form-errors";
 
 const schema = z.object({
   userId: z.uuid(),
   status: z.enum(["active", "suspended", "deactivated"]),
 });
 
-export async function changeUserStatusAction(formData: FormData): Promise<void> {
+async function changeUserStatusActionImpl(formData: FormData): Promise<void> {
   await assertSameOrigin();
   const admin = await requireApiAdmin();
   const parsed = schema.safeParse({
@@ -44,4 +45,8 @@ export async function changeUserStatusAction(formData: FormData): Promise<void> 
     description: `${updated.fullName}'s account was set to ${parsed.data.status}.`,
   });
   revalidatePath("/admin/users");
+}
+
+export async function changeUserStatusAction(formData: FormData): Promise<void> {
+  return runAdminFormAction("/admin/users", () => changeUserStatusActionImpl(formData));
 }
