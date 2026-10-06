@@ -25,7 +25,7 @@ const contentSecurityPolicy = [
   "manifest-src 'self'",
   "object-src 'none'",
   "base-uri 'self'",
-  "form-action 'self'",
+  "form-action 'self' https://api.razorpay.com https://*.razorpay.com",
   "frame-ancestors 'none'",
 ].join("; ");
 
