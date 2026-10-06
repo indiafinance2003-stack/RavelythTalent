@@ -19,6 +19,13 @@ import { emailVerificationEmail, passwordResetEmail } from "@/lib/email/template
 import { companyVerificationSubmittedEmail } from "@/lib/email/templates/recruiter";
 import { appUrl } from "@/lib/email/urls";
 import { slugify } from "@/lib/utils";
+import {
+  assertCompanyIdentityAvailable,
+  normalizeCompanyName,
+  normalizeContactPhone,
+  normalizeWebsiteDomain,
+} from "@/lib/company-identity";
+import { isDisposableEmail } from "@/lib/auth/disposable-email";
 import type { LoginInput, RegisterInput } from "@/lib/validation/auth";
 
 export const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
@@ -121,6 +128,13 @@ export async function consumeEmailVerificationToken(token: string): Promise<bool
 /* -------------------------------------------------------------------------- */
 
 export async function registerUser(input: RegisterInput): Promise<string> {
+  if (input.role === "recruiter" && isDisposableEmail(input.email)) {
+    throw new AppError(
+      "Use a work or personal email address that is not a disposable mailbox to register a company.",
+      422,
+      "disposable_email",
+    );
+  }
   const existing = await db
     .select({ id: users.id })
     .from(users)
@@ -132,6 +146,16 @@ export async function registerUser(input: RegisterInput): Promise<string> {
     );
   }
 
+  const companyIdentity =
+    input.role === "recruiter" && input.companyName
+      ? {
+          normalizedName: normalizeCompanyName(input.companyName),
+          websiteDomain: normalizeWebsiteDomain(input.companyWebsite),
+          normalizedContactPhone: normalizeContactPhone(input.phone),
+        }
+      : null;
+  if (companyIdentity) await assertCompanyIdentityAvailable(companyIdentity);
+
   const passwordHash = await hashPassword(input.password);
 
   const inserted = await db
@@ -139,6 +163,7 @@ export async function registerUser(input: RegisterInput): Promise<string> {
     .values({
       email: input.email,
       fullName: input.fullName,
+      phone: input.phone ?? null,
       passwordHash,
       role: input.role,
     })
@@ -153,14 +178,19 @@ export async function registerUser(input: RegisterInput): Promise<string> {
 
   if (input.role === "recruiter" && input.companyName) {
     const slug = await uniqueCompanySlug(input.companyName);
+    const identity = companyIdentity!;
     const company = await db
       .insert(companies)
       .values({
         ownerUserId: user.id,
         name: input.companyName,
+        normalizedName: identity.normalizedName,
         slug,
         website: input.companyWebsite || null,
+        websiteDomain: identity.websiteDomain,
         contactEmail: user.email,
+        contactPhone: input.phone || null,
+        normalizedContactPhone: identity.normalizedContactPhone,
         status: "pending",
       })
       .returning({ id: companies.id, name: companies.name });

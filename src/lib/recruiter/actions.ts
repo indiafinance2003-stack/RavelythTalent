@@ -2,9 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { assertSameOrigin } from "@/lib/security";
+import { assertSameOrigin, getRequestIp } from "@/lib/security";
 import { AppError } from "@/lib/errors";
 import { requireApiVerifiedUser } from "@/lib/auth/current-user";
+import { enforceRateLimit, RATE_LIMITS, rateKey } from "@/lib/rate-limit";
 import { formError, formSuccess, type FormState } from "@/lib/form-state";
 import { changeApplicationStatus } from "@/lib/applications/service";
 import {
@@ -102,9 +103,12 @@ export async function createCompanyAction(
   try {
     await assertSameOrigin();
     const user = await requireApiVerifiedUser();
+    const ip = (await getRequestIp()) ?? "unknown";
+    await enforceRateLimit(rateKey("companyRegister", ip), RATE_LIMITS.companyRegister);
     const name = String(formData.get("name") ?? "").trim();
     const website = String(formData.get("website") ?? "").trim();
-    await createCompanyForUser(user.id, name, website || null);
+    const contactPhone = String(formData.get("contactPhone") ?? "").trim();
+    await createCompanyForUser(user.id, name, website || null, contactPhone || null);
     revalidatePath("/recruiter/company");
     return formSuccess("Company created. Complete your profile and submit verification.");
   } catch (error) {

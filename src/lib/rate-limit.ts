@@ -20,6 +20,7 @@ export type RateRule = {
 /**
  * Documented limits.
  *   register            5 / hour   per IP
+ *   companyRegister     3 / hour   per IP
  *   login              10 / 15 min  per IP + per account
  *   verify-resend       5 / hour   per IP + per account
  *   forgot-password     5 / hour   per IP
@@ -30,6 +31,7 @@ export type RateRule = {
  */
 export const RATE_LIMITS = {
   register: { limit: 5, windowSeconds: 60 * 60 },
+  companyRegister: { limit: 3, windowSeconds: 60 * 60 },
   login: { limit: 10, windowSeconds: 15 * 60 },
   verifyResend: { limit: 5, windowSeconds: 60 * 60 },
   forgotPassword: { limit: 5, windowSeconds: 60 * 60 },

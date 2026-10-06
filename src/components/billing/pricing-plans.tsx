@@ -219,7 +219,11 @@ export function PricingPlans({
                 </p>
               ) : null}
 
-              {plan.jobPostsPerMonth ? (
+              {plan.code === "employer_free" ? (
+                <p className="mt-2 text-sm font-semibold text-navy">
+                  One lifetime free job post per company
+                </p>
+              ) : plan.jobPostsPerMonth ? (
                 <p className="mt-2 text-sm font-semibold text-navy">
                   {plan.jobPostsPerMonth} job posts / month
                 </p>
@@ -242,7 +246,20 @@ export function PricingPlans({
                   ))}
               </ul>
 
-              {price > 0 && !paymentAvailable ? (
+              {audience === "employer" && plan.code === "employer_free" ? (
+                <Link
+                  className="mt-6 w-full rounded-xl bg-royal px-5 py-2.5 text-center text-sm font-semibold text-white hover:bg-navy"
+                  href={
+                    !signedIn
+                      ? "/register?role=recruiter"
+                      : companyId
+                        ? "/recruiter/jobs/new"
+                        : "/recruiter/company"
+                  }
+                >
+                  Start free
+                </Link>
+              ) : price > 0 && !paymentAvailable ? (
                 <Link
                   className="mt-6 w-full rounded-xl border border-slate-300 px-5 py-2.5 text-center text-sm font-semibold text-navy hover:border-royal hover:text-royal"
                   href="/contact"

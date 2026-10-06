@@ -155,6 +155,7 @@ async function seedSiteSettings(): Promise<void> {
       subTagline: "Right People | Better Opportunities | Stronger Tomorrow",
       country: "India",
       currency: "INR",
+      freeJobPosts: 1,
     })
     .onConflictDoNothing({ target: siteSettings.id });
   log("site_settings: singleton row ensured (legal details left blank for admin)");

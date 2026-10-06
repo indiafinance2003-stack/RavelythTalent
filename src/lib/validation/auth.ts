@@ -50,8 +50,7 @@ export const registerSchema = z
     password: passwordSchema,
     confirmPassword: z.string(),
     phone: z
-      .string()
-      .trim()
+      .union([phoneSchema, z.literal("")])
       .optional()
       .transform((v) => (v ? v : undefined)),
     role: z.enum(["job_seeker", "recruiter"]).default("job_seeker"),
@@ -61,9 +60,10 @@ export const registerSchema = z
       .optional()
       .transform((v) => (v ? v : undefined)),
     companyWebsite: z
-      .string()
-      .trim()
-      .max(200)
+      .union([
+        z.string().trim().max(200).url("Enter a valid company website URL."),
+        z.literal(""),
+      ])
       .optional()
       .transform((v) => (v ? v : undefined)),
   })

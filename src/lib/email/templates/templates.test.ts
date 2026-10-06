@@ -34,6 +34,8 @@ import {
   companyVerificationApprovedEmail,
   companyVerificationRejectedEmail,
   companyVerificationSubmittedEmail,
+  freeJobCreditLimitReachedEmail,
+  freeJobCreditWarningEmail,
   jobApprovedEmail,
   jobPostLimitReachedEmail,
   jobPostLimitWarningEmail,
@@ -72,6 +74,8 @@ const templates = [
   ["job approved", () => jobApprovedEmail({ recruiterName: "Recruiter", jobTitle: "Engineer", jobUrl: "https://example.test/job" })],
   ["job post limit reached", () => jobPostLimitReachedEmail({ companyName: "Example", limit: 5, periodLabel: "January", upgradeUrl: "https://example.test/pricing" })],
   ["job post limit warning", () => jobPostLimitWarningEmail({ companyName: "Example", used: 4, limit: 5, periodLabel: "January" })],
+  ["free job credit warning", () => freeJobCreditWarningEmail({ companyName: "Example", used: 1, limit: 1, upgradeUrl: "https://example.test/pricing" })],
+  ["free job credit limit reached", () => freeJobCreditLimitReachedEmail({ companyName: "Example", limit: 1, upgradeUrl: "https://example.test/pricing" })],
   ["job rejected", () => jobRejectedEmail({ recruiterName: "Recruiter", jobTitle: "Engineer", reason: "Needs details", editUrl: "https://example.test/edit" })],
   ["team invitation", () => teamInvitationEmail({ companyName: "Example", role: "recruiter", inviteUrl: "https://example.test/invite" })],
 ] as const;

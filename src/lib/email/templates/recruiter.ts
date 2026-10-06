@@ -318,6 +318,51 @@ export function jobPostLimitReachedEmail(params: {
   });
 }
 
+export function freeJobCreditWarningEmail(params: {
+  companyName: string;
+  used: number;
+  limit: number;
+  upgradeUrl: string;
+  brand?: EmailBrand;
+}): RenderedEmail {
+  return render({
+    subject: "Your free job-post credit is nearly used",
+    preheader: "Plan ahead for your next job posting.",
+    heading: "Free job-post credit update",
+    intro: `${params.companyName} has used ${params.used} of ${params.limit} lifetime free job posts.`,
+    blocks: [
+      {
+        type: "paragraph",
+        text: "Your free job-post allowance is shared by everyone in your company and does not reset monthly. Choose an employer plan when you need to post more roles.",
+      },
+    ],
+    cta: { label: "Compare employer plans", url: params.upgradeUrl },
+    brand: params.brand,
+  });
+}
+
+export function freeJobCreditLimitReachedEmail(params: {
+  companyName: string;
+  limit: number;
+  upgradeUrl: string;
+  brand?: EmailBrand;
+}): RenderedEmail {
+  return render({
+    subject: "Your free job-post allowance is used",
+    preheader: "Upgrade to post another role.",
+    heading: "Free job-post allowance used",
+    intro: `${params.companyName} has used all ${params.limit} lifetime free job posts.`,
+    blocks: [
+      {
+        type: "paragraph",
+        text: "Your existing jobs remain available as before. An active paid employer plan is required to submit another job.",
+      },
+    ],
+    cta: { label: "Upgrade to an employer plan", url: params.upgradeUrl },
+    brand: params.brand,
+  });
+}
+
 export function addonPurchaseEmail(params: {
   ownerName: string;
   addonName: string;

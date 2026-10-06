@@ -63,6 +63,7 @@ export const siteSettings = pgTable("site_settings", {
 
   resumeDbViewLimit: integer("resume_db_view_limit").notNull().default(50),
   jobPostWarningThreshold: integer("job_post_warning_threshold").notNull().default(80),
+  freeJobPosts: integer("free_job_posts").notNull().default(1),
 
   maintenanceMode: boolean("maintenance_mode").notNull().default(false),
   updatedByUserId: uuid("updated_by_user_id").references(() => users.id, {

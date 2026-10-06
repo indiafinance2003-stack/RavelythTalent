@@ -9,6 +9,7 @@ import {
   subscriptions,
 } from "@/lib/db/schema";
 import { AppError } from "@/lib/errors";
+import { getSiteSettings } from "@/lib/settings";
 
 /**
  * Central server-side entitlement + quota enforcement.
@@ -295,12 +296,27 @@ export type JobQuota = {
   percentUsed: number;
   planName: string | null;
   planId: string | null;
+  usesFreeCredit: boolean;
+  freeLimit: number;
+  freeUsed: number;
+  freeRemaining: number;
+  warningThreshold: number;
 };
 
 export async function getJobQuota(companyId: string): Promise<JobQuota> {
   const periodKey = quotaPeriodKey();
   const plan = await getCompanyPlan(companyId);
-  const limit = plan?.jobPostsPerMonth ?? null;
+  const usesPaidPlan = Boolean(plan && plan.planCode !== "employer_free");
+  const [settings, companyRows] = await Promise.all([
+    getSiteSettings(),
+    db
+      .select({ freeJobPostsUsed: companies.freeJobPostsUsed })
+      .from(companies)
+      .where(eq(companies.id, companyId))
+      .limit(1),
+  ]);
+  const freeLimit = settings.freeJobPosts;
+  const freeUsed = companyRows.at(0)?.freeJobPostsUsed ?? 0;
 
   // Drafts never consume quota; only submitted/modated postings count.
   const usedRows = await db
@@ -315,17 +331,25 @@ export async function getJobQuota(companyId: string): Promise<JobQuota> {
       ),
     );
 
-  const used = usedRows.at(0)?.count ?? 0;
+  const monthlyUsed = usedRows.at(0)?.count ?? 0;
+  const usesFreeCredit = !usesPaidPlan;
+  const used = usesFreeCredit ? freeUsed : monthlyUsed;
+  const limit = usesPaidPlan ? plan?.jobPostsPerMonth ?? null : freeLimit;
 
   return {
     periodKey,
-    periodLabel: quotaPeriodLabel(),
+    periodLabel: usesFreeCredit ? "for the lifetime of this company" : quotaPeriodLabel(),
     used,
     limit,
     remaining: limit === null ? null : Math.max(0, limit - used),
     percentUsed: limit === null ? 0 : Math.min(100, Math.round((used / limit) * 100)),
-    planName: plan?.planName ?? null,
-    planId: plan?.planId ?? null,
+    planName: usesPaidPlan ? plan?.planName ?? null : "Free",
+    planId: usesPaidPlan ? plan?.planId ?? null : null,
+    usesFreeCredit,
+    freeLimit,
+    freeUsed,
+    freeRemaining: Math.max(0, freeLimit - freeUsed),
+    warningThreshold: settings.jobPostWarningThreshold,
   };
 }
 
@@ -348,7 +372,9 @@ export async function checkJobQuota(companyId: string): Promise<QuotaDecision> {
     return {
       allowed: false,
       quota,
-      reason: `You have used all ${quota.limit} job posts included in your plan for ${quota.periodLabel}.`,
+      reason: quota.usesFreeCredit
+        ? "Your company's one-time free job post has been used. Upgrade to a paid employer plan to post another job."
+        : `You have used all ${quota.limit} job posts included in your plan for ${quota.periodLabel}.`,
     };
   }
   return { allowed: true, quota };

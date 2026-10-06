@@ -77,6 +77,7 @@ export async function registerAction(
     }
 
     const data = parsed.data;
+    if (data.role === "recruiter") await limitByIp("companyRegister");
     await registerUser(data);
 
     // Unverified users cannot log in, so send them straight to the

@@ -278,3 +278,15 @@ tokens, skill links, application history).
 - A live manual walkthrough was not performed because the runtime database and
   external service credentials are not configured in this workspace. Use the
   post-deploy smoke-test checklist after owner setup.
+
+## 10. Free employer job post
+
+- Each company starts with the admin-configurable `site_settings.freeJobPosts`
+  lifetime credit (default 1). Submitted free postings consume credits
+  independently from monthly paid-plan quotas; rejected, closed, and deleted
+  postings do not restore them. Automatic safety blocks are the sole exception
+  and restore the credit before it is committed.
+- Companies are deduplicated on a normalized name, website domain, and contact
+  phone. Recruiter registration rejects domains listed in the maintained
+  `src/lib/auth/disposable-email-domains.txt` denylist and has a separate
+  three-per-hour-per-IP registration limit.

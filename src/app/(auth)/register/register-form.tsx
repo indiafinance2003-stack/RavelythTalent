@@ -18,7 +18,8 @@ export function RegisterForm() {
     <div className="surface p-6 sm:p-8">
       <h1 className="text-2xl font-bold text-navy">Create your account</h1>
       <p className="mt-1 text-sm text-slate-600">
-        Free forever for job seekers. Employers can post after verification.
+        Applying is free for candidates. Every approved company gets one free
+        job post to start hiring.
       </p>
 
       {state.status === "error" && state.message ? (
@@ -178,9 +179,24 @@ function CompanyFields({ errors }: { errors?: Record<string, string> }) {
           placeholder="https://example.com"
         />
       </Field>
+      <Field
+        label="Company contact phone"
+        htmlFor="phone"
+        error={errors?.phone}
+        hint="Optional; used to protect one free credit per company"
+      >
+        <Input
+          id="phone"
+          name="phone"
+          type="tel"
+          autoComplete="tel"
+          placeholder="+91 98765 43210"
+          invalid={Boolean(errors?.phone)}
+        />
+      </Field>
       <p className="text-xs text-slate-600">
-        Your company is reviewed before you can post jobs. We will email you as
-        soon as it is verified.
+        Your first job post is free. Your company is reviewed before you can
+        submit it; we will email you when verification is complete.
       </p>
     </div>
   );

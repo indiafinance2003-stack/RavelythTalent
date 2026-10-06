@@ -41,6 +41,7 @@ export const FALLBACK_SETTINGS: SiteSettings = {
   featureResumeDatabase: true,
   resumeDbViewLimit: 50,
   jobPostWarningThreshold: 80,
+  freeJobPosts: 1,
   maintenanceMode: false,
   updatedByUserId: null,
   updatedAt: new Date(0),

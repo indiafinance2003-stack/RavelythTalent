@@ -68,13 +68,25 @@ export default async function RecruiterJobsPage({
     <div className="space-y-6">
       <PageHeader
         title="Jobs"
-        description={`${quota.used} of ${quota.limit ?? "unlimited"} job posts used in ${quota.periodLabel}.`}
+        description={quota.usesFreeCredit
+          ? `${quota.freeRemaining} of ${quota.freeLimit} lifetime free job posts remaining.`
+          : `${quota.used} of ${quota.limit ?? "unlimited"} job posts used in ${quota.periodLabel}.`}
         action={
           <ButtonLink href="/recruiter/jobs/new">
             <Plus className="h-4 w-4" aria-hidden="true" /> Post a job
           </ButtonLink>
         }
       />
+
+      {quota.usesFreeCredit && quota.freeRemaining === 0 ? (
+        <Alert tone="warning" title="Upgrade to submit another job">
+          Your company&apos;s one-time free posting credit has been used.{" "}
+          <Link className="font-semibold text-royal hover:underline" href="/pricing?audience=employer">
+            Compare employer plans
+          </Link>
+          .
+        </Alert>
+      ) : null}
 
       {company.status !== "approved" ? (
         <Alert tone="warning" title="Company not approved">

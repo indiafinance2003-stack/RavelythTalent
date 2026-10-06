@@ -110,6 +110,22 @@ export const PLAN_SEED: PlanSeed[] = [
     ],
   },
   {
+    code: "employer_free",
+    name: "Free",
+    audience: "employer",
+    description: "One lifetime job post per company to get started.",
+    priceMonthlyPaise: 0,
+    priceYearlyPaise: 0,
+    jobPostsPerMonth: null,
+    sortOrder: 5,
+    features: [
+      f("job_posts_per_month", "One lifetime job post", 1),
+      f("applicant_management", "Applicant management pipeline"),
+      f("company_page", "Public company page"),
+      f("company_verification", "Company verification"),
+    ],
+  },
+  {
     code: "employer_professional",
     name: "Professional",
     audience: "employer",

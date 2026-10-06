@@ -142,15 +142,20 @@ export default async function RecruiterOverviewPage({
       <Card>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="text-sm font-bold text-navy">Job post quota</h2>
+            <h2 className="text-sm font-bold text-navy">
+              {quota.usesFreeCredit ? "Lifetime free job posts" : "Monthly job-post quota"}
+            </h2>
             <p className="mt-1 text-sm text-slate-600">
-              {quota.used} of{" "}
-              {quota.limit === null ? "unlimited" : quota.limit} used in{" "}
-              {quota.periodLabel}
-              {quota.planName ? ` · ${quota.planName}` : ""}
+              {quota.usesFreeCredit
+                ? `${quota.freeRemaining} of ${quota.freeLimit} free job posts remaining`
+                : `${quota.used} of ${quota.limit ?? "unlimited"} used in ${quota.periodLabel}${quota.planName ? ` · ${quota.planName}` : ""}`}
             </p>
           </div>
-          {quota.limit === null ? (
+          {quota.usesFreeCredit ? (
+            <ButtonLink href="/pricing?audience=employer" size="sm">
+              {quota.freeRemaining > 0 ? "View paid plans" : "Upgrade to post again"}
+            </ButtonLink>
+          ) : quota.limit === null ? (
             <ButtonLink href="/pricing?audience=employer" size="sm">
               Choose a plan
             </ButtonLink>
@@ -167,6 +172,12 @@ export default async function RecruiterOverviewPage({
               style={{ width: `${Math.max(2, quota.percentUsed)}%` }}
             />
           </div>
+        ) : null}
+        {quota.usesFreeCredit && quota.freeRemaining === 0 ? (
+          <Alert className="mt-4" tone="warning" title="Your free job post has been used">
+            Your free credit is lifetime and is not restored if a post is rejected,
+            closed or deleted. Choose a paid employer plan to submit another job.
+          </Alert>
         ) : null}
       </Card>
 

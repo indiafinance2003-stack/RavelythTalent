@@ -1,4 +1,4 @@
-import { and, count, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   applications,
@@ -17,12 +17,21 @@ import {
   requireCompanyMembership,
 } from "@/lib/entitlements";
 import {
+  assertCompanyIdentityAvailable,
+  normalizeCompanyName,
+  normalizeContactPhone,
+  normalizeWebsiteDomain,
+} from "@/lib/company-identity";
+import {
   companyVerificationSubmittedEmail,
+  freeJobCreditLimitReachedEmail,
+  freeJobCreditWarningEmail,
 } from "@/lib/email/templates/recruiter";
 import {
   getEmailBrand,
   queueRenderedEmail,
 } from "@/lib/email/send";
+import { appUrl } from "@/lib/email/urls";
 import {
   readValidatedUpload,
   storeValidatedFile,
@@ -105,20 +114,28 @@ export async function updateCompanyProfile(
     throw new AppError("Company name must be 2-160 characters.", 422, "invalid_name");
   }
   await requireCompanyMembership(userId, companyId, "admin");
+  await assertCompanyIdentityAvailable({
+    normalizedName: normalizeCompanyName(name),
+    websiteDomain: normalizeWebsiteDomain(input.website),
+    normalizedContactPhone: normalizeContactPhone(input.contactPhone),
+  }, companyId);
 
   await db
     .update(companies)
     .set({
       name,
+      normalizedName: normalizeCompanyName(name),
       about: input.about?.trim() || null,
       industry: input.industry?.trim() || null,
       size: (input.size as never) ?? null,
       website: input.website?.trim() || null,
+      websiteDomain: normalizeWebsiteDomain(input.website),
       foundedYear: input.foundedYear,
       headquarters: input.headquarters?.trim() || null,
       locations: input.locations.map((city) => ({ city })),
       contactEmail: input.contactEmail?.trim() || null,
       contactPhone: input.contactPhone?.trim() || null,
+      normalizedContactPhone: normalizeContactPhone(input.contactPhone),
       updatedAt: new Date(),
     })
     .where(eq(companies.id, companyId));
@@ -129,6 +146,7 @@ export async function createCompanyForUser(
   userId: string,
   name: string,
   website?: string | null,
+  contactPhone?: string | null,
 ): Promise<string> {
   const trimmed = name.trim();
   if (trimmed.length < 2 || trimmed.length > COMPANY_NAME_MAX) {
@@ -139,14 +157,26 @@ export async function createCompanyForUser(
     throw new AppError("You already belong to a company with that name.", 409, "duplicate_company");
   }
 
+  const normalizedName = normalizeCompanyName(trimmed);
+  const websiteDomain = normalizeWebsiteDomain(website);
+  const normalizedContactPhone = normalizeContactPhone(contactPhone);
+  await assertCompanyIdentityAvailable({
+    normalizedName,
+    websiteDomain,
+    normalizedContactPhone,
+  });
   const slug = uniqueSlug(trimmed);
   const inserted = await db
     .insert(companies)
     .values({
       ownerUserId: userId,
       name: trimmed,
+      normalizedName,
       slug,
       website: website?.trim() || null,
+      websiteDomain,
+      contactPhone: contactPhone?.trim() || null,
+      normalizedContactPhone,
       contactEmail: null,
       status: "pending",
     })
@@ -377,21 +407,42 @@ export async function createCompanyJob(params: {
   submit: boolean;
 }): Promise<string> {
   await requireCompanyMembership(params.userId, params.companyId);
-  const status = params.submit
-    ? await assertCanSubmit(params.companyId)
-    : ("draft" as const);
+  if (!params.submit) {
+    const inserted = await db
+      .insert(jobs)
+      .values({
+        ...jobValuesForInsert(params.companyId, params.userId, params.input),
+        status: "draft",
+      })
+      .returning({ id: jobs.id });
+    return inserted[0]!.id;
+  }
 
-  const inserted = await db
-    .insert(jobs)
-    .values({
-      ...jobValuesForInsert(params.companyId, params.userId, params.input),
-      status,
-      ...(params.submit
-        ? { quotaPeriodKey: quotaPeriodKey() }
-        : {}),
-    })
-    .returning({ id: jobs.id });
-  return inserted[0]!.id;
+  const allowance = await assertCanSubmit(params.companyId);
+  const result = await db.transaction(async (tx) => {
+    const freeUsed = allowance.usesFreeCredit
+      ? await claimFreeJobCredit(tx, params.companyId, allowance.limit)
+      : null;
+    const [job] = await tx
+      .insert(jobs)
+      .values({
+        ...jobValuesForInsert(params.companyId, params.userId, params.input),
+        status: allowance.status,
+        quotaPeriodKey: quotaPeriodKey(),
+      })
+      .returning({ id: jobs.id });
+    if (!job) throw new AppError("Could not create the job post.", 500);
+    return { id: job.id, freeUsed };
+  });
+  if (result.freeUsed !== null) {
+    await notifyFreeJobCreditUsage(
+      params.companyId,
+      result.freeUsed,
+      allowance.limit,
+      allowance.warningThreshold,
+    );
+  }
+  return result.id;
 }
 
 /** Submits an existing draft / rejected job for admin approval. */
@@ -408,20 +459,40 @@ export async function submitCompanyJob(
       "invalid_status",
     );
   }
-  const status = await assertCanSubmit(companyId);
-
-  await db
-    .update(jobs)
-    .set({
-      status,
-      moderationNotes: null,
-      quotaPeriodKey: quotaPeriodKey(),
-      updatedAt: new Date(),
-    })
-    .where(eq(jobs.id, jobId));
+  const allowance = await assertCanSubmit(companyId);
+  const freeUsed = await db.transaction(async (tx) => {
+    const consumed = allowance.usesFreeCredit
+      ? await claimFreeJobCredit(tx, companyId, allowance.limit)
+      : null;
+    await tx
+      .update(jobs)
+      .set({
+        status: allowance.status,
+        moderationNotes: null,
+        quotaPeriodKey: quotaPeriodKey(),
+        updatedAt: new Date(),
+      })
+      .where(eq(jobs.id, jobId));
+    return consumed;
+  });
+  if (freeUsed !== null) {
+    await notifyFreeJobCreditUsage(
+      companyId,
+      freeUsed,
+      allowance.limit,
+      allowance.warningThreshold,
+    );
+  }
 }
 
-async function assertCanSubmit(companyId: string): Promise<"pending_approval"> {
+type SubmissionAllowance = {
+  status: "pending_approval";
+  usesFreeCredit: boolean;
+  limit: number;
+  warningThreshold: number;
+};
+
+async function assertCanSubmit(companyId: string): Promise<SubmissionAllowance> {
   const companyRows = await db
     .select({ status: companies.status })
     .from(companies)
@@ -439,7 +510,95 @@ async function assertCanSubmit(companyId: string): Promise<"pending_approval"> {
   if (!decision.allowed) {
     throw new AppError(decision.reason, 403, "quota_exceeded");
   }
-  return "pending_approval";
+  return {
+    status: "pending_approval",
+    usesFreeCredit: decision.quota.usesFreeCredit,
+    limit: decision.quota.limit ?? 0,
+    warningThreshold: decision.quota.warningThreshold,
+  };
+}
+
+async function claimFreeJobCredit(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  companyId: string,
+  limit: number,
+): Promise<number> {
+  const rows = await tx
+    .update(companies)
+    .set({
+      freeJobPostsUsed: sql`${companies.freeJobPostsUsed} + 1`,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(companies.id, companyId),
+        eq(companies.status, "approved"),
+        sql`${companies.freeJobPostsUsed} < ${limit}`,
+      ),
+    )
+    .returning({ freeJobPostsUsed: companies.freeJobPostsUsed });
+  if (!rows[0]) {
+    throw new AppError(
+      "Your company's free job-post credit has been used. Upgrade to a paid employer plan to post another job.",
+      403,
+      "quota_exceeded",
+    );
+  }
+  return rows[0].freeJobPostsUsed;
+}
+
+async function notifyFreeJobCreditUsage(
+  companyId: string,
+  used: number,
+  limit: number,
+  warningThreshold: number,
+): Promise<void> {
+  const warningAt = Math.max(1, Math.ceil((limit * warningThreshold) / 100));
+  if (used !== warningAt && used < limit) return;
+
+  try {
+    const [company] = await db
+      .select({
+        name: companies.name,
+        ownerName: users.fullName,
+        ownerEmail: users.email,
+      })
+      .from(companies)
+      .innerJoin(users, eq(users.id, companies.ownerUserId))
+      .where(eq(companies.id, companyId))
+      .limit(1);
+    if (!company) return;
+    const brand = await getEmailBrand();
+    if (used === warningAt) {
+      await queueRenderedEmail({
+        to: company.ownerEmail,
+        toName: company.ownerName,
+        templateKey: "free_job_credit_warning",
+        rendered: freeJobCreditWarningEmail({
+          companyName: company.name,
+          used,
+          limit,
+          upgradeUrl: appUrl("/pricing?audience=employer"),
+          brand,
+        }),
+      });
+    }
+    if (used >= limit) {
+      await queueRenderedEmail({
+        to: company.ownerEmail,
+        toName: company.ownerName,
+        templateKey: "free_job_credit_limit_reached",
+        rendered: freeJobCreditLimitReachedEmail({
+          companyName: company.name,
+          limit,
+          upgradeUrl: appUrl("/pricing?audience=employer"),
+          brand,
+        }),
+      });
+    }
+  } catch (error) {
+    console.error("[recruiter] could not queue free job-post emails:", error);
+  }
 }
 
 export type JobLifecycleAction = "pause" | "resume" | "close";
