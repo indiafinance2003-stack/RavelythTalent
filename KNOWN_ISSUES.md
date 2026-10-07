@@ -38,12 +38,12 @@
   bootstrap attempt changed the local `postgres` password before failing; its
   generated password was not retained. Do not enable trust authentication as a
   workaround. Migrations and seeds have not been applied to a local database.
-- **HIGH — database-backed flows not exercised:** The unit suite has 82 passing
-  tests across 14 Vitest files, including mocked Razorpay owner/activation
-  coverage, but it does not replace DB-backed tests for free-post quota
-  consumption, moderation/report persistence, offline billing transactions,
-  invoices, or the admin search flow. Those require a working local/staging
-  PostgreSQL database.
+- **HIGH — database-backed flows not exercised:** The unit suite has 193
+  passing tests across 34 Vitest files, including mocked Razorpay
+  owner/activation coverage, but it does not replace DB-backed tests for
+  free-post quota consumption, moderation/report persistence, offline billing
+  transactions, invoices, or the admin search flow. Those require a working
+  local/staging PostgreSQL database.
 - **MEDIUM — live providers not configured:** Razorpay checkout/webhooks,
   production SMTP and a real SMS provider have not been exercised against live
   services. Razorpay SDK order creation is mocked in unit tests.
@@ -74,6 +74,25 @@
   service/timer files are added disabled and were not validated with
   `systemd-analyze verify` (Windows environment). Validate on the Ubuntu
   host before enabling.
+- **MEDIUM — social auto-posting (Task 9) needs database and Meta API
+  verification:** Additive migration `0016_lowly_franklin_storm.sql` (social
+  posts, social settings, WhatsApp digests and
+  `companies.social_promotion_opt_out`) has not been applied locally because
+  PostgreSQL authentication is unavailable. Publish-hook enqueueing, cron
+  processing, admin queue actions and the job-card route were covered with
+  pure-logic and `fetch`-mocked tests only; no call was made to Meta's Graph
+  API and no post was published to the Facebook Page or Instagram account.
+  Review the migration SQL (additive only: three new tables, one new column
+  with `DEFAULT false`, constraints and indexes) before deploying.
+- **LOW — `SOCIAL_GRAPH_VERSION` must be verified by the owner [OWNER
+  ACTION]:** the Graph API version is read from `SOCIAL_GRAPH_VERSION`
+  (documented default `v26.0` in `.env.example`) instead of being hard-coded.
+  Verify the current version against Meta's documentation before the first
+  real post and update the variable if Meta has moved on.
+- **LOW — social systemd timer unvalidated:** The new
+  `ravelyth-cron-process-social-posts` service/timer files are added disabled
+  and were not validated with `systemd-analyze verify` (Windows environment).
+  Validate on the Ubuntu host before enabling.
 
 Do not treat this application as launch-ready until database access, owner
 configuration, staging walkthroughs and the outstanding actions in

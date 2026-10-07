@@ -87,7 +87,7 @@ export function defaultTermsSections(settings: SiteSettings): PolicySection[] {
     },
     {
       heading: "Permission to display and promote employer content",
-      body: `${settings.brandName} may display and promote an employer's job posts and company name on the portal and on ${settings.brandName}'s own social media channels, free of charge, for the purpose of operating and promoting the portal. The employer grants us the permission needed for that display and promotion and confirms it has authority to provide the content. The employer retains ownership of its content.`,
+      body: `${settings.brandName} may display and promote an employer's job posts and company name on the portal and on ${settings.brandName}'s own social media channels, free of charge, for the purpose of operating and promoting the portal. The employer grants us the permission needed for that display and promotion and confirms it has authority to provide the content. The employer may opt out of this promotion at any time in company settings, and ${settings.brandName} may remove any such post at any time. The employer retains ownership of its content.`,
     },
     {
       heading: "Employer post limits and free post",

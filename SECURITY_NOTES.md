@@ -58,3 +58,27 @@ database and provider credentials.
 - Cron endpoints `/api/internal/cron/sync-inbox` and
   `/api/internal/cron/process-campaigns` use the existing `CRON_SECRET`
   protection; the Nginx deny rule for `/api/internal/` covers them.
+
+## Social auto-posting (Task 9)
+
+- Meta credentials are read from environment variables only
+  (`SOCIAL_FACEBOOK_PAGE_ID`, `SOCIAL_FACEBOOK_PAGE_TOKEN`,
+  `SOCIAL_INSTAGRAM_USER_ID`, `SOCIAL_GRAPH_VERSION`). The database stores
+  switches, caps and a token *error message* only; no access token is ever
+  persisted, logged or returned to the browser.
+- `/admin/social`, `/admin/social/settings` and `/admin/social/digest` and all
+  their server actions require admin authorization, the shared same-origin
+  (CSRF) check, rate limiting and audit-log entries for settings changes,
+  retries, cancellations, manual posts and digest marking.
+- Post text and the job-card image are built from public job fields only.
+  Candidate data, employer private contact details and hidden salaries are
+  never included; `/api/social/card/[jobId]` returns 404 for any job that is
+  not currently published.
+- The processor endpoint `/api/internal/cron/process-social-posts` uses the
+  existing `CRON_SECRET` protection and is covered by the Nginx deny rule for
+  `/api/internal/`.
+- Graph API failures that indicate an expired or invalid token (HTTP 401/403
+  or Graph error code 190) stop that platform's retries and raise an admin
+  banner instead of silently hammering the API.
+- No unofficial WhatsApp automation is used: the digest is generated for
+  manual copy/paste and nothing is sent to a personal WhatsApp account.

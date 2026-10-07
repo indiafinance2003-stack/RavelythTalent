@@ -42,6 +42,8 @@ describe("default legal policy text", () => {
       "never charge candidates any fee",
       "pause or remove a job post",
       "social media channels, free of charge",
+      "opt out of this promotion at any time in company settings",
+      "remove any such post at any time",
       "one free job post",
       "do not automatically renew",
       "Candidate Premium",

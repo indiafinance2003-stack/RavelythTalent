@@ -55,6 +55,11 @@ const envSchema = z.object({
   INBOX_GMAIL_APP_PASSWORD: optionalTrimmed,
   ANTHROPIC_API_KEY: optionalTrimmed,
 
+  SOCIAL_FACEBOOK_PAGE_ID: optionalTrimmed,
+  SOCIAL_FACEBOOK_PAGE_TOKEN: optionalTrimmed,
+  SOCIAL_INSTAGRAM_USER_ID: optionalTrimmed,
+  SOCIAL_GRAPH_VERSION: optionalTrimmed,
+
   RAZORPAY_KEY_ID: optionalTrimmed,
   RAZORPAY_KEY_SECRET: optionalTrimmed,
   RAZORPAY_WEBHOOK_SECRET: optionalTrimmed,

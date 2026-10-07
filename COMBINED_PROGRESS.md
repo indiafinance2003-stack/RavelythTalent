@@ -6,8 +6,10 @@
 - [x] Task 4: Shared Asia/Kolkata date/time formatting
 - [x] Task 5: Role/status-safe password reset email reliability
 - [x] Task 6: Safe admin account deletion
-- [ ] Task 7: Admin assistant inbox, leads, campaigns, and optional AI
+- [x] Task 7: Admin assistant inbox, leads, campaigns, and optional AI
+- [x] Task 9: Social auto-posting (Facebook, Instagram, WhatsApp digest)
 - [ ] Task 8: Admin, candidate, and employer dashboard redesign
+- [ ] Task 10: SMS adapters, npm audit follow-up, off-site backups
 - [ ] Final quality gates, documentation, and deploy report
 
 ## Current task
@@ -30,11 +32,24 @@ teammate, and writes a minimal audit row. Resume, built-resume and verification
 files are cleaned after commit with visible failure reporting. Typecheck, lint
 and deletion policy tests passed.
 
-Task 7 is next; no Task 7 implementation changes have been made yet. Start with
-7.1: add the optional inbox variables to `src/lib/env.ts` and `.env.example`
-(never `.env`), install/use `imapflow` and `mailparser`, and implement an
-environment-only account resolver for support and Gmail that shows
-“Not configured” when absent. Do not access noreply@ and never store, log or
-display credentials. Then proceed through 7.2 inbox/sync, 7.3 CRM, 7.4
-campaigns, 7.5 mocked optional AI, and 7.6 privacy/compliance/tests. Task 8 and
-final quality gates remain after Task 7.
+Task 7 is complete and locally committed (migrations `0011`-`0015`,
+`/admin/assistant`, inbox sync, CRM, campaigns and the mocked optional AI).
+Task 9 is complete and locally committed: `social_settings` and
+`social_posts` plus `companies.social_promotion_opt_out` arrive in additive
+migration `0016_lowly_franklin_storm.sql`; publishing a clean, opted-in job
+enqueues one row per enabled platform, `/api/internal/cron/process-social-posts`
+(CRON_SECRET, disabled systemd timer) applies the IST window, daily cap,
+20-minute spacing and 4-attempt exponential backoff, and
+`/admin/social` covers connection status, queue/history filters, retry,
+cancel, post-now and the kill switch. Captions and the 1080x1080 card at
+`/api/social/card/[jobId]` use public job data only, and
+`/admin/social/digest` generates the manual WhatsApp message. Terms now state
+the promotion permission, the employer opt-out and Ravelyth's right to remove
+posts. Typecheck, lint, build and 193 tests pass.
+
+Task 8 (dashboard redesign) is next: shared card/KPI/table/empty-state
+components and responsive navigation, then the admin overview (including the
+Social status card that Task 9 left as a note for Task 8), the candidate
+dashboard with the documented match function, and the employer dashboard.
+Task 10 (MSG91/Twilio adapters, `npm audit`, off-site backups) and the final
+quality-gates report follow.

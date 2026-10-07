@@ -7,11 +7,12 @@ import {
   VerificationUploadForm,
   type CompanyFormValues,
 } from "@/components/recruiter/company-form";
-import { Alert, Badge, Card, PageHeader } from "@/components/ui/primitives";
+import { Alert, Badge, Button, Card, PageHeader } from "@/components/ui/primitives";
 import {
   SwitchToCandidateForm,
 } from "@/components/candidate/employer-conversion";
 import { getSwitchBackBlockReason } from "@/lib/auth/employer-conversion";
+import { setSocialPromotionOptOutAction } from "@/lib/social/company-opt-out";
 
 export const dynamic = "force-dynamic";
 
@@ -113,6 +114,29 @@ export default async function CompanyPage({
           </code>
           .
         </p>
+      </Card>
+
+      <Card>
+        <h2 className="text-sm font-bold text-navy">Social media promotion</h2>
+        <p className="mt-1 text-sm text-slate-600">
+          Ravelyth may promote your published job posts and company name on its own social media
+          channels, free of charge. You can opt out at any time; already queued posts stop being
+          sent.
+        </p>
+        <form action={setSocialPromotionOptOutAction} className="mt-4 flex flex-wrap items-center gap-3">
+          <input name="companyId" type="hidden" value={detail.id} />
+          <label className="flex items-center gap-2 text-sm font-semibold text-navy">
+            <input
+              defaultChecked={detail.socialPromotionOptOut}
+              name="optOut"
+              type="checkbox"
+            />
+            Do not promote my jobs on Ravelyth&apos;s social media
+          </label>
+          <Button size="sm" type="submit">
+            Save preference
+          </Button>
+        </form>
       </Card>
 
       {detail.ownerUserId === user.id ? (

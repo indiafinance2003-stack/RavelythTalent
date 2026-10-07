@@ -1,0 +1,13 @@
+[Unit]
+Description=Run Ravelyth Talent social post publishing every ten minutes
+Documentation=file:/var/www/ravelyth/DEPLOYMENT.md
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=10min
+Persistent=true
+AccuracySec=30s
+Unit=ravelyth-cron-process-social-posts.service
+
+[Install]
+WantedBy=timers.target

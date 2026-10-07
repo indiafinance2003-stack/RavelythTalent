@@ -64,6 +64,8 @@ export const companies = pgTable(
     averageRating: numeric("average_rating", { precision: 3, scale: 2 }),
     reviewsCount: integer("reviews_count").notNull().default(0),
     isFeatured: boolean("is_featured").notNull().default(false),
+    /** Employer opt-out from Ravelyth's own social-media promotion (Task 9). */
+    socialPromotionOptOut: boolean("social_promotion_opt_out").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),

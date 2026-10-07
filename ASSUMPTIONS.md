@@ -417,3 +417,42 @@ tokens, skill links, application history).
 - Assistant cron endpoints reuse the existing `CRON_SECRET` pattern and the
   systemd service/timer files are added disabled, matching earlier cron
   timers.
+
+## 17. Social auto-posting (Task 9)
+
+- Meta credentials come only from environment variables
+  (`SOCIAL_FACEBOOK_PAGE_ID`, `SOCIAL_FACEBOOK_PAGE_TOKEN`,
+  `SOCIAL_INSTAGRAM_USER_ID`, `SOCIAL_GRAPH_VERSION`); no token is stored in
+  the database. `social_settings` holds switches, caps and the last token
+  error text only, and a missing credential simply shows "Not configured".
+- Auto-posting is off by default (master switch) and is additionally gated by
+  a "pause all" kill switch, per-platform switches, the IST posting window
+  (09:00-21:00), a daily cap of 10 per platform and a 20-minute minimum gap.
+- A post is queued only for a job that is currently published, passed the
+  deterministic safety scan with a `publish` decision, has zero open reports
+  and whose company has not opted out of social promotion
+  (`companies.social_promotion_opt_out`). Eligibility is re-checked immediately
+  before sending, so a job that becomes held, reported, paused, closed,
+  expired or deleted is skipped rather than posted.
+- Dedupe is a database guarantee: one `social_posts` row per
+  `(job_id, platform)` via a unique index plus `ON CONFLICT DO NOTHING`.
+- Captions and cards are built exclusively from public job fields (title,
+  company, city/state, job type, work mode and the salary only when it is not
+  hidden) plus the public job URL carrying UTM parameters. Candidate data and
+  the employer's private contact details never reach a post or an image.
+- Facebook publishes a Page photo post; Instagram uses the documented content
+  publishing flow (container -> status poll -> publish) and ends captions with
+  the plain URL and "Link in bio" because Instagram captions cannot hold
+  clickable links. Both adapters sit behind a `SocialProvider` interface and
+  are always mocked in tests.
+- Failures retry with exponential backoff (10/20/40 minutes, maximum 4
+  attempts). HTTP 401/403 or Graph error code 190 is treated as an expired or
+  invalid token: the post fails immediately, retries stop for that platform and
+  the admin panel shows a banner.
+- WhatsApp is deliberately manual: Channels have no official posting API, so
+  `/admin/social/digest` only generates a paste-ready message and records that
+  the admin posted it. No unofficial WhatsApp automation is used.
+- **[OWNER ACTION]** `SOCIAL_GRAPH_VERSION` must be verified against Meta's
+  current Graph API documentation before the first real post; the code reads
+  the variable and falls back to a documented default rather than hard-coding
+  a version in request paths.

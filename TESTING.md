@@ -12,7 +12,7 @@ available locally at `127.0.0.1:1025` (SMTP) and `127.0.0.1:8025` (web UI).
 | `npm run typecheck` | Passed |
 | `npm run lint` | Passed |
 | `npm run build` | Passed; production Next.js build completed |
-| `npm run test` | Passed: 143 tests across 28 Vitest files |
+| `npm run test` | Passed: 193 tests across 34 Vitest files |
 | `npm run db:generate` | Passed; generated additive migration `0007_late_fabian_cortez.sql` |
 | `npm run db:migrate` | Not run: local app database credentials are unusable; no migration was applied |
 
@@ -62,6 +62,26 @@ normal `db:generate` workflow, reviewed as additive only, and not applied
 locally because application database authentication is unavailable. Live
 IMAP/SMTP, the Anthropic API and DB-backed inbox/campaign flows were not
 exercised; see `KNOWN_ISSUES.md`.
+
+Task 9 (social auto-posting) checks: `npm run typecheck`, `npm run lint`,
+`npm run build` and `npm run test` (193 tests) passed. Social-focused suites
+cover eligibility for every job state (`draft`, `pending_approval`,
+`published`, `rejected`, `paused`, `closed`, `expired`), deleted jobs,
+held/blocked scans, open reports, company opt-out and the master/platform/kill
+switches; IST posting window, daily cap and minimum spacing; exponential
+retry backoff up to 4 attempts; the Facebook and Instagram adapters with
+`fetch` mocked, including expired-token (HTTP 401/403, Graph error 190)
+handling and the Instagram container -> poll -> publish sequence; caption
+contents (public fields only, hidden salary omitted, UTM link, no leftover
+template tokens, Instagram ending with the plain URL and "Link in bio");
+job-card model contents and brand colours; the 404 rules for non-published
+job cards; WhatsApp digest line formatting; and a guard that migration
+`0016` is additive only and carries the unique `(job_id, platform)` dedupe
+index. Migrations `0016` was generated with the normal `db:generate`
+workflow and reviewed as additive only; it was not applied locally because
+application database authentication is unavailable. No Meta Graph API call
+was made and no queue/cron flow ran against a real database; see
+`KNOWN_ISSUES.md`.
 
 ## Manual staging verification
 
@@ -148,6 +168,21 @@ working email and (for paid flows) Razorpay test credentials:
    jobs, reports, verification documents and company-identity fields are gone.
    Delete a recruiter with active teammates and verify the company remains
    with ownership transferred to an active teammate.
+16. Social auto-posting: set `SOCIAL_FACEBOOK_PAGE_ID`,
+   `SOCIAL_FACEBOOK_PAGE_TOKEN`, `SOCIAL_INSTAGRAM_USER_ID` and
+   `SOCIAL_GRAPH_VERSION` on staging, then open `/admin/social/settings` and
+   confirm both platforms show "Connected". Turn the master switch on and
+   publish a clean job; confirm two `social_posts` rows appear as `queued`,
+   then run
+   `curl -H "x-cron-secret: $CRON_SECRET" http://127.0.0.1:3000/api/internal/cron/process-social-posts`
+   inside the posting window and confirm the rows become `published` with a
+   platform post id. Repeat with a reported job, a held job and a company that
+   has ticked "Do not promote my jobs" in `/recruiter/company`; each must stay
+   queued or be skipped, never posted. Visit `/api/social/card/<jobId>` for a
+   published job (image) and for a closed job (404). Use "Post now", Retry and
+   Cancel from `/admin/social`, toggle the kill switch, and confirm the
+   audit-log entries. Generate a digest on `/admin/social/digest`, copy it,
+   download a card image and mark it posted.
 
 Do not run the migration against production as a validation step. Apply
 migrations only through the server deployment procedure and after a database

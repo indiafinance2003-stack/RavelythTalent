@@ -11,3 +11,4 @@ export * from "./jobs";
 export * from "./billing";
 export * from "./platform";
 export * from "./assistant";
+export * from "./social";
