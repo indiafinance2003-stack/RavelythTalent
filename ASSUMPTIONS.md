@@ -382,3 +382,38 @@ tokens, skill links, application history).
   pending-approval jobs and no unexpired active employer subscription. The
   owner membership is removed, not deleted, and the company and hiring history
   remain intact.
+
+## 16. Assistant (Task 7)
+
+- Mail credentials come only from environment variables (`INBOX_*`,
+  `ANTHROPIC_API_KEY`); no credential is ever stored in the database. Account
+  status objects exposed to the UI contain IDs, addresses and configured
+  booleans only.
+- The IMAP sync is read-only and bounded (25 messages per account per run,
+  3 MB per message, 128 KiB of plain text kept). HTML is never stored or
+  rendered, attachments are recorded as file names only, and remote mail is
+  never deleted or modified.
+- Opt-out replies detected by the rule classifier are applied immediately
+  (suppression list + lead `do_not_contact` + admin notification) and a single
+  confirmation reply may be sent without approval; every other reply is a
+  draft awaiting the admin.
+- Campaign sending always requires per-message admin approval (single or
+  batch). Pre-send checks cannot be bypassed: valid/suppressed/status gates,
+  a 14-day contact gap except scheduled sequence follow-ups, a visible
+  opt-out line, and a sender legal name/address taken from site settings.
+  Daily cap defaults to 15 with a hard maximum of 40 per sender account per
+  day, inside a 10:00-17:00 IST Monday-Saturday window with 2-6 minute random
+  spacing; a campaign auto-pauses when the bounce rate of the last 20 sends
+  exceeds 10%.
+- The public `/unsubscribe/[signed-token]` page uses HMAC-signed, expiring
+  tokens (the same pattern as job alerts) and adds the address to the
+  suppression list on a one-click POST without requiring a login.
+- AI is an optional, off-by-default layer. The Anthropic adapter runs only
+  server-side, receives only delimited untrusted email text plus FAQ and
+  public plan data (no user/candidate/resume/payment records), is validated
+  with zod, and every output is stored as a draft for admin approval —
+  nothing is sent automatically. Calls are blocked once the month-to-date
+  spend reaches the configured cap.
+- Assistant cron endpoints reuse the existing `CRON_SECRET` pattern and the
+  systemd service/timer files are added disabled, matching earlier cron
+  timers.

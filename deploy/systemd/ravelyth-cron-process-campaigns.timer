@@ -1,0 +1,13 @@
+[Unit]
+Description=Run approved Ravelyth Talent campaign processing every ten minutes
+Documentation=file:/var/www/ravelyth/DEPLOYMENT.md
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=10min
+Persistent=true
+AccuracySec=30s
+Unit=ravelyth-cron-process-campaigns.service
+
+[Install]
+WantedBy=timers.target

@@ -48,6 +48,13 @@ const envSchema = z.object({
   EMAIL_FROM: z.string().default("Ravelyth Talent <noreply@ravelyth.in>"),
   SUPPORT_EMAIL: optionalTrimmed,
 
+  INBOX_SUPPORT_USER: optionalTrimmed,
+  INBOX_SUPPORT_PASS: optionalTrimmed,
+  INBOX_SUPPORT_ADDRESS: optionalTrimmed,
+  INBOX_GMAIL_USER: optionalTrimmed,
+  INBOX_GMAIL_APP_PASSWORD: optionalTrimmed,
+  ANTHROPIC_API_KEY: optionalTrimmed,
+
   RAZORPAY_KEY_ID: optionalTrimmed,
   RAZORPAY_KEY_SECRET: optionalTrimmed,
   RAZORPAY_WEBHOOK_SECRET: optionalTrimmed,

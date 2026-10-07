@@ -1,0 +1,1 @@
+ALTER TABLE "inbox_drafts" ADD COLUMN "send_status" text DEFAULT 'draft' NOT NULL;

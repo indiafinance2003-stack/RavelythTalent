@@ -57,6 +57,23 @@
   findings remain in the ESLint/Next lint dependency chain; production
   dependencies previously reported zero vulnerabilities. See
   `SECURITY_NOTES.md`.
+- **MEDIUM — Assistant (Task 7) needs database and mail-server verification:**
+  Additive migrations `0011_closed_timeslip.sql` through
+  `0015_late_skullbuster.sql` have not been applied locally (PostgreSQL
+  authentication is unavailable), so inbox sync, thread/draft persistence,
+  leads CRUD, campaign queueing and approval flows were exercised only
+  through mocked/pure-logic tests. Live IMAP/SMTP against mail.ravelyth.in or
+  Gmail has not been tested; no real message was read or sent.
+- **MEDIUM — Anthropic AI layer unverified:** The Anthropic adapter, safety
+  validation, usage recording and cost-cap shutdown are covered with a mocked
+  provider only. No live `ANTHROPIC_API_KEY` call was made; token/cost
+  estimates are approximate and should be checked against the first real
+  usage in the provider console.
+- **LOW — assistant systemd timers unvalidated:** The new
+  `ravelyth-cron-sync-inbox` and `ravelyth-cron-process-campaigns`
+  service/timer files are added disabled and were not validated with
+  `systemd-analyze verify` (Windows environment). Validate on the Ubuntu
+  host before enabling.
 
 Do not treat this application as launch-ready until database access, owner
 configuration, staging walkthroughs and the outstanding actions in

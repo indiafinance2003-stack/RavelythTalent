@@ -39,3 +39,22 @@ The repository-wide static route/action review found no additional actionable
 findings in its bounded pass. Database-backed authorization, ownership,
 entitlement, and provider behavior still require runtime tests with a usable
 database and provider credentials.
+
+## Assistant area (Task 7)
+
+- Inbox and Anthropic credentials are read from environment variables only
+  (`src/lib/env.ts`, `.env.example`); nothing secret is stored in the
+  database and account status payloads expose no credentials.
+- All `/admin/assistant` pages and server actions require admin
+  authorization plus the shared CSRF (same-origin) check, rate limiting and
+  audit-log entries for sends, approvals, imports and deletions.
+- Email content is treated as untrusted: messages render as plain text only,
+  HTML is never stored or executed, attachments are names only, and the AI
+  prompt delimits email text with explicit instructions never to follow
+  instructions found inside emails.
+- Campaign mail carries `List-Unsubscribe` / `List-Unsubscribe-Post` headers
+  and the public unsubscribe endpoint accepts only HMAC-signed, expiring
+  tokens and writes only to the suppression list.
+- Cron endpoints `/api/internal/cron/sync-inbox` and
+  `/api/internal/cron/process-campaigns` use the existing `CRON_SECRET`
+  protection; the Nginx deny rule for `/api/internal/` covers them.

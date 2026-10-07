@@ -31,6 +31,14 @@ export function defaultPrivacySections(settings: SiteSettings): PolicySection[] 
       body: "We use hosting providers to operate and secure the portal, email providers to deliver messages, and Razorpay to process payment transactions. This application receives payment references and transaction status but does not store card data. Providers process information only as needed to deliver their services and under applicable contractual and legal safeguards.",
     },
     {
+      heading: "Support emails and optional AI assistance",
+      body: "When you send a support email to Ravelyth, we store and handle that email, including its plain-text content and basic delivery details, so we can answer you and keep a record of the request. When optional AI assistance is enabled by us, the text of support emails may be processed by a third-party AI provider to suggest a category and draft a reply. AI assistance is off by default, drafts are never sent automatically, and no AI feature receives candidate, resume or payment records.",
+    },
+    {
+      heading: "Business contact outreach and opt-out",
+      body: "Ravelyth contacts business leads only from lists our administrators add or import manually. A business contact who receives outreach can opt out at any time using the unsubscribe link included in every outreach email or by contacting us; the address is then added to a suppression list and receives no further outreach. A business contact can also ask us to delete their stored lead record, and we will remove it subject to any records we must retain by law.",
+    },
+    {
       heading: "Retention",
       body: "We retain account, profile, resume, application, payment-reference, log and support records for as long as needed to operate the portal, comply with legal and accounting requirements, resolve disputes, enforce platform terms and protect users. Retention periods vary by record type. When information is no longer required, we delete or de-identify it where reasonably practicable, subject to lawful retention and backup cycles.",
     },

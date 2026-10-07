@@ -1,0 +1,13 @@
+[Unit]
+Description=Run Ravelyth Talent support inbox sync every three minutes
+Documentation=file:/var/www/ravelyth/DEPLOYMENT.md
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=3min
+Persistent=true
+AccuracySec=30s
+Unit=ravelyth-cron-sync-inbox.service
+
+[Install]
+WantedBy=timers.target

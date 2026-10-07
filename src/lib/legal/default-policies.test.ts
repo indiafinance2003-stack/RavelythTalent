@@ -22,6 +22,10 @@ describe("default legal policy text", () => {
       "children under 18",
       "Digital Personal Data Protection Act, 2023",
       "/contact",
+      "support email",
+      "third-party AI provider",
+      "suppression list",
+      "delete their stored lead record",
     ]) {
       expect(text).toContain(required);
     }

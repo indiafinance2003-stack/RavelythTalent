@@ -10,3 +10,4 @@ export * from "./company";
 export * from "./jobs";
 export * from "./billing";
 export * from "./platform";
+export * from "./assistant";

@@ -12,7 +12,7 @@ available locally at `127.0.0.1:1025` (SMTP) and `127.0.0.1:8025` (web UI).
 | `npm run typecheck` | Passed |
 | `npm run lint` | Passed |
 | `npm run build` | Passed; production Next.js build completed |
-| `npm run test` | Passed: 82 tests across 14 Vitest files |
+| `npm run test` | Passed: 143 tests across 28 Vitest files |
 | `npm run db:generate` | Passed; generated additive migration `0007_late_fabian_cortez.sql` |
 | `npm run db:migrate` | Not run: local app database credentials are unusable; no migration was applied |
 
@@ -49,6 +49,19 @@ that paid payment/invoice records block deletion, and that a company is deleted
 only when it has no other active user-members. The transactional cascade,
 ownership transfer and on-disk cleanup remain unverified against PostgreSQL
 and real uploaded files.
+
+Task 7 (Assistant) checks: `npm run typecheck`, `npm run lint`,
+`npm run build` and `npm run test` (143 tests) passed. Assistant-focused
+suites cover rule-based classification and bounce detection with fixture
+emails, threading and opt-out handling, every campaign pre-send check,
+daily-cap/window/spacing guards, unsubscribe token signing and expiry,
+CSV import validation, lead/subscription matching, mocked Anthropic provider
+headers and retries, zod rejection of bad or prompt-injected AI output, and
+monthly cost-cap shutdown. Migrations `0011`-`0015` were generated with the
+normal `db:generate` workflow, reviewed as additive only, and not applied
+locally because application database authentication is unavailable. Live
+IMAP/SMTP, the Anthropic API and DB-backed inbox/campaign flows were not
+exercised; see `KNOWN_ISSUES.md`.
 
 ## Manual staging verification
 
