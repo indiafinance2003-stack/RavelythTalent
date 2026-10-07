@@ -384,6 +384,7 @@ export async function changeApplicationStatusAction(
     });
 
     revalidatePath("/recruiter/applications");
+    revalidatePath("/recruiter");
     return formSuccess("Application updated. The candidate has been notified.");
   } catch (error) {
     if (error instanceof AppError) return formError(error.message);

@@ -909,6 +909,9 @@ export async function listCompanyApplications(params: {
   companyId: string;
   jobId?: string | undefined;
   status?: string | undefined;
+  limit?: number | undefined;
+  /** Newest applications first (dashboard board). Default keeps Premium-first. */
+  recentFirst?: boolean | undefined;
 }): Promise<PipelineRow[]> {
   const conditions = [eq(jobs.companyId, params.companyId)];
   if (params.jobId) conditions.push(eq(jobs.id, params.jobId));
@@ -938,8 +941,15 @@ export async function listCompanyApplications(params: {
     .innerJoin(users, eq(users.id, applications.candidateUserId))
     .leftJoin(candidateProfiles, eq(candidateProfiles.userId, users.id))
     .where(and(...conditions))
-    .orderBy(desc(activeCandidatePremiumSql(users.id)), desc(applications.createdAt))
-    .limit(300);
+    .orderBy(
+      ...(params.recentFirst
+        ? [desc(applications.createdAt)]
+        : [
+            desc(activeCandidatePremiumSql(users.id)),
+            desc(applications.createdAt),
+          ]),
+    )
+    .limit(params.limit ?? 300);
 }
 
 export async function countApplicationsByStatus(

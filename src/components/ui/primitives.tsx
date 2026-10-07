@@ -235,6 +235,8 @@ const BADGE_TONES = {
   navy: "bg-navy-50 text-navy",
 } as const;
 
+export type BadgeTone = keyof typeof BADGE_TONES;
+
 export function Badge({
   tone = "neutral",
   className,

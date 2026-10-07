@@ -8,12 +8,27 @@ import {
   listCompanyJobs,
   resolveRecruiterCompany,
 } from "@/lib/recruiter/service";
-import { formatDate } from "@/lib/utils";
+import {
+  getBoardApplicants,
+  getCompanyUpcomingInterviews,
+  getJobFunnel,
+} from "@/lib/recruiter/overview";
+import {
+  DataTable,
+  KpiCard,
+  ProgressBar,
+  SectionCard,
+  StatusChip,
+  type DataTableColumn,
+} from "@/components/dashboard/kit";
+import { BarsChart, ChartCard } from "@/components/dashboard/charts";
+import { PipelineBoard } from "@/components/recruiter/pipeline-board";
+import { formatDate, formatIndianDateTime, labelFor } from "@/lib/utils";
+import { formatCount } from "@/lib/dashboard/format";
 import {
   Alert,
   Badge,
   ButtonLink,
-  Card,
   EmptyState,
   PageHeader,
 } from "@/components/ui/primitives";
@@ -33,6 +48,35 @@ const STATUS_TONE: Record<string, "success" | "warning" | "neutral" | "danger"> 
   closed: "neutral",
   expired: "neutral",
   rejected: "danger",
+};
+
+const CHART_SERIES = [
+  { label: "Views", color: "#1F6FEB" },
+  { label: "Applications", color: "#3DB8B0" },
+];
+
+type FunnelRow = Awaited<ReturnType<typeof getJobFunnel>>[number];
+
+const FUNNEL_COLUMNS: Array<DataTableColumn<FunnelRow>> = [
+  { key: "title", header: "Job" },
+  {
+    key: "views",
+    header: "Views",
+    align: "right",
+    cell: (row) => formatCount(row.views),
+  },
+  {
+    key: "applications",
+    header: "Applications",
+    align: "right",
+    cell: (row) => formatCount(row.applications),
+  },
+];
+
+const INTERVIEW_MODE: Record<string, string> = {
+  video: "Video call",
+  phone: "Phone call",
+  in_person: "On-site",
 };
 
 export default async function RecruiterOverviewPage({
@@ -67,23 +111,23 @@ export default async function RecruiterOverviewPage({
     );
   }
 
-  const [quota, jobs, applicationCounts] = await Promise.all([
-    getJobQuota(company.id),
-    listCompanyJobs(company.id),
-    countApplicationsByStatus(company.id),
-  ]);
+  const [quota, jobs, applicationCounts, board, funnel, interviews] =
+    await Promise.all([
+      getJobQuota(company.id),
+      listCompanyJobs(company.id),
+      countApplicationsByStatus(company.id),
+      getBoardApplicants(company.id, 30),
+      getJobFunnel(company.id),
+      getCompanyUpcomingInterviews(company.id),
+    ]);
 
   const totalApplications = applicationCounts.reduce((sum, row) => sum + row.value, 0);
   const openJobs = jobs.filter((j) => j.status === "published").length;
   const inReview = jobs.filter((j) => j.status === "pending_approval").length;
   const recent = jobs.slice(0, 5);
-
-  const stats = [
-    { label: "Live jobs", value: openJobs, icon: Briefcase },
-    { label: "Applicants", value: totalApplications, icon: UsersRound },
-    { label: "In review", value: inReview, icon: AlertCircle },
-    { label: "All jobs", value: jobs.length, icon: Inbox },
-  ];
+  const countsByStatus = Object.fromEntries(
+    applicationCounts.map((row) => [row.status, row.value]),
+  );
 
   return (
     <div className="space-y-6">
@@ -123,92 +167,248 @@ export default async function RecruiterOverviewPage({
         </Alert>
       ) : null}
 
+      {/* KPIs */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat) => (
-          <Card key={stat.label} className="p-5">
-            <div className="flex items-center gap-3">
-              <span className="rounded-xl bg-sky-tint p-2.5 text-royal">
-                <stat.icon className="h-5 w-5" aria-hidden="true" />
-              </span>
-              <div>
-                <p className="text-2xl font-extrabold text-navy">{stat.value}</p>
-                <p className="text-sm text-slate-600">{stat.label}</p>
-              </div>
-            </div>
-          </Card>
-        ))}
+        <KpiCard
+          href="/recruiter/jobs"
+          hint="Accepting applicants now"
+          icon={Briefcase}
+          label="Live jobs"
+          tone="teal"
+          value={formatCount(openJobs)}
+        />
+        <KpiCard
+          href="/recruiter/applications"
+          hint="Across all of your jobs"
+          icon={UsersRound}
+          label="Applicants"
+          value={formatCount(totalApplications)}
+        />
+        <KpiCard
+          href="/recruiter/jobs"
+          hint="Waiting for admin review"
+          icon={AlertCircle}
+          label="In review"
+          tone={inReview > 0 ? "warning" : "brand"}
+          value={formatCount(inReview)}
+        />
+        <KpiCard
+          href="/recruiter/jobs"
+          hint="Including drafts and closed roles"
+          icon={Inbox}
+          label="All jobs"
+          value={formatCount(jobs.length)}
+        />
       </div>
 
-      <Card>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-sm font-bold text-navy">
-              {quota.usesFreeCredit ? "Lifetime free job posts" : "Monthly job-post quota"}
-            </h2>
-            <p className="mt-1 text-sm text-slate-600">
-              {quota.usesFreeCredit
-                ? `${quota.freeRemaining} of ${quota.freeLimit} free job posts remaining`
-                : `${quota.used} of ${quota.limit ?? "unlimited"} used in ${quota.periodLabel}${quota.planName ? ` · ${quota.planName}` : ""}`}
-            </p>
-          </div>
-          {quota.usesFreeCredit ? (
-            <ButtonLink href="/pricing?audience=employer" size="sm">
-              {quota.freeRemaining > 0 ? "View paid plans" : "Upgrade to post again"}
-            </ButtonLink>
-          ) : quota.limit === null ? (
-            <ButtonLink href="/pricing?audience=employer" size="sm">
-              Choose a plan
-            </ButtonLink>
-          ) : (
-            <Badge tone={quota.remaining === 0 ? "danger" : "success"}>
-              {quota.remaining} left
-            </Badge>
-          )}
-        </div>
-        {quota.limit !== null ? (
-          <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
-            <div
-              className={quota.percentUsed >= 100 ? "h-full bg-red-500" : "h-full bg-royal"}
-              style={{ width: `${Math.max(2, quota.percentUsed)}%` }}
-            />
-          </div>
-        ) : null}
-        {quota.usesFreeCredit && quota.freeRemaining === 0 ? (
-          <Alert className="mt-4" tone="warning" title="Your free job post has been used">
-            Your free credit is lifetime and is not restored if a post is rejected,
-            closed or deleted. Choose a paid employer plan to submit another job.
-          </Alert>
-        ) : null}
-      </Card>
-
-      <section aria-labelledby="recent-jobs">
-        <div className="flex items-center justify-between">
-          <h2 id="recent-jobs" className="text-base font-bold text-navy">
-            Recent jobs
-          </h2>
+      {/* Pipeline board */}
+      <SectionCard
+        action={
           <Link
+            className="text-sm font-semibold text-royal hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-royal"
+            href="/recruiter/applications"
+          >
+            Open full pipeline
+          </Link>
+        }
+        description="Move candidates between stages with the control on each card. Column numbers are live totals."
+        title="Hiring pipeline"
+      >
+        {board.length === 0 ? (
+          <EmptyState
+            description="Applications will land here as candidates apply to your jobs."
+            icon={<UsersRound className="h-10 w-10" aria-hidden="true" />}
+            title="No applicants yet"
+            action={
+              <ButtonLink href="/recruiter/jobs/new" size="sm">
+                Post a job
+              </ButtonLink>
+            }
+          />
+        ) : (
+          <PipelineBoard
+            applicants={board.map((row) => ({
+              id: row.id,
+              status: row.status,
+              candidateName: row.candidateName,
+              jobTitle: row.jobTitle,
+              appliedAt: row.createdAt,
+              isPremium: row.isPremium,
+            }))}
+            counts={countsByStatus}
+          />
+        )}
+      </SectionCard>
+
+      {/* Views vs applications + upcoming interviews */}
+      <div className="grid gap-4 xl:grid-cols-3">
+        <ChartCard
+          className="xl:col-span-2"
+          description="Views against applications for your most-viewed jobs."
+          title="Views vs applications"
+        >
+          <BarsChart
+            ariaLabel="Views and applications per job for your most viewed jobs"
+            height={200}
+            points={funnel.map((row) => ({
+              label:
+                row.title.length > 14 ? `${row.title.slice(0, 13)}…` : row.title,
+              values: [row.views, row.applications],
+            }))}
+            series={CHART_SERIES.map((entry) => ({ ...entry }))}
+          />
+          <DataTable
+            caption="Exact views and applications per job"
+            columns={FUNNEL_COLUMNS}
+            empty={
+              <p className="text-sm text-slate-500">
+                Post a job and its views will appear here.
+              </p>
+            }
+            rowKey={(row) => row.jobId}
+            rows={funnel}
+          />
+        </ChartCard>
+
+        <SectionCard
+          action={
+            <Link
+              className="text-sm font-semibold text-royal hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-royal"
+              href="/recruiter/interviews"
+            >
+              All interviews
+            </Link>
+          }
+          title="Upcoming interviews"
+        >
+          {interviews.length === 0 ? (
+            <EmptyState
+              description="Schedule an interview from any shortlisted applicant."
+              icon={<UsersRound className="h-10 w-10" aria-hidden="true" />}
+              title="No interviews scheduled"
+            />
+          ) : (
+            <ul className="divide-y divide-slate-100">
+              {interviews.map((interview) => (
+                <li className="py-3 first:pt-0 last:pb-0" key={interview.id}>
+                  <p className="truncate text-sm font-bold text-navy">
+                    {interview.candidateName}
+                  </p>
+                  <p className="truncate text-xs text-slate-500">
+                    {interview.jobTitle}
+                  </p>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs">
+                    <StatusChip tone="brand">
+                      {formatIndianDateTime(interview.scheduledAt)}
+                    </StatusChip>
+                    <span className="text-slate-500">
+                      {labelFor(INTERVIEW_MODE, interview.mode)}
+                    </span>
+                    <StatusChip
+                      tone={interview.status === "confirmed" ? "success" : "teal"}
+                    >
+                      {labelFor(
+                        {
+                          scheduled: "Awaiting confirmation",
+                          confirmed: "Confirmed",
+                          rescheduled: "Rescheduled",
+                        },
+                        interview.status,
+                      )}
+                    </StatusChip>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </SectionCard>
+      </div>
+
+      {/* Plan / quota */}
+      <SectionCard
+        description={
+          quota.usesFreeCredit
+            ? "Your lifetime free job posts."
+            : "Job posts included with your current plan."
+        }
+        title={
+          quota.usesFreeCredit
+            ? "Lifetime free job posts"
+            : `Monthly job-post quota${quota.planName ? ` · ${quota.planName}` : ""}`
+        }
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600">
+            {quota.usesFreeCredit
+              ? `${quota.freeRemaining} of ${quota.freeLimit} free job posts remaining`
+              : `${quota.used} of ${quota.limit ?? "unlimited"} used in ${quota.periodLabel}`}
+          </p>
+          {quota.limit !== null ? (
+            <ProgressBar
+              label={`${quota.percentUsed}% of the monthly quota used`}
+              percent={quota.percentUsed}
+              tone={quota.percentUsed >= 100 ? "danger" : "brand"}
+            />
+          ) : null}
+          <div className="flex flex-wrap items-center gap-3">
+            {quota.usesFreeCredit ? (
+              <ButtonLink href="/pricing?audience=employer" size="sm">
+                {quota.freeRemaining > 0 ? "View paid plans" : "Upgrade to post again"}
+              </ButtonLink>
+            ) : quota.limit === null ? (
+              <ButtonLink href="/pricing?audience=employer" size="sm">
+                Choose a plan
+              </ButtonLink>
+            ) : (
+              <Badge tone={quota.remaining === 0 ? "danger" : "success"}>
+                {quota.remaining} left
+              </Badge>
+            )}
+            <Link
+              className="text-sm font-semibold text-royal hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-royal"
+              href="/recruiter/billing"
+            >
+              Billing
+            </Link>
+          </div>
+          {quota.usesFreeCredit && quota.freeRemaining === 0 ? (
+            <Alert tone="warning" title="Your free job post has been used">
+              Your free credit is lifetime and is not restored if a post is rejected,
+              closed or deleted. Choose a paid employer plan to submit another job.
+            </Alert>
+          ) : null}
+        </div>
+      </SectionCard>
+
+      {/* Recent jobs */}
+      <SectionCard
+        action={
+          <Link
+            className="text-sm font-semibold text-royal hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-royal"
             href="/recruiter/jobs"
-            className="text-sm font-semibold text-royal hover:underline"
           >
             View all
           </Link>
-        </div>
+        }
+        title="Recent jobs"
+      >
         {recent.length === 0 ? (
-          <div className="mt-3">
-            <EmptyState
-              title="No jobs yet"
-              description="Post your first job to start receiving applications."
-              action={
-                <ButtonLink href="/recruiter/jobs/new">
-                  <Plus className="h-4 w-4" aria-hidden="true" /> Post a job
-                </ButtonLink>
-              }
-            />
-          </div>
+          <EmptyState
+            title="No jobs yet"
+            description="Post your first job to start receiving applications."
+            action={
+              <ButtonLink href="/recruiter/jobs/new">
+                <Plus className="h-4 w-4" aria-hidden="true" /> Post a job
+              </ButtonLink>
+            }
+          />
         ) : (
-          <ul className="mt-3 space-y-3">
+          <ul className="space-y-3">
             {recent.map((job) => (
-              <li key={job.id} className="surface flex flex-wrap items-center gap-3 p-4">
+              <li
+                className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-100 bg-white p-4"
+                key={job.id}
+              >
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-semibold text-navy">{job.title}</p>
                   <p className="text-sm text-slate-600">
@@ -225,7 +425,7 @@ export default async function RecruiterOverviewPage({
             ))}
           </ul>
         )}
-      </section>
+      </SectionCard>
     </div>
   );
 }

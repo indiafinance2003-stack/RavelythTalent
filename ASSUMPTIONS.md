@@ -3,7 +3,7 @@
 Every decision taken while building Ravelyth Talent autonomously, with the
 reasoning. Anything marked **[OWNER ACTION]** needs a human.
 
-Last updated: Phase 7.
+Last updated: Task 8 (dashboard redesign).
 
 ---
 
@@ -456,3 +456,49 @@ tokens, skill links, application history).
   current Graph API documentation before the first real post; the code reads
   the variable and falls back to a documented default rather than hard-coding
   a version in request paths.
+
+## 18. Dashboard redesign (Task 8)
+
+- One shared client shell (`src/components/dashboard/shell.tsx`) is used by all
+  three route groups: a navy sidebar with grouped navigation (admin) or a flat
+  list (candidate/employer), a sticky top bar with the brand, scope-based
+  search (admin), notification bell and avatar initials, plus a mobile drawer
+  with Escape/overlay close, focus return and focus-visible rings. Sign-out is
+  the existing `logoutAction` server action. The shell renders
+  `<main id="main-content">`, which the single global skip link in the root
+  layout targets; the per-shell skip link was removed as a duplicate.
+- Navigation labels are fixed to the brief: candidate main items are
+  Dashboard, Find jobs, Applications, Saved jobs, Job alerts, Resume builder,
+  Interviews, Notifications, Settings (Resume/Billing/Profile in an "Account"
+  group); employer items are Overview, Jobs, Applicants, Interviews, Company
+  profile, Billing, Add-ons, Reports, Candidates, Team. Every existing route,
+  permission check and server action is unchanged - only presentation moved
+  into the shell.
+- All dashboard numbers are read from PostgreSQL at request time
+  (`force-dynamic` stays on the route-group layouts). Charts are hand-written
+  SVG components (`src/components/dashboard/charts.tsx`); recharts is not
+  installed. Time-series buckets use Asia/Kolkata day and month boundaries
+  via `src/lib/dashboard/ist.ts` and are zero-filled by
+  `src/lib/dashboard/series.ts`, so an empty database renders real zeroes and
+  EmptyStates rather than invented numbers.
+- **Deterministic job match** (`src/lib/jobs/match.ts`): a pure 0-100 score
+  with weights skills 50 / location 30 / experience 20. Skills are compared
+  case-insensitively as a fraction of the job's listed skills (a job with no
+  listed skills gives half credit when the candidate has skills). Location
+  gives full weight for a matching city, 80% for any remote job, 60% for a
+  matching state. Experience gives full weight inside the job's range, half
+  credit for a shortfall under two years or an unset range, 60% for over-qualification.
+  Labels: 70+ "Strong match", 50-69 "Good match", 30-49 "Match".
+  Recommendations (and their chips) are only produced once the profile has at
+  least one usable signal (`hasEnoughMatchData`: any skill, current or
+  preferred location, or experience); jobs the candidate already applied to
+  are excluded. The same inputs always yield the same score (unit tested).
+- The recruiter overview reads applications through `listCompanyApplications`
+  with an optional `limit` and an opt-in `recentFirst` ordering: the
+  dashboard board is a recency view (newest applications first), while
+  `/recruiter/applications` keeps its existing Premium-first ordering, since
+  Task 8 only changes presentation. The status-change action now
+  revalidates `/recruiter` as well as `/recruiter/applications` so the
+  board's column counts refresh immediately.
+- Route-group `loading.tsx` skeletons render plain skeletons rather than
+  `PageHeader`, whose `title` is a `string` prop.

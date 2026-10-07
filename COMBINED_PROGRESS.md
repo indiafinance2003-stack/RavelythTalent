@@ -8,7 +8,7 @@
 - [x] Task 6: Safe admin account deletion
 - [x] Task 7: Admin assistant inbox, leads, campaigns, and optional AI
 - [x] Task 9: Social auto-posting (Facebook, Instagram, WhatsApp digest)
-- [ ] Task 8: Admin, candidate, and employer dashboard redesign
+- [x] Task 8: Admin, candidate, and employer dashboard redesign
 - [ ] Task 10: SMS adapters, npm audit follow-up, off-site backups
 - [ ] Final quality gates, documentation, and deploy report
 
@@ -47,9 +47,24 @@ cancel, post-now and the kill switch. Captions and the 1080x1080 card at
 the promotion permission, the employer opt-out and Ravelyth's right to remove
 posts. Typecheck, lint, build and 193 tests pass.
 
-Task 8 (dashboard redesign) is next: shared card/KPI/table/empty-state
-components and responsive navigation, then the admin overview (including the
-Social status card that Task 9 left as a note for Task 8), the candidate
-dashboard with the documented match function, and the employer dashboard.
+Task 8 (dashboard redesign) is complete and locally committed: one shared
+client shell (`DashboardShell`) now drives all three route groups with a navy
+sidebar (grouped admin menu, brief-mandated candidate and employer orders),
+sticky top bar with scope search/attention bell/initials avatar, accessible
+mobile drawer (Escape, overlay, route-change close, focus return) and the
+existing `logoutAction`. The admin overview reads real KPIs, revenue-by-month
+line, 30-day signups bars, jobs-by-category donut, needs-attention and recent
+activity from `src/lib/admin/overview.ts` plus the deferred Assistant and
+Social status cards, with `/admin` and `/admin/users?q=` searches wired to
+the top bar. The candidate dashboard shows the completeness ring, plan card,
+application tracker, upcoming interviews, alerts totals and deterministic
+recommended jobs (`src/lib/jobs/match.ts`, weights 50/30/20, hidden until
+the profile has data). The employer dashboard adds quota/plan KPIs, a
+button-driven pipeline board reusing the existing status-change action (now
+revalidating `/recruiter`), a views-vs-applications chart, interviews and
+recent jobs. Zero-filled IST series helpers, match scoring and formatting are
+unit tested; route-group `loading.tsx` skeletons were added. Typecheck, lint,
+build and 240 tests pass.
+
 Task 10 (MSG91/Twilio adapters, `npm audit`, off-site backups) and the final
 quality-gates report follow.

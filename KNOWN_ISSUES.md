@@ -38,8 +38,8 @@
   bootstrap attempt changed the local `postgres` password before failing; its
   generated password was not retained. Do not enable trust authentication as a
   workaround. Migrations and seeds have not been applied to a local database.
-- **HIGH — database-backed flows not exercised:** The unit suite has 193
-  passing tests across 34 Vitest files, including mocked Razorpay
+- **HIGH — database-backed flows not exercised:** The unit suite has 240
+  passing tests across 39 Vitest files, including mocked Razorpay
   owner/activation coverage, but it does not replace DB-backed tests for
   free-post quota consumption, moderation/report persistence, offline billing
   transactions, invoices, or the admin search flow. Those require a working
@@ -89,6 +89,17 @@
   (documented default `v26.0` in `.env.example`) instead of being hard-coded.
   Verify the current version against Meta's documentation before the first
   real post and update the variable if Meta has moved on.
+- **MEDIUM — dashboard redesign (Task 8) needs a browser walkthrough against
+  a real database:** the shared shell, route permissions, data queries and
+  server actions were kept intact and the pure pieces (zero-filled IST series,
+  match scoring and gating, count/label formatting) are unit tested, but no
+  authenticated browser session could be run locally because PostgreSQL
+  authentication is unavailable. Verify on staging: all three shells render
+  their grouped navigation, the admin overview KPIs/charts/attention/activity
+  cards show real values, the candidate dashboard shows the completeness ring
+  and recommended jobs only after a profile has data, the employer pipeline
+  board's status buttons update the column counts, and the mobile drawer
+  opens/closes with Escape, overlay click and route changes.
 - **LOW — social systemd timer unvalidated:** The new
   `ravelyth-cron-process-social-posts` service/timer files are added disabled
   and were not validated with `systemd-analyze verify` (Windows environment).

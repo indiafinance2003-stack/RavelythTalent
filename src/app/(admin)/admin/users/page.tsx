@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { desc, ne } from "drizzle-orm";
+import { and, desc, ilike, ne, or } from "drizzle-orm";
 import { Alert, Card, PageHeader } from "@/components/ui/primitives";
 import { DeleteAccountForm } from "@/components/admin/delete-account-form";
 import { changeUserStatusAction } from "@/lib/admin/user-actions";
@@ -12,9 +12,24 @@ export const metadata: Metadata = { title: "User management" };
 export default async function AdminUsersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ deleted?: string; fileCleanup?: string; adminError?: string }>;
+  searchParams: Promise<{
+    deleted?: string;
+    fileCleanup?: string;
+    adminError?: string;
+    q?: string;
+  }>;
 }) {
   const params = await searchParams;
+  const query = (params.q ?? "").trim().slice(0, 120);
+  const filters = [ne(users.role, "admin")];
+  if (query) {
+    filters.push(
+      or(
+        ilike(users.fullName, `%${query}%`),
+        ilike(users.email, `%${query}%`),
+      )!,
+    );
+  }
   const rows = await db
     .select({
       id: users.id,
@@ -25,13 +40,20 @@ export default async function AdminUsersPage({
       createdAt: users.createdAt,
     })
     .from(users)
-    .where(ne(users.role, "admin"))
+    .where(and(...filters))
     .orderBy(desc(users.createdAt))
     .limit(200);
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Users" description="Suspend, restore or safely delete non-administrator accounts." />
+      <PageHeader
+        title="Users"
+        description={
+          query
+            ? `${rows.length} account${rows.length === 1 ? "" : "s"} matching “${query}”.`
+            : "Suspend, restore or safely delete non-administrator accounts."
+        }
+      />
       {params.deleted === "1" ? (
         <Alert tone="success">The account and its database records were deleted.</Alert>
       ) : null}

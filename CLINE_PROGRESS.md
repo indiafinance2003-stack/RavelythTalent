@@ -81,13 +81,49 @@ until Task 8 builds the overview - see checklist item 8.2.
 
 ## Task 8 - Dashboard redesign
 
-- [ ] 8.1 Shared responsive dashboard components, mobile navigation/drawer, accessible states.
-- [ ] 8.2 Admin overview and sidebar, real-data KPIs/analytics/attention/activity and Assistant/Social summaries.
-  (Includes the **Social status card** deferred from Task 9.2: connection
-  status, posts today, failures - see the Task 9 note above.)
-- [ ] 8.3 Candidate dashboard/sidebar with profile completeness, real recommendations/match logic, applications/interviews/alerts and premium state.
-- [ ] 8.4 Employer dashboard/sidebar with real KPIs, plan usage, hiring pipeline, job performance, applicants/interviews.
-- [ ] 8.5 Component/policy tests, docs, quality check, and local commit.
+- [x] 8.1 Shared responsive dashboard components, mobile navigation/drawer, accessible states.
+      `src/components/dashboard/{shell,kit,charts}.tsx`: `DashboardShell`
+      (navy sidebar with grouped admin menu + brief-ordered candidate/employer
+      menus, sticky top bar with scope search/attention bell/initials avatar,
+      mobile drawer with Escape/overlay/route-change close, focus return and
+      focus-visible rings, `logoutAction` sign-out, `<main id="main-content">`
+      for the root skip link), kit cards (`SectionCard`, `KpiCard`,
+      `StatTrend`, `ProgressBar`, `RingProgress`, `StatusChip`, `DataTable`,
+      `EmptyState`, `PageHeader`) and hand-written SVG charts (`LineChart`,
+      `BarsChart`, `DonutChart`) on the existing brand tokens. Skeleton
+      utility in `primitives.tsx`.
+- [x] 8.2 Admin overview and sidebar, real-data KPIs/analytics/attention/activity and Assistant/Social summaries.
+      (Includes the **Social status card** deferred from Task 9.2: connection
+      status, posts today, failures - see the Task 9 note above.)
+      `src/lib/admin/overview.ts` + rewritten `src/app/(admin)/admin/page.tsx`
+      with greeting, six KPI cards, revenue line, 30-day signup bars,
+      jobs-by-category donut, recent activity, needs-attention, Assistant and
+      Social cards; `(admin)/layout.tsx` wires the shell; `/admin/users` reads
+      the top-bar `?q=` filter; `(admin)/admin/loading.tsx` skeleton added.
+- [x] 8.3 Candidate dashboard/sidebar with profile completeness, real recommendations/match logic, applications/interviews/alerts and premium state.
+      `src/lib/jobs/match.ts` (deterministic 50/30/20 weights,
+      `hasEnoughMatchData` gate) + tests, `getCompleteness` in
+      `src/lib/candidate/profile.ts`, `src/lib/candidate/dashboard.ts`
+      (application summary, upcoming interviews, recommendations excluding
+      applied jobs, saved count, alerts summary), rewritten
+      `(app)/dashboard/page.tsx` (completeness ring, plan/Premium card,
+      activity KPIs, tracker, interviews, recommended jobs with Match chip,
+      alerts), `loading.tsx` skeleton, `JobCardView` `badge` prop.
+- [x] 8.4 Employer dashboard/sidebar with real KPIs, plan usage, hiring pipeline, job performance, applicants/interviews.
+      `src/lib/recruiter/overview.ts` (funnel, upcoming interviews, board
+      applicants), `pipeline-board.tsx` (button-driven columns reusing
+      `ApplicantStatusForm`), rewritten `(recruiter)/recruiter/page.tsx`
+      (quota/plan KPIs, plan usage bar, pipeline, views-vs-applications
+      chart + table, interviews, recent jobs), `listCompanyApplications`
+      optional `limit` + newest-first ordering for the overview,
+      `changeApplicationStatusAction` now revalidates `/recruiter`, and
+      `(recruiter)/loading.tsx` skeleton.
+- [x] 8.5 Component/policy tests, docs, quality check, and local commit.
+      Tests: match/series/format coverage (240 total across 39 files).
+      ASSUMPTIONS gained section 18; KNOWN_ISSUES, TESTING (checks + manual
+      walkthrough item 17) and COMBINED_PROGRESS updated. Quality gates
+      green: `npm run typecheck`, `npm run lint`, `npm run build`,
+      `npm run test`. Local commit for Task 8.
 
 ## Task 10 - Small items
 
@@ -101,51 +137,39 @@ until Task 8 builds the overview - see checklist item 8.2.
 ## Resume point
 
 Task 7 COMPLETE and committed locally. Task 9 COMPLETE and committed
-locally: social settings/queue/providers/card/digest code, additive
-migration `0016_lowly_franklin_storm.sql` (+ snapshot), the disabled
-`ravelyth-cron-process-social-posts` service/timer, the Terms
-opt-out/removal clauses, ASSUMPTIONS/KNOWN_ISSUES/TESTING/SECURITY_NOTES/
-COMBINED_PROGRESS updates. Quality gates green: `npm run typecheck`,
-`npm run lint`, `npm run build`, `npm run test` (193 tests / 34 files), and
-`npm run db:generate` reports "No schema changes, nothing to migrate"
-(snapshot 0016 matches the schema).
+locally. Task 8 (dashboard redesign) COMPLETE and committed locally: the
+shared `DashboardShell`/kit/SVG charts, the three rewritten route-group
+layouts (admin, candidate, employer) with their brief-mandated navigation,
+the real-data admin overview (+ deferred Assistant/Social cards and
+`/admin/users?q=` search), the candidate dashboard with the deterministic
+match model (`src/lib/jobs/match.ts`, 50/30/20, `hasEnoughMatchData` gate),
+the employer overview with the button-driven pipeline board and
+`changeApplicationStatusAction` revalidating `/recruiter`, route-group
+`loading.tsx` skeletons, and ASSUMPTIONS section 18 / KNOWN_ISSUES / TESTING
+/ COMBINED_PROGRESS updates. Quality gates green: `npm run typecheck`,
+`npm run lint`, `npm run build`, `npm run test` (240 tests / 39 files); no
+migration was added (task is presentation only, `npm run db:generate`
+previously reported no schema changes).
 
-Next: **Task 8 (dashboard redesign)**, in order:
+Next: **Task 10**, in order:
 
-1. 8.1 Shared responsive components (card, KPI card, stat trend, chart
-   wrapper, status chip, table, empty state), mobile drawer navigation,
-   accessible focus states, skeleton loaders. Use existing brand tokens
-   (navy #0B2A6F, royal blue #1F6FEB, teal #3DB8B0, sky #DCEBFB, mint
-   #C8EEE7, off-white #FAFAF8, Plus Jakarta Sans), rounded-2xl cards,
-   lucide icons, the existing Logo component; lightweight SVG charts (add
-   recharts only if already installed - it is not).
-2. 8.2 Admin overview + grouped sidebar/top bar: greeting, real KPI cards,
-   revenue-by-month line, signups/day bars (30 days), jobs-by-category
-   donut, "Needs attention" table, recent audit activity, Assistant card,
-   and the **Social card** deferred from Task 9 (connection status, posts
-   today, failures). Keep every existing route/permission/query working.
-3. 8.3 Candidate dashboard/sidebar: profile-completeness ring, Go
-   Premium/Premium state, recommended jobs with a documented deterministic
-   Match chip (+tests, only when the profile has enough data), application
-   tracker, upcoming interviews, job alerts summary.
-4. 8.4 Employer dashboard/sidebar: KPIs, plan card with usage bar/expiry
-   (Indian time)/Upgrade incl. free-post state, hiring pipeline board using
-   the existing status-change actions (buttons, no drag and drop), job
-   performance chart, recent applicants, interviews.
-5. 8.5 Component/policy tests, docs updates, quality gates, local commit.
-   Do not change what any user can see or do; verify with the existing
-   authorization tests. Empty states must show real emptiness, never fake
-   numbers.
-
-Then Task 10: 10.1 MSG91 + Twilio adapters with mocked tests (console
-provider still refused in production, OTP login hidden when unconfigured,
-note in KNOWN_ISSUES that they were not verified live); 10.2 `npm audit`
-without `--force`, record remaining advisories in SECURITY_NOTES; 10.3
-`deploy/scripts/offsite-backup.sh` + disabled service/timer (rclone,
-optional gpg, 30-day remote retention); 10.4 `deploy/OFFSITE_BACKUP.md`;
-10.5 final docs + gates; 10.6 final commit and the report required by
-CLINE_PROMPT (per-task changes, migration names, settings defaults, env
-vars, timer enablement, unfinished work, manual browser steps, deploy steps).
+1. 10.1 MSG91 + Twilio adapters behind one SMS provider interface, with
+   mocked tests; the console provider stays refused in production and the
+   OTP login entry point stays hidden when no provider is configured; note
+   in KNOWN_ISSUES that neither service was verified live.
+2. 10.2 `npm audit` without `--force`; remediate what a normal upgrade can,
+   record every remaining advisory and its production reachability in
+   SECURITY_NOTES.
+3. 10.3 `deploy/scripts/offsite-backup.sh` plus a disabled systemd
+   service/timer (rclone remote, optional GPG encryption, 30-day remote
+   retention).
+4. 10.4 `deploy/OFFSITE_BACKUP.md`: one-time rclone setup and operating
+   instructions.
+5. 10.5 Final documentation updates and the full gate run (typecheck, lint,
+   build, tests) with any database/provider verification notes.
+6. 10.6 Final local commit and the report required by CLINE_PROMPT
+   (per-task changes, migration names, settings defaults, env vars, timer
+   enablement, unfinished work, manual browser steps, deploy steps).
 
 Environment notes: Windows/PowerShell; no local PostgreSQL auth, no live
 mail/SMS/Meta credentials, so DB/IMAP/third-party flows are covered by mocked

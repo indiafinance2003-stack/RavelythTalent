@@ -12,7 +12,7 @@ available locally at `127.0.0.1:1025` (SMTP) and `127.0.0.1:8025` (web UI).
 | `npm run typecheck` | Passed |
 | `npm run lint` | Passed |
 | `npm run build` | Passed; production Next.js build completed |
-| `npm run test` | Passed: 193 tests across 34 Vitest files |
+| `npm run test` | Passed: 240 tests across 39 Vitest files |
 | `npm run db:generate` | Passed; generated additive migration `0007_late_fabian_cortez.sql` |
 | `npm run db:migrate` | Not run: local app database credentials are unusable; no migration was applied |
 
@@ -82,6 +82,17 @@ workflow and reviewed as additive only; it was not applied locally because
 application database authentication is unavailable. No Meta Graph API call
 was made and no queue/cron flow ran against a real database; see
 `KNOWN_ISSUES.md`.
+
+Task 8 (dashboard redesign) checks: `npm run typecheck`, `npm run lint`,
+`npm run build` and `npm run test` (240 tests) passed. Dashboard-focused
+suites cover the zero-filled Asia/Kolkata daily/monthly series helpers, the
+sum/collapse chart helpers, Indian count and match-label formatting, and the
+deterministic match model (perfect/no-overlap/remote/partial-skill/tolerance
+cases, determinism, a missing profile, and the `hasEnoughMatchData` gate that
+hides recommendations until a profile carries at least one signal). No
+authenticated page could be opened locally because database authentication is
+unavailable, so the three shells and their data cards are verified by the
+manual walkthrough below; see `KNOWN_ISSUES.md`.
 
 ## Manual staging verification
 
@@ -183,6 +194,19 @@ working email and (for paid flows) Razorpay test credentials:
    Cancel from `/admin/social`, toggle the kill switch, and confirm the
    audit-log entries. Generate a digest on `/admin/social/digest`, copy it,
    download a card image and mark it posted.
+17. Dashboard shells: sign in as an admin and confirm the navy grouped sidebar
+   (Marketplace, Plans and billing, Operations, Content, System), the top-bar
+   scope search routing to `/admin/users?q=...`, the attention bell and the
+   assistant/social overview cards with real values or honest empty states.
+   Sign in as a candidate and confirm the completeness ring, plan card,
+   application tracker, upcoming interviews, alerts totals and recommended
+   jobs (recommendations must stay hidden until the profile has skills,
+   location or experience, and the Match chip must never show on an
+   applied job). Sign in as a recruiter and confirm the pipeline board's
+   status buttons move an application between columns, update the counts,
+   refresh `/recruiter` and keep the candidate notified. Shrink the window
+   below 1024px and verify the drawer opens, closes with Escape/overlay
+   click/route change, and returns focus to the menu button.
 
 Do not run the migration against production as a validation step. Apply
 migrations only through the server deployment procedure and after a database

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { Building2, Clock, MapPin, Sparkles } from "lucide-react";
 import type { JobCard } from "@/lib/jobs/queries";
 import {
@@ -21,7 +22,16 @@ function initialsOf(name: string): string {
   );
 }
 
-export function JobCardView({ job, showApply = true }: { job: JobCard; showApply?: boolean }) {
+export function JobCardView({
+  job,
+  showApply = true,
+  badge,
+}: {
+  job: JobCard;
+  showApply?: boolean;
+  /** Extra chip rendered next to the featured/urgent badges (e.g. match score). */
+  badge?: ReactNode;
+}) {
   const location = [job.city, job.state].filter(Boolean).join(", ");
 
   return (
@@ -55,14 +65,17 @@ export function JobCardView({ job, showApply = true }: { job: JobCard; showApply
                 {job.title}
               </Link>
             </h3>
-            {job.isFeatured ? (
-              <Badge tone="teal">
-                <Sparkles className="h-3 w-3" aria-hidden="true" />
-                Featured
-              </Badge>
-            ) : job.isUrgent ? (
-              <Badge tone="warning">Urgent</Badge>
-            ) : null}
+            <div className="flex flex-wrap items-center gap-1.5">
+              {badge}
+              {job.isFeatured ? (
+                <Badge tone="teal">
+                  <Sparkles className="h-3 w-3" aria-hidden="true" />
+                  Featured
+                </Badge>
+              ) : job.isUrgent ? (
+                <Badge tone="warning">Urgent</Badge>
+              ) : null}
+            </div>
           </div>
 
           <p className="mt-0.5 flex items-center gap-1.5 text-sm text-slate-600">
