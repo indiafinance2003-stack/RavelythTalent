@@ -1,0 +1,25 @@
+[Unit]
+Description=Copy the newest Ravelyth Talent backups off-site with rclone
+Documentation=file:/var/www/ravelyth/deploy/OFFSITE_BACKUP.md
+After=network.target
+
+[Service]
+Type=oneshot
+User=ravelyth
+Group=ravelyth
+Environment=ENV_FILE=/var/www/ravelyth/.env
+Environment=BACKUP_DIR=/var/backups/ravelyth
+Environment=UPLOAD_DIR=/var/lib/ravelyth/uploads
+Environment=RCLONE_CONFIG=/var/www/ravelyth/.config/rclone/rclone.conf
+Environment=RCLONE_CACHE_DIR=/tmp/rclone-cache
+ExecStart=/usr/local/sbin/ravelyth-offsite-backup
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/backups/ravelyth
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ravelyth-offsite-backup

@@ -12,7 +12,7 @@ available locally at `127.0.0.1:1025` (SMTP) and `127.0.0.1:8025` (web UI).
 | `npm run typecheck` | Passed |
 | `npm run lint` | Passed |
 | `npm run build` | Passed; production Next.js build completed |
-| `npm run test` | Passed: 240 tests across 39 Vitest files |
+| `npm run test` | Passed: 260 tests across 40 Vitest files |
 | `npm run db:generate` | Passed; generated additive migration `0007_late_fabian_cortez.sql` |
 | `npm run db:migrate` | Not run: local app database credentials are unusable; no migration was applied |
 
@@ -93,6 +93,33 @@ hides recommendations until a profile carries at least one signal). No
 authenticated page could be opened locally because database authentication is
 unavailable, so the three shells and their data cards are verified by the
 manual walkthrough below; see `KNOWN_ISSUES.md`.
+
+Task 10.1 (SMS adapters) checks: `npm run typecheck` and
+`npm run test -- src/lib/sms` (20 tests) passed. The suites mock `fetch` and
+cover provider selection from `SMS_PROVIDER`, `smsProviderAvailable()`
+(console false; MSG91/Twilio false until every credential exists, true with
+them), the MSG91 v5 flow request (auth header, template/sender body,
+10-digit recipient, `OTP`/`otp` fields, `type: "error"` handling and
+missing-credential refusal before any network call), the Twilio Messages
+request (Basic auth, form body with To/From/Body containing the code and
+validity window, purpose wording, HTTP failure surfacing and the same
+missing-credential refusal), the console provider's production refusal, and
+`dispatchOtp()` returning true on success and false on transport failures.
+No live call was made to MSG91 or Twilio; see `KNOWN_ISSUES.md`.
+
+Task 10.2 (npm audit) checks: `npm audit` was run without `--force`;
+`npm audit fix` bumped `eslint-config-next`/`@next/eslint-plugin-next` from
+16.3.8 to 16.4.0 in the lockfile only (within the declared `^16.3.8`
+range), `npm run lint` was rerun afterwards and passed. The remaining five
+high advisories sit in one dev-only chain and `npm audit --omit=dev`
+reports zero production vulnerabilities; details in `SECURITY_NOTES.md`.
+
+Task 10.3/10.4 (off-site backups) checks: `deploy/scripts/offsite-backup.sh`
+passed `bash -n` (Git Bash). The script and units cannot be executed on this
+Windows machine (no rclone, GPG workflow, systemd or local server), so the
+first real run is the manual test in `deploy/OFFSITE_BACKUP.md` step 6 on
+the Ubuntu host; see `KNOWN_ISSUES.md`. `.env.example` gained the four
+`OFFSITE_*` entries and was re-verified BOM-free after editing.
 
 ## Manual staging verification
 

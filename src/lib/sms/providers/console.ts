@@ -9,6 +9,11 @@ import { AppError } from "@/lib/errors";
 export class ConsoleSmsProvider implements SmsProvider {
   readonly name = "console";
 
+  /** The console provider needs no credentials, but it is never a "real" provider. */
+  isConfigured(): boolean {
+    return true;
+  }
+
   async sendOtp(input: SendOtpInput): Promise<SendOtpResult> {
     const message = `[sms:console] to=${input.to} purpose=${input.purpose} otp=${input.otp} expires=${input.expiresInMinutes}m`;
 

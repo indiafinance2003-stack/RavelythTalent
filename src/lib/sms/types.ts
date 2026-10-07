@@ -1,16 +1,17 @@
 /**
  * SMS provider abstraction.
  *
- * ## Implementing a real provider
+ * ## Available providers
  *
- * 1. Add `SmsProvider` implementation in `src/lib/sms/providers/` (see
- *    `msg91.ts` / `twilio.ts` for fully-commented templates).
- * 2. Set `SMS_PROVIDER=msg91` or `twilio` and fill the matching env vars.
- * 3. Nothing else changes - `getSmsProvider()` resolves it at call time.
+ * - `msg91` / `twilio`: full HTTP adapters in `src/lib/sms/providers/`
+ *   against each provider's documented API. Selected with `SMS_PROVIDER` and
+ *   the matching `MSG91_*` / `TWILIO_*` env vars; they stay unused until
+ *   those variables exist.
+ * - `console` (default): development-only stand-in that prints the OTP to
+ *   the server console and is refused outright when NODE_ENV=production.
  *
- * NOTE FOR THE OWNER: no real SMS integration is shipped. Until a provider is
- * selected and configured, keep `SMS_PROVIDER=console`, which logs the OTP to
- * the server console only (and is refused outright when NODE_ENV=production).
+ * `smsProviderAvailable()` (see `index.ts`) is what keeps the OTP endpoints
+ * hidden until a real provider is configured.
  */
 
 export type OtpPurpose = "login" | "phone_verification";
@@ -31,6 +32,8 @@ export type SendOtpResult = {
 
 export interface SmsProvider {
   readonly name: string;
+  /** True when every credential this provider needs is present. */
+  isConfigured(): boolean;
   /**
    * Sends a one-time password. Implementations must not throw on transient
    * transport failures - the caller already rate limits and surfaces a

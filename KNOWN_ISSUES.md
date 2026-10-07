@@ -38,8 +38,8 @@
   bootstrap attempt changed the local `postgres` password before failing; its
   generated password was not retained. Do not enable trust authentication as a
   workaround. Migrations and seeds have not been applied to a local database.
-- **HIGH — database-backed flows not exercised:** The unit suite has 240
-  passing tests across 39 Vitest files, including mocked Razorpay
+- **HIGH — database-backed flows not exercised:** The unit suite has 260
+  passing tests across 40 Vitest files, including mocked Razorpay
   owner/activation coverage, but it does not replace DB-backed tests for
   free-post quota consumption, moderation/report persistence, offline billing
   transactions, invoices, or the admin search flow. Those require a working
@@ -47,16 +47,21 @@
 - **MEDIUM — live providers not configured:** Razorpay checkout/webhooks,
   production SMTP and a real SMS provider have not been exercised against live
   services. Razorpay SDK order creation is mocked in unit tests.
-- **MEDIUM — deployment validation:** Nginx, systemd and shell validation
-  tools were unavailable on Windows. Deployment, backup/restore and restart
-  behavior still need validation on the target Ubuntu host.
+- **MEDIUM — deployment validation:** Nginx, systemd (`systemd-analyze
+  verify`) and `shellcheck` tools were unavailable on Windows; the new
+  off-site backup script was checked with `bash -n` only. Deployment,
+  backup/restore and restart behavior still need validation on the target
+  Ubuntu host.
 - **MEDIUM — browser verification:** No authenticated browser walkthrough
   against a working database was possible. Use the manual scenarios in
   `TESTING.md` on staging before launch.
 - **HIGH — development dependency advisories:** Five high-severity npm audit
-  findings remain in the ESLint/Next lint dependency chain; production
-  dependencies previously reported zero vulnerabilities. See
-  `SECURITY_NOTES.md`.
+  findings remain in the ESLint/Next lint dependency chain
+  (`eslint-config-next` -> `fast-glob` -> `micromatch` -> `braces`);
+  `npm audit fix` (non-force) was applied during Task 10 and bumped the lint
+  packages within their declared range without clearing them, while
+  `npm audit --omit=dev` reports zero production vulnerabilities. See
+  `SECURITY_NOTES.md` for reachability and the recommendation.
 - **MEDIUM — Assistant (Task 7) needs database and mail-server verification:**
   Additive migrations `0011_closed_timeslip.sql` through
   `0015_late_skullbuster.sql` have not been applied locally (PostgreSQL
@@ -100,10 +105,29 @@
   and recommended jobs only after a profile has data, the employer pipeline
   board's status buttons update the column counts, and the mobile drawer
   opens/closes with Escape, overlay click and route changes.
+- **MEDIUM — SMS providers (Task 10) not verified against the live
+  services:** the MSG91 (v5 Flow API) and Twilio (Messages resource) adapters
+  are covered by mocked-`fetch` tests only. No request was made to
+  `control.msg91.com` or `api.twilio.com`, no message was delivered to a real
+  handset, and the MSG91 DLT template variable naming (`{{otp}}`/`{{OTP}}`)
+  plus the Twilio sender (number or alphanumeric sender ID) still need
+  confirmation against each provider's console before first use. OTP stays
+  hidden (HTTP 503 on `/api/auth/otp/*`) until a provider is configured, so
+  nothing changed for end users.
 - **LOW — social systemd timer unvalidated:** The new
   `ravelyth-cron-process-social-posts` service/timer files are added disabled
   and were not validated with `systemd-analyze verify` (Windows environment).
   Validate on the Ubuntu host before enabling.
+- **MEDIUM — off-site backup (Task 10) never executed:** The new
+  `deploy/scripts/offsite-backup.sh` (syntax-checked with `bash -n`),
+  `ravelyth-offsite-backup.{service,timer}` and `deploy/OFFSITE_BACKUP.md`
+  ship disabled and were not run: there is no rclone remote, GPG passphrase
+  file, systemd or Linux shell on this machine. Before enabling on the
+  Ubuntu host, follow `deploy/OFFSITE_BACKUP.md` end to end (rclone wizard,
+  `OFFSITE_*` variables in the production `.env`, one manual
+  `systemctl start ravelyth-offsite-backup.service`, `rclone ls`
+  verification) and confirm the rclone config and passphrase files are
+  readable only by `ravelyth`.
 
 Do not treat this application as launch-ready until database access, owner
 configuration, staging walkthroughs and the outstanding actions in

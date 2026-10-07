@@ -1,0 +1,12 @@
+[Unit]
+Description=Daily off-site copy of Ravelyth Talent backups
+Documentation=file:/var/www/ravelyth/deploy/OFFSITE_BACKUP.md
+
+[Timer]
+OnCalendar=*-*-* 03:15:00
+Persistent=true
+RandomizedDelaySec=15m
+Unit=ravelyth-offsite-backup.service
+
+[Install]
+WantedBy=timers.target

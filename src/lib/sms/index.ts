@@ -29,9 +29,18 @@ export function getSmsProvider(): SmsProvider {
   return cached;
 }
 
-/** The MSG91 and Twilio adapters remain stubs; console OTP is never real SMS. */
+/**
+ * True only when a real provider (MSG91 or Twilio) is selected and every
+ * credential it needs is present. The console provider is deliberately never
+ * available: it only prints OTPs during development (and refuses outright in
+ * production), so with the default `SMS_PROVIDER=console` - or a real
+ * provider missing its env vars - the OTP request/verify endpoints stay
+ * hidden behind HTTP 503 and no login UI option is offered.
+ */
 export function smsProviderAvailable(): boolean {
-  return false;
+  const provider = getSmsProvider();
+  if (provider.name === "console") return false;
+  return provider.isConfigured();
 }
 
 /**

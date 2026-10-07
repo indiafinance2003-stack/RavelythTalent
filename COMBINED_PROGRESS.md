@@ -9,8 +9,8 @@
 - [x] Task 7: Admin assistant inbox, leads, campaigns, and optional AI
 - [x] Task 9: Social auto-posting (Facebook, Instagram, WhatsApp digest)
 - [x] Task 8: Admin, candidate, and employer dashboard redesign
-- [ ] Task 10: SMS adapters, npm audit follow-up, off-site backups
-- [ ] Final quality gates, documentation, and deploy report
+- [x] Task 10: SMS adapters, npm audit follow-up, off-site backups
+- [x] Final quality gates, documentation, and deploy report
 
 ## Current task
 
@@ -66,5 +66,21 @@ recent jobs. Zero-filled IST series helpers, match scoring and formatting are
 unit tested; route-group `loading.tsx` skeletons were added. Typecheck, lint,
 build and 240 tests pass.
 
-Task 10 (MSG91/Twilio adapters, `npm audit`, off-site backups) and the final
-quality-gates report follow.
+Task 10 (MSG91/Twilio adapters, `npm audit`, off-site backups) is complete
+and locally committed. `src/lib/sms/providers/{msg91,twilio}.ts` are real
+adapters (MSG91 v5 Flow API, Twilio Messages resource) behind a shared
+timeout helper and `isConfigured()`; `smsProviderAvailable()` is true only
+for a fully credentialled real provider, so `/api/auth/otp/*` keeps
+answering 503 and the console provider is still refused in production (20
+mocked-`fetch` tests in `src/lib/sms/providers.test.ts`; live delivery
+unverified - KNOWN_ISSUES). `npm audit fix` (never `--force`) bumped
+`eslint-config-next` to 16.4.0 in the lockfile; the five remaining highs
+are one dev-only chain and `npm audit --omit=dev` is clean (SECURITY_NOTES).
+New additive-only deploy files: `deploy/scripts/offsite-backup.sh`,
+`systemd/ravelyth-offsite-backup.{service,timer}` (disabled) and
+`deploy/OFFSITE_BACKUP.md` - newest DB dump plus daily uploads archive to
+an rclone remote, optional GPG passphrase-file encryption, 30-day remote
+retention, configured by the new `OFFSITE_*` entries in `.env.example`.
+ASSUMPTIONS gained section 19 (SMS) and 20 (off-site backups). Final gates:
+typecheck, lint, build and 260 tests / 40 files all pass; Task 10 added no
+migration. The CLINE_PROMPT final report was delivered in the session.

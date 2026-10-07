@@ -3,7 +3,7 @@
 Every decision taken while building Ravelyth Talent autonomously, with the
 reasoning. Anything marked **[OWNER ACTION]** needs a human.
 
-Last updated: Task 8 (dashboard redesign).
+Last updated: Task 10 (SMS providers, npm audit, off-site backups).
 
 ---
 
@@ -502,3 +502,71 @@ tokens, skill links, application history).
   board's column counts refresh immediately.
 - Route-group `loading.tsx` skeletons render plain skeletons rather than
   `PageHeader`, whose `title` is a `string` prop.
+
+## 19. SMS providers (Task 10)
+
+- Two real OTP adapters now implement the `SmsProvider` interface against
+  each provider's documented HTTP API, with no new dependencies:
+  - **MSG91** - `POST https://control.msg91.com/api/v5/flow/` with the
+    `authkey` header, `template_id`/`sender`/`short_url: "0"` and a single
+    recipient carrying `OTP` and `otp` (both casings, so either DLT template
+    variable name works). The number is passed without the `+91` prefix as
+    the Flow API expects for Indian sender IDs. `type: "error"` responses are
+    failures even on HTTP 200.
+  - **Twilio** - `POST /2010-04-01/Accounts/{SID}/Messages.json` with HTTP
+    Basic auth (`SID:token`), an `x-www-form-urlencoded` body
+    (`To`, `From`, `Body`) and the returned `sid` as the provider message id.
+    The message states the code, its validity window and the purpose
+    (sign-in vs phone verification).
+- Configuration is unchanged: `SMS_PROVIDER` selects `console` (default),
+  `msg91` or `twilio`, with the existing `MSG91_*` / `TWILIO_*` variables -
+  no new environment variables. Both adapters stay unused until those
+  variables exist: `smsProviderAvailable()` returns true only when a real
+  provider is selected and every credential it needs is present, so the
+  `/api/auth/otp/*` endpoints keep answering HTTP 503 (and no login UI is
+  offered) until then. The console provider is never treated as available,
+  and `ConsoleSmsProvider.sendOtp()` still refuses outright when
+  `NODE_ENV=production`.
+- Transport failures become plain errors so `dispatchOtp()` logs them and
+  returns `false`, giving callers one generic "could not send OTP" message;
+  missing credentials raise a 503 `AppError` before any network call.
+  Adapters never log or expose credentials.
+- The existing `deploy/DEPLOYMENT.md` SMS section ("keep
+  `SMS_PROVIDER=console` until a real provider is implemented") predates
+  Task 10 and cannot be edited under the "no changes to existing deploy/
+  files" rule; the authoritative setup guidance now lives here, in
+  `.env.example` and in `src/lib/sms/`.
+
+## 20. Off-site backups (Task 10)
+
+- Four **new** files were added under `deploy/` (no existing deploy file was
+  modified): `scripts/offsite-backup.sh`,
+  `systemd/ravelyth-offsite-backup.service`,
+  `systemd/ravelyth-offsite-backup.timer` and `OFFSITE_BACKUP.md`. The
+  timer ships disabled; `deploy/DEPLOYMENT.md` section 9 still says to
+  "configure a separate encrypted off-site backup" without linking it,
+  because existing deploy files are read-only under the task rules.
+- The script is configured entirely through environment variables read from
+  the application `.env`: `OFFSITE_RCLONE_REMOTE` (remote name plus
+  bucket/folder) and `OFFSITE_RCLONE_PATH` (sub-folder) are required;
+  `OFFSITE_GPG_PASSPHRASE_FILE` optionally switches staged copies to
+  `gpg --symmetric --cipher-algo AES256` with that passphrase file;
+  `OFFSITE_RETENTION_DAYS` defaults to 30. All four are documented in
+  `.env.example`; the app's zod env schema ignores unknown keys, so these
+  operational variables do not affect the running application.
+- No credentials live in the repository: provider keys stay in rclone's own
+  config file (the unit pins `RCLONE_CONFIG` to
+  `/var/www/ravelyth/.config/rclone/rclone.conf`), and the GPG passphrase is
+  referenced only by file path (mode 600, owned by `ravelyth`).
+- Inputs are the newest `ravelyth-*.dump` and the newest `uploads-*.tar*`
+  in `/var/backups/ravelyth`. If no uploads archive was created that day,
+  the script first builds `uploads-YYYY-MM-DD.tar.gz` from `UPLOAD_DIR`
+  (default `/var/lib/ravelyth/uploads`), so the off-site copy is never
+  stale; it fails when no database dump exists, which makes the local
+  `ravelyth-backup.timer` a prerequisite.
+- Remote retention deletes only files matching `ravelyth-*.dump*` and
+  `uploads-*.tar*` past `OFFSITE_RETENTION_DAYS`, so other objects in the
+  remote folder are never touched. Local backups are left untouched.
+- The timer runs daily at 03:15 server time (after the 02:15 local backup,
+  `Persistent=true` with 15 minutes of random delay). Everything was
+  validated with `bash -n` only - see `KNOWN_ISSUES.md` before enabling.

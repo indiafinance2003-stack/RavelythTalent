@@ -127,49 +127,90 @@ until Task 8 builds the overview - see checklist item 8.2.
 
 ## Task 10 - Small items
 
-- [ ] 10.1 Implement and test MSG91 and Twilio SMS adapters; retain production refusal for console and hidden OTP when unconfigured.
-- [ ] 10.2 Run `npm audit`, remediate without major upgrades, document every remaining advisory and production reachability.
-- [ ] 10.3 Add off-server backup script and disabled systemd service/timer with optional GPG and remote retention.
-- [ ] 10.4 Document one-time rclone setup and backup operations.
-- [ ] 10.5 Final documentation updates, typecheck, lint, build, full tests, and any database/provider verification notes.
-- [ ] 10.6 Final local commit and final report with deployment, timer, env, manual test, and unfinished-work details.
+- [x] 10.1 Implement and test MSG91 and Twilio SMS adapters; retain production refusal for console and hidden OTP when unconfigured.
+      Real adapters in `src/lib/sms/providers/{msg91,twilio}.ts` (v5 Flow
+      API / Messages resource) behind a shared `smsFetch` timeout helper,
+      `isConfigured()` on the `SmsProvider` interface, and
+      `smsProviderAvailable()` = true only for a fully credentialled real
+      provider (console never available, still refused in production).
+      20 mocked-`fetch` tests in `src/lib/sms/providers.test.ts`; no live
+      provider call (recorded in KNOWN_ISSUES). `.env.example` documents the
+      503 gating; ASSUMPTIONS gained section 19.
+- [x] 10.2 Run `npm audit`, remediate without major upgrades, document every remaining advisory and production reachability.
+      `npm audit fix` (no `--force`) bumped `eslint-config-next`/
+      `@next/eslint-plugin-next` 16.3.8 -> 16.4.0 in the lockfile (within
+      `^16.3.8`, `package.json` untouched, lint still green). The same five
+      highs remain (single dev-only `braces` chain); `npm audit --omit=dev`
+      is clean. SECURITY_NOTES now records the re-run, production
+      reachability (none) and the do-not-force recommendation; KNOWN_ISSUES
+      updated.
+- [x] 10.3 Add off-server backup script and disabled systemd service/timer with optional GPG and remote retention.
+      New files only: `deploy/scripts/offsite-backup.sh` (syntax-checked with
+      `bash -n`), `deploy/systemd/ravelyth-offsite-backup.{service,timer}`.
+      The script sources `ENV_FILE`, requires `OFFSITE_RCLONE_REMOTE` +
+      `OFFSITE_RCLONE_PATH`, copies the newest `ravelyth-*.dump` and the
+      newest uploads archive from `/var/backups/ravelyth` (creating a fresh
+      `uploads-YYYY-MM-DD.tar.gz` from `UPLOAD_DIR` when today's is missing),
+      stages copies in a mode-0700 temp dir, optionally encrypts them with
+      `gpg --symmetric --passphrase-file`, runs `rclone copy`, then applies
+      `OFFSITE_RETENTION_DAYS` (default 30) remote retention scoped to
+      `ravelyth-*.dump*` / `uploads-*.tar*`. No credentials in the repo;
+      timer ships disabled (files only, nothing enabled).
+- [x] 10.4 Document one-time rclone setup and backup operations.
+      New `deploy/OFFSITE_BACKUP.md`: plain-language explanation of what runs
+      (script + disabled daily 03:15 timer, five-step run description),
+      prerequisites (local backup timer, `rclone`/`gnupg` packages),
+      one-time `sudo -u ravelyth rclone config` wizard walkthrough with
+      verification commands, `.env` additions
+      (`OFFSITE_RCLONE_REMOTE`/`OFFSITE_RCLONE_PATH`/`OFFSITE_RETENTION_DAYS`),
+      optional GPG passphrase file creation (mode 600, back it up
+      elsewhere), install commands mirroring DEPLOYMENT section 9, manual
+      test run + journal + `rclone ls` verification, explicit enable step,
+      day-to-day operations (credential rotation, retention, passphrase
+      rotation, stop), restore procedure (fetch/decrypt/`pg_restore`/tar +
+      chown with a rehearse-first note), and a troubleshooting table.
+- [x] 10.5 Final documentation updates, typecheck, lint, build, full tests, and any database/provider verification notes.
+      ASSUMPTIONS header moved to Task 10 with new section 20 (off-site
+      backups: additive deploy files, `OFFSITE_*` env vars ignored by the
+      app's zod schema, no credentials in git, newest-dump/uploads-archive
+      selection, retention scoping, disabled 03:15 timer). KNOWN_ISSUES:
+      counts updated to 260 tests / 40 files, deployment-validation entry
+      notes `bash -n` availability, new "off-site backup never executed"
+      entry. TESTING: table row 260/40 plus Task 10.2 and 10.3/10.4 check
+      paragraphs. SECURITY_NOTES: new "Off-site backups" section.
+      `.env.example`: new OFFSITE_* block (verified BOM-free). Gates all
+      green: `npm run typecheck`, `npm run lint`, `npm run build`,
+      `npm run test` (260 tests / 40 files). No migration added (Task 10
+      touches no schema; `npm run db:generate` not needed).
+- [x] 10.6 Final local commit and final report with deployment, timer, env, manual test, and unfinished-work details.
+      One local commit carries the whole of Task 10 (SMS adapters + tests,
+      lockfile audit fix, off-site backup script/units/docs, final doc
+      updates). The report required by CLINE_PROMPT was delivered in the
+      session: per-task changes, migration list, settings defaults, env
+      vars, timer enablement, unfinished work, manual browser steps and
+      deploy steps. Nothing was pushed.
 
 ## Resume point
 
-Task 7 COMPLETE and committed locally. Task 9 COMPLETE and committed
-locally. Task 8 (dashboard redesign) COMPLETE and committed locally: the
-shared `DashboardShell`/kit/SVG charts, the three rewritten route-group
-layouts (admin, candidate, employer) with their brief-mandated navigation,
-the real-data admin overview (+ deferred Assistant/Social cards and
-`/admin/users?q=` search), the candidate dashboard with the deterministic
-match model (`src/lib/jobs/match.ts`, 50/30/20, `hasEnoughMatchData` gate),
-the employer overview with the button-driven pipeline board and
-`changeApplicationStatusAction` revalidating `/recruiter`, route-group
-`loading.tsx` skeletons, and ASSUMPTIONS section 18 / KNOWN_ISSUES / TESTING
-/ COMBINED_PROGRESS updates. Quality gates green: `npm run typecheck`,
-`npm run lint`, `npm run build`, `npm run test` (240 tests / 39 files); no
-migration was added (task is presentation only, `npm run db:generate`
-previously reported no schema changes).
+ALL TASKS (1-10) are COMPLETE and committed locally. Task 10 closed the
+plan: real MSG91/Twilio adapters behind `smsProviderAvailable()` gating
+(20 mocked tests, console refused in production, OTP endpoints 503 until a
+credentialled provider exists), a non-force `npm audit fix`
+(`eslint-config-next` 16.4.0 in the lockfile, five remaining highs
+documented as dev-only in SECURITY_NOTES), and the off-site backup feature
+(`deploy/scripts/offsite-backup.sh` + disabled
+`ravelyth-offsite-backup.{service,timer}` + `deploy/OFFSITE_BACKUP.md`,
+`OFFSITE_*` variables in `.env.example`, optional GPG, 30-day scoped remote
+retention). Final gates all green: `npm run typecheck`, `npm run lint`,
+`npm run build`, `npm run test` (260 tests / 40 files). No migration was
+added by Task 10 (no schema change).
 
-Next: **Task 10**, in order:
-
-1. 10.1 MSG91 + Twilio adapters behind one SMS provider interface, with
-   mocked tests; the console provider stays refused in production and the
-   OTP login entry point stays hidden when no provider is configured; note
-   in KNOWN_ISSUES that neither service was verified live.
-2. 10.2 `npm audit` without `--force`; remediate what a normal upgrade can,
-   record every remaining advisory and its production reachability in
-   SECURITY_NOTES.
-3. 10.3 `deploy/scripts/offsite-backup.sh` plus a disabled systemd
-   service/timer (rclone remote, optional GPG encryption, 30-day remote
-   retention).
-4. 10.4 `deploy/OFFSITE_BACKUP.md`: one-time rclone setup and operating
-   instructions.
-5. 10.5 Final documentation updates and the full gate run (typecheck, lint,
-   build, tests) with any database/provider verification notes.
-6. 10.6 Final local commit and the report required by CLINE_PROMPT
-   (per-task changes, migration names, settings defaults, env vars, timer
-   enablement, unfinished work, manual browser steps, deploy steps).
+Remaining work is server/owner-side only and tracked in KNOWN_ISSUES.md /
+MANUAL_TODO.md: apply additive migrations `0005`-`0016` on a real
+PostgreSQL, the Task 8 browser walkthrough, live provider verification
+(SMS, Meta, Razorpay, SMTP/IMAP), `bash -n`-only deploy files that need
+`systemd-analyze verify` and one manual test run on the Ubuntu host, and
+the enable step for each disabled timer.
 
 Environment notes: Windows/PowerShell; no local PostgreSQL auth, no live
 mail/SMS/Meta credentials, so DB/IMAP/third-party flows are covered by mocked

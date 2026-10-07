@@ -2,7 +2,11 @@
 
 ## Dependency audit
 
-`npm audit` reports five high-severity development-tooling findings:
+Re-run during Task 10 (`npm audit`, no `--force`): five high-severity
+development-tooling findings remain, all in one dependency chain. The
+compatible `npm audit fix` was applied and bumped `eslint-config-next` and
+`@next/eslint-plugin-next` from 16.3.8 to 16.4.0 (still within the declared
+`^16.3.8` range, so `package.json` is unchanged); the findings persist.
 
 | Package | Severity | Where used | Assessment |
 | --- | --- | --- | --- |
@@ -12,11 +16,20 @@
 | `micromatch` | High | Transitive under `fast-glob` | Development/lint dependency path only. |
 | `braces` | High | Transitive under `micromatch` | GHSA-vfj7-8cjw-p6xm describes stack exhaustion on deeply nested patterns; not exposed to requests handled by the production app in the reported dependency path. |
 
-The compatible `npm audit fix` did not resolve the advisories; the suggested
-forced fix downgrades the Next.js lint config across a major version. No
-breaking fix was applied. Recheck the audit and update to compatible patched
-Next.js/ESLint tooling releases. `npm audit --omit=dev --audit-level=low`
-reports zero production dependency vulnerabilities.
+**Production reachability:** none. `npm audit --omit=dev
+--audit-level=low` reports zero production dependency vulnerabilities, and
+`npm ls braces --omit=dev` is empty - the whole chain hangs off
+`eslint-config-next`, which only runs inside `npm run lint`. The advisory is
+a denial-of-service class issue triggered by deeply nested glob patterns;
+the only patterns processed are this repository's own trusted ESLint
+configuration, never user or request input.
+
+**Recommendation:** the forced fix (`npm audit fix --force`) must not be run:
+it installs `eslint-config-next@14.2.35`, which does not support Next.js 16.
+Keep the compatible fix applied, re-run `npm audit` whenever
+`eslint-config-next` or Next.js ships a release with an updated
+`fast-glob`/`micromatch`/`braces` chain, and treat any future advisory that
+appears under `npm audit --omit=dev` as a release blocker.
 
 ## Checks performed
 
@@ -82,3 +95,23 @@ database and provider credentials.
   banner instead of silently hammering the API.
 - No unofficial WhatsApp automation is used: the digest is generated for
   manual copy/paste and nothing is sent to a personal WhatsApp account.
+
+## Off-site backups (Task 10)
+
+- `deploy/scripts/offsite-backup.sh` and the off-site systemd units contain
+  no credentials. Storage-provider keys live only in rclone's own config
+  file on the server (`RCLONE_CONFIG` is pinned to
+  `/var/www/ravelyth/.config/rclone/rclone.conf`, readable by `ravelyth`
+  only); the optional GPG passphrase is referenced by file path
+  (`OFFSITE_GPG_PASSPHRASE_FILE`, mode 600) and is never echoed or written
+  anywhere by the script.
+- `.env.example` documents `OFFSITE_RCLONE_REMOTE`,
+  `OFFSITE_RCLONE_PATH`, `OFFSITE_GPG_PASSPHRASE_FILE` and
+  `OFFSITE_RETENTION_DAYS` as names/placeholders only - no remote names,
+  buckets, keys or passphrases are committed, and the script fails before
+  any upload if the required variables are missing.
+- Off-site copies contain database dumps and uploaded resumes (personal
+  data); when the remote is not encrypted at rest, configure the optional
+  GPG symmetric encryption. Remote retention is scoped to
+  `ravelyth-*.dump*` and `uploads-*.tar*`, so it cannot delete unrelated
+  objects. The timer ships disabled - see `deploy/OFFSITE_BACKUP.md`.
