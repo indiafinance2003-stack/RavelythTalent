@@ -1,0 +1,13 @@
+[Unit]
+Description=Run Ravelyth Talent target crawling every 30 minutes
+Documentation=file:/var/www/ravelyth/DEPLOYMENT.md
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=30min
+Persistent=true
+AccuracySec=30s
+Unit=ravelyth-cron-crawl-targets.service
+
+[Install]
+WantedBy=timers.target

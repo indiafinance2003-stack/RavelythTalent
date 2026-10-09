@@ -126,7 +126,7 @@ function parseHistoryDate(value: string): Date | null {
   return new Date(Date.UTC(year, month - 1, day, 6, 30));
 }
 
-function parseRecords(csv: string): string[][] {
+export function parseRecords(csv: string): string[][] {
   const records: string[][] = [];
   let record: string[] = [];
   let field = "";

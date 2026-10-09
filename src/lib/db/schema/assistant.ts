@@ -242,6 +242,13 @@ export const assistantSettings = pgTable("assistant_settings", {
   sendWindowStart: text("send_window_start").notNull().default("10:00"),
   sendWindowEnd: text("send_window_end").notNull().default("17:00"),
   noReplyAfterDays: integer("no_reply_after_days").notNull().default(3),
+  crawlEnabled: boolean("crawl_enabled").notNull().default(true),
+  crawlPerRun: integer("crawl_per_run").notNull().default(20),
+  contactFormTemplate: text("contact_form_template")
+    .notNull()
+    .default(
+      "Hello {{company}} team,\n\nWe help companies like yours reach qualified candidates on Ravelyth Talent (ravelyth.in). May I send you a short overview of our hiring plans?\n\nThank you,\nRavelyth Talent",
+    ),
   updatedByUserId: uuid("updated_by_user_id").references(() => users.id, {
     onDelete: "set null",
   }),
