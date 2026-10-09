@@ -1,0 +1,20 @@
+[Unit]
+Description=Send the daily assistant digest email (08:30 IST)
+After=network.target ravelyth.service
+Requires=ravelyth.service
+
+[Service]
+Type=oneshot
+User=ravelyth
+Group=ravelyth
+WorkingDirectory=/var/www/ravelyth
+EnvironmentFile=/var/www/ravelyth/.env
+ExecStart=/usr/bin/curl --fail --silent --show-error --max-time 300 -H "x-cron-secret: ${CRON_SECRET}" http://127.0.0.1:3000/api/internal/cron/daily-digest
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ravelyth-cron-daily-digest
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true

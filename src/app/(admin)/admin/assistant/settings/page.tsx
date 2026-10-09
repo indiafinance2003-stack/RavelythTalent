@@ -46,6 +46,8 @@ export default async function AssistantSettingsPage() {
         <Link className="text-royal hover:underline" href="/admin/assistant">Inbox</Link>
         <Link className="text-royal hover:underline" href="/admin/assistant/leads">Company leads</Link>
         <Link className="text-royal hover:underline" href="/admin/assistant/campaigns">Campaigns</Link>
+        <Link className="text-royal hover:underline" href="/admin/assistant/targets">Targets</Link>
+        <Link className="text-royal hover:underline" href="/admin/assistant/contact-forms">Contact forms</Link>
         <Link className="text-royal hover:underline" href="/admin/assistant/settings">Settings and FAQ</Link>
       </nav>
       <Card className="space-y-4">
@@ -74,6 +76,15 @@ export default async function AssistantSettingsPage() {
           <label className="text-sm font-semibold text-navy sm:col-span-2">Business description for AI only<Textarea className="mt-1" defaultValue={settings?.businessDescription ?? ""} maxLength={5000} name="businessDescription" rows={4} /></label>
           <label className="text-sm font-semibold text-navy sm:col-span-2">Email signature<Textarea className="mt-1" defaultValue={settings?.signatureText ?? ""} maxLength={2000} name="signatureText" rows={3} /></label>
           <label className="text-sm font-semibold text-navy sm:col-span-2">Opt-out confirmation text<Textarea className="mt-1" defaultValue={settings?.optOutText ?? "Reply to this email with unsubscribe to opt out."} maxLength={500} name="optOutText" required rows={2} /></label>
+          <label className="flex items-center gap-2 text-sm font-semibold text-navy">
+            <input defaultChecked={Boolean(settings?.sendingPaused)} name="sendingPaused" type="checkbox" />
+            Pause all outreach sends
+          </label>
+          <label className="flex items-center gap-2 text-sm font-semibold text-navy">
+            <input defaultChecked={Boolean(settings?.digestEnabled)} name="digestEnabled" type="checkbox" />
+            Email a daily operations digest
+          </label>
+          <label className="text-sm font-semibold text-navy sm:col-span-2">Digest recipient email (optional override)<Input className="mt-1" defaultValue={settings?.digestEmail ?? ""} maxLength={254} name="digestEmail" placeholder="Leave blank for the first active admin" type="email" /></label>
           <div className="sm:col-span-2"><Button type="submit">Save assistant settings</Button></div>
         </form>
       </Card>

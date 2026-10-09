@@ -104,6 +104,9 @@ export async function processCampaigns(): Promise<{
     .where(eq(assistantSettings.id, 1)).limit(1);
   const now = new Date();
   if (!settings) throw new Error("Assistant sending settings are unavailable.");
+  if (settings.sendingPaused) {
+    return { checked: 0, sent: 0, skipped: 0, paused: 0 };
+  }
 
   const dueMessages = await db.select({
     message: campaignMessages,

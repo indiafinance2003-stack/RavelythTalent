@@ -31,6 +31,9 @@ async function saveSettingsImpl(formData: FormData): Promise<void> {
     sendWindowStart: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/),
     sendWindowEnd: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/),
     noReplyAfterDays: z.coerce.number().int().min(1).max(90),
+    sendingPaused: z.boolean(),
+    digestEnabled: z.boolean(),
+    digestEmail: z.string().trim().toLowerCase().max(254).nullable(),
   }).safeParse({
     aiEnabled: formData.get("aiEnabled") === "on",
     monthlySpendCapUsd: formData.get("monthlySpendCapUsd"),
@@ -41,6 +44,9 @@ async function saveSettingsImpl(formData: FormData): Promise<void> {
     sendWindowStart: formData.get("sendWindowStart"),
     sendWindowEnd: formData.get("sendWindowEnd"),
     noReplyAfterDays: formData.get("noReplyAfterDays") || 3,
+    sendingPaused: formData.get("sendingPaused") === "on",
+    digestEnabled: formData.get("digestEnabled") === "on",
+    digestEmail: String(formData.get("digestEmail") ?? "").trim() || null,
   });
   if (!parsed.success) throw new AppError(parsed.error.issues[0]?.message ?? "Invalid assistant settings.", 422);
   if (parsed.data.sendWindowStart >= parsed.data.sendWindowEnd) {
@@ -83,6 +89,9 @@ async function saveSettingsImpl(formData: FormData): Promise<void> {
       monthlySpendCapUsd: parsed.data.monthlySpendCapUsd,
       dailySendCap: parsed.data.dailySendCap,
       noReplyAfterDays: parsed.data.noReplyAfterDays,
+      sendingPaused: parsed.data.sendingPaused,
+      digestEnabled: parsed.data.digestEnabled,
+      digestEmail: parsed.data.digestEmail ?? null,
     },
   });
   revalidatePath("/admin/assistant");
@@ -93,6 +102,38 @@ async function saveSettingsImpl(formData: FormData): Promise<void> {
 
 export async function saveAssistantSettingsAction(formData: FormData): Promise<void> {
   return runAdminFormAction("/admin/assistant/settings", () => saveSettingsImpl(formData));
+}
+
+/** One-click global pause/resume toggle used by the red banner and settings. */
+async function setSendingPausedImpl(formData: FormData): Promise<void> {
+  const admin = await actor();
+  const paused = z.enum(["true", "false"]).safeParse(String(formData.get("paused") ?? ""));
+  if (!paused.success) throw new AppError("Invalid pause value.", 422);
+  await db.insert(assistantSettings).values({ id: 1 }).onConflictDoNothing();
+  await db.update(assistantSettings).set({
+    sendingPaused: paused.data === "true",
+    updatedByUserId: admin.id,
+    updatedAt: new Date(),
+  }).where(eq(assistantSettings.id, 1));
+  await db.insert(auditLogs).values({
+    actorUserId: admin.id,
+    actorRole: "admin",
+    action: paused.data === "true" ? "assistant.sending_paused" : "assistant.sending_resumed",
+    entityType: "assistant_settings",
+    entityId: "1",
+    description: paused.data === "true"
+      ? "All outreach sends were paused by an administrator."
+      : "Outreach sends were resumed by an administrator.",
+    metadata: { sendingPaused: paused.data === "true" },
+  });
+  revalidatePath("/admin/assistant");
+  revalidatePath("/admin/assistant/settings");
+  revalidatePath("/admin/assistant/campaigns");
+  revalidatePath("/admin");
+}
+
+export async function setSendingPausedAction(formData: FormData): Promise<void> {
+  return runAdminFormAction("/admin/assistant", () => setSendingPausedImpl(formData));
 }
 
 async function saveFaqImpl(formData: FormData): Promise<void> {

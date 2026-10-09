@@ -1,0 +1,12 @@
+[Unit]
+Description=Run Ravelyth Talent daily assistant digest at 08:30 IST
+Documentation=file:/var/www/ravelyth/DEPLOYMENT.md
+
+[Timer]
+OnCalendar=*-*-* 08:30:00 Asia/Kolkata
+Persistent=true
+AccuracySec=30s
+Unit=ravelyth-cron-daily-digest.service
+
+[Install]
+WantedBy=timers.target

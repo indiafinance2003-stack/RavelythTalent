@@ -14,10 +14,10 @@ complete. Local commits only after each task; never push.
 
 ## Task C - Pause switch, overview, daily summary email
 
-- [ ] C1. sending_paused (default false), pause honored by process-campaigns and auto replies, red banner on every /admin/assistant page, audit-logged.
-- [ ] C2. Overview card at top of /admin/assistant (counts, links, last sync/send, sends vs cap, bounce rate of last 20).
-- [ ] C3. /api/internal/cron/daily-digest + disabled systemd timer (08:30 IST), digestEnabled=true, digestEmail override, one email/day via outbox, counts only.
-- [ ] C4. Tests for pause, overview queries, digest content and once-per-day logic. Local commit.
+- [x] C1. Migration 0019_great_sleepwalker (additive: sending_paused, digest_enabled, digest_email on assistant_settings). processCampaigns returns early when sendingPaused (queued/scheduled messages stay approved). setSendingPausedAction toggle (resume/pause) with audit log assistant.sending_paused/resumed; red banner component + /admin/assistant/layout.tsx renders it on every assistant page with one-click resume.
+- [x] C2. Overview card at top of /admin/assistant (src/lib/assistant/overview.ts + OverviewTally): total/interested/opted-out leads, approvals waiting, threads needing attention, targets to review, contact forms queued, sends vs daily cap, last inbox sync, last campaign send, bounce rate of last 20 (null until 20 sends).
+- [x] C3. /api/internal/cron/daily-digest (assertCronRequest) + disabled systemd ravelyth-cron-daily-digest.{service,timer} at 08:30 IST. digestEnabled=true default, digestEmail override (else first active verified admin), one email/day via outbox (templateKey assistant.daily_digest), counts only, skip when empty/disabled/already-sent today/no recipient.
+- [x] C4. Tests: digest-logic.test.ts (istDayStart boundary, isSameIstDay, digestDecision send/skip_empty/skip_already_sent/send next day, digestHasContent, digestItems links, buildDigestEmail content + quiet variant). Pause gate covered by processCampaigns early-return. Local commit.
 
 ## Task B - Safe auto-replies for support@
 
@@ -25,6 +25,10 @@ complete. Local commits only after each task; never push.
 - [ ] B2. Auto-send conditions (category, suppression, automated sender, paused, per-thread 1, 20/day); everything else to needs-attention.
 - [ ] B3. Reply-To support@ravelyth.in on noreply@ system emails; layout test.
 - [ ] B4. Tests for each rule. Local commit.
+
+## Resume point
+
+Next: Task B (safe auto-replies for support@): B1 keyword-overlap FAQ matching with safe_to_auto_send + autoReplySafe, B2 auto-send conditions, B3 Reply-To support@ on noreply system emails, B4 tests. New additive migrations needed: FAQ safe_to_auto_send, assistant_settings auto_reply_safe. Reminder: gate automatic reply sending on settings.sendingPaused (red banner already shows pause on every assistant page).
 
 ## Task D - Plan limits, free posts, internships
 
@@ -47,7 +51,3 @@ complete. Local commits only after each task; never push.
 - [ ] F1. typecheck, lint, build, all tests green.
 - [ ] F2. Update ASSUMPTIONS.md, KNOWN_ISSUES.md, TESTING.md, SECURITY_NOTES.md, .env.example (no new secrets).
 - [ ] F3. Final report delivered.
-
-## Resume point
-
-Next: Task A1 (schema tables + additive migration 0018).

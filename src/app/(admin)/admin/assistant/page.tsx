@@ -22,6 +22,8 @@ import {
   classifyThreadWithAiAction,
   draftReplyWithAiAction,
 } from "@/lib/assistant/ai-actions";
+import { loadAssistantOverview } from "@/lib/assistant/overview";
+import { OverviewTally } from "@/components/admin/assistant/overview-tally";
 
 export const dynamic = "force-dynamic";
 
@@ -77,6 +79,7 @@ export default async function AssistantInboxPage({
       .where(eq(assistantSettings.id, 1))
       .limit(1),
   ]);
+  const overview = await loadAssistantOverview();
 
   const selectedId = z.uuid().safeParse(params.thread).success ? params.thread : undefined;
   const [selected] = selectedId
@@ -118,8 +121,12 @@ export default async function AssistantInboxPage({
         <Link className="text-royal hover:underline" href="/admin/assistant">Inbox</Link>
         <Link className="text-royal hover:underline" href="/admin/assistant/leads">Company leads</Link>
         <Link className="text-royal hover:underline" href="/admin/assistant/campaigns">Campaigns</Link>
+        <Link className="text-royal hover:underline" href="/admin/assistant/targets">Targets</Link>
+        <Link className="text-royal hover:underline" href="/admin/assistant/contact-forms">Contact forms</Link>
         <Link className="text-royal hover:underline" href="/admin/assistant/settings">Settings and FAQ</Link>
       </nav>
+
+      <OverviewTally summary={overview} />
 
       <div className="grid gap-3 sm:grid-cols-2">
         {accountStatuses.map((account) => (

@@ -242,6 +242,9 @@ export const assistantSettings = pgTable("assistant_settings", {
   sendWindowStart: text("send_window_start").notNull().default("10:00"),
   sendWindowEnd: text("send_window_end").notNull().default("17:00"),
   noReplyAfterDays: integer("no_reply_after_days").notNull().default(3),
+  sendingPaused: boolean("sending_paused").notNull().default(false),
+  digestEnabled: boolean("digest_enabled").notNull().default(true),
+  digestEmail: text("digest_email"),
   crawlEnabled: boolean("crawl_enabled").notNull().default(true),
   crawlPerRun: integer("crawl_per_run").notNull().default(20),
   contactFormTemplate: text("contact_form_template")
