@@ -131,6 +131,10 @@ export default async function AssistantCampaignsPage({
                 <Textarea aria-label="Step 3 body" defaultValue={step3?.body ?? "Hi {{contact_name}},\n\nOne last note about {{company}}. Opt out: {{unsubscribe_url}}"} maxLength={20_000} name="step3Body" rows={5} />
               </div>
             </details>
+            <label className="flex items-center gap-2 text-sm font-semibold text-navy">
+              <input defaultChecked={campaign?.autoApproveFollowups ?? false} name="autoApproveFollowups" type="checkbox" />
+              Auto-approve follow-ups after I approve the first email
+            </label>
             <Button type="submit">Save draft</Button>
           </form>
         )}

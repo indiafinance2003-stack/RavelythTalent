@@ -11,6 +11,65 @@
 - [x] Task 8: Admin, candidate, and employer dashboard redesign
 - [x] Task 10: SMS adapters, npm audit follow-up, off-site backups
 - [x] Final quality gates, documentation, and deploy report
+- [x] Assistant upgrade Phase 1: safety fixes (quoted-text classification, OOO handling, CSV outreach history, follow-up-only activation)
+- [x] Assistant upgrade Phase 2: sequence automation (auto-approved follow-ups, no_reply status)
+
+## Assistant upgrade — Phase 1 (safety fixes)
+
+Phase 1 is complete (no migration required). `classification.ts` now exports
+`stripQuotedText()` so reply classification only sees the sender's new text
+(stop markers: `On ... wrote:` including the two-line form, Original/Forwarded
+Message separators, 5+ underscores, Outlook `From:` + `Sent:`/`Date:` blocks;
+`>` lines are skipped). Bounce detection is restricted to mailer-daemon/
+postmaster/"mail delivery subsystem" senders, delivery-failure phrases in the
+subject, and `Final-Recipient:`/`X-Failed-Recipients:` DSN header lines — the
+loose `5.x.x` body match is gone. The opt-out phrase list follows the spec
+(no bare "stop"), and out-of-office also matches "autoreply". A new pure
+`inboundMessageEffects()` helper makes `persistIncoming` skip lead-status
+changes, `campaign_messages` updates and admin notifications for
+`out_of_office` replies while still saving the message, thread and
+classification. `parseLeadCsv` accepts optional `Status`/`Last Contacted`
+columns (multiple header aliases, four date formats stored at 12:00 noon IST,
+emailed-without-date is a row error, date-without-status implies `emailed`) and
+`importLeadsImpl` persists the history and records the real status in the
+`csv_import` event; the leads import card documents the columns. The new pure
+`planCampaignStep()` in `campaign-rules.ts` makes already-emailed leads
+(`status === "emailed"`, `lastContactedAt` set, no `sent` campaign message)
+start at step 2 scheduled `max(now, lastContactedAt + delayDays)` with the
+14-day rule ignored and a skip when follow-up 1 is disabled;
+`activateCampaignImpl` uses it and logs `firstEmails`/`followUps` counts in the
+activation audit metadata. Typecheck, lint and 287 tests / 40 files pass.
+
+## Assistant upgrade — Phase 2 (sequence automation)
+
+Phase 2 is complete with additive migration
+`0017_colossal_blackheart.sql` (two `ADD COLUMN ... DEFAULT ... NOT NULL`
+statements; not applied locally - PostgreSQL authentication is unavailable).
+`outreach_campaigns.auto_approve_followups` (default `false`) is exposed as
+the "Auto-approve follow-ups after I approve the first email" checkbox, saved
+through `saveCampaignAction` with the usual zod validation; when the flag is
+on, the follow-up message created after a send in `process-campaigns` is
+inserted as `approved` with `approvedAt` set and no approver user - every
+send-time check (suppression, replied, bounced, caps, window, spacing,
+bounce-rate pause) still applies at send time. The `no_reply` lead status was
+added to `LeadStatus`, `leadStatuses` (so every admin filter, badge, bulk
+select and the AI suggestion enum pick it up automatically) and the CSV
+mapping ("no reply"/"no response"); `assistant_settings.no_reply_after_days`
+(default 3, form field on the settings page) drives the new pure
+`shouldMarkNoReply()` decision in `src/lib/assistant/no-reply.ts`, whose
+`markNoReplyLeads()` runs from the existing
+`/api/internal/cron/process-campaigns` route (no new timer), writes one
+`no_reply_marked` lead event per lead and one summary audit log per run with
+markings. `campaignLeadBlockReasons` gained the optional
+`noReplyContactedWithin60Days` input ("Lead did not reply to a previous full
+sequence; wait 60 days."), used both at activation (`planCampaignStep`
+computes it from status + last contact + now) and at send time. A `no_reply`
+lead that receives a fresh first email returns to `emailed` on send, and the
+new pure `inboundLeadStatus()` helper (used by `persistIncoming`) guarantees a
+later real reply moves it back to `replied`. The social-migration test's "is
+the newest journal entry" assertion was updated to "exists after 0015" because
+0017 now exists (guard preserved). Typecheck, lint and 298 tests / 41 files
+pass.
 
 ## Current task
 

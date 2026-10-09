@@ -57,6 +57,12 @@ export function LeadCsvImport() {
         <p className="mt-1 text-sm text-slate-600">
           Preview and correct the file before saving. Company Name and Contact Email are required; up to 1,000 rows and 2 MB.
         </p>
+        <p className="mt-1 text-xs text-slate-500">
+          Optional columns: <span className="font-semibold">Status</span> (Status, Outreach Status or Lead Status) and{" "}
+          <span className="font-semibold">Last Contacted</span> (Last Contacted, Last Contacted Date, Email Sent Date, Sent Date or Date Emailed).
+          Dates accept 07/10/2026, 07-10-2026, 07.10.2026 or 2026-10-07 (day first) and are stored at 12:00 noon IST.
+          Rows marked as emailed need a Last Contacted date; a date without a status marks the lead as emailed so it will not receive a duplicate first email.
+        </p>
       </div>
       <label className="block text-sm font-semibold text-navy" htmlFor="leads-csv">
         CSV file

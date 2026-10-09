@@ -218,7 +218,12 @@ async function importLeadsImpl(formData: FormData): Promise<void> {
     for (const row of validRows) {
       if (!row.data) continue;
       const [created] = await tx.insert(companyLeads)
-        .values({ ...row.data, createdByUserId: admin.id })
+        .values({
+          ...row.data,
+          ...(row.history?.status ? { status: row.history.status } : {}),
+          ...(row.history?.lastContactedAt ? { lastContactedAt: row.history.lastContactedAt } : {}),
+          createdByUserId: admin.id,
+        })
         .onConflictDoNothing()
         .returning({ id: companyLeads.id });
       if (!created) continue;
@@ -227,7 +232,7 @@ async function importLeadsImpl(formData: FormData): Promise<void> {
         leadId: created.id,
         actorUserId: admin.id,
         eventType: "csv_import",
-        toStatus: "new",
+        toStatus: row.history?.status ?? "new",
         details: `Imported from CSV row ${row.row}.`,
       });
     }

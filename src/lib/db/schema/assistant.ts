@@ -23,6 +23,7 @@ export type LeadStatus =
   | "subscribed"
   | "rejected"
   | "bounced"
+  | "no_reply"
   | "do_not_contact";
 
 export const inboxAccounts = pgTable("inbox_accounts", {
@@ -240,6 +241,7 @@ export const assistantSettings = pgTable("assistant_settings", {
   dailySendCap: integer("daily_send_cap").notNull().default(15),
   sendWindowStart: text("send_window_start").notNull().default("10:00"),
   sendWindowEnd: text("send_window_end").notNull().default("17:00"),
+  noReplyAfterDays: integer("no_reply_after_days").notNull().default(3),
   updatedByUserId: uuid("updated_by_user_id").references(() => users.id, {
     onDelete: "set null",
   }),
@@ -292,6 +294,7 @@ export const outreachCampaigns = pgTable(
       .$type<Array<{ delayDays: number; subject: string; body: string; enabled: boolean }>>()
       .notNull()
       .default([]),
+    autoApproveFollowups: boolean("auto_approve_followups").notNull().default(false),
     createdByUserId: uuid("created_by_user_id").references(() => users.id, {
       onDelete: "set null",
     }),

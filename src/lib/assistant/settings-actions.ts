@@ -30,6 +30,7 @@ async function saveSettingsImpl(formData: FormData): Promise<void> {
     dailySendCap: z.coerce.number().int().min(1).max(40),
     sendWindowStart: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/),
     sendWindowEnd: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/),
+    noReplyAfterDays: z.coerce.number().int().min(1).max(90),
   }).safeParse({
     aiEnabled: formData.get("aiEnabled") === "on",
     monthlySpendCapUsd: formData.get("monthlySpendCapUsd"),
@@ -39,6 +40,7 @@ async function saveSettingsImpl(formData: FormData): Promise<void> {
     dailySendCap: formData.get("dailySendCap"),
     sendWindowStart: formData.get("sendWindowStart"),
     sendWindowEnd: formData.get("sendWindowEnd"),
+    noReplyAfterDays: formData.get("noReplyAfterDays") || 3,
   });
   if (!parsed.success) throw new AppError(parsed.error.issues[0]?.message ?? "Invalid assistant settings.", 422);
   if (parsed.data.sendWindowStart >= parsed.data.sendWindowEnd) {
@@ -80,6 +82,7 @@ async function saveSettingsImpl(formData: FormData): Promise<void> {
       aiEnabled: parsed.data.aiEnabled,
       monthlySpendCapUsd: parsed.data.monthlySpendCapUsd,
       dailySendCap: parsed.data.dailySendCap,
+      noReplyAfterDays: parsed.data.noReplyAfterDays,
     },
   });
   revalidatePath("/admin/assistant");

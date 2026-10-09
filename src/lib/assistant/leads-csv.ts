@@ -8,8 +8,11 @@ export const leadStatuses = [
   "subscribed",
   "rejected",
   "bounced",
+  "no_reply",
   "do_not_contact",
 ] as const;
+
+export type LeadStatusValue = (typeof leadStatuses)[number];
 
 export const leadInputSchema = z.object({
   company: z.string().trim().min(1).max(200),
@@ -39,11 +42,89 @@ const HEADER_ALIASES: Record<keyof LeadInput, string[]> = {
   source: ["source", "leadsource"],
 };
 
+export type LeadCsvHistory = {
+  status: LeadStatusValue | null;
+  lastContactedAt: Date | null;
+};
+
 export type LeadCsvRow = {
   row: number;
   data: LeadInput | null;
   error: string | null;
+  /** Present only when the CSV contains the optional history columns. */
+  history?: LeadCsvHistory;
 };
+
+const STATUS_HEADERS = ["status", "outreachstatus", "leadstatus"];
+const LAST_CONTACTED_HEADERS = [
+  "lastcontacted",
+  "lastcontacteddate",
+  "emailsentdate",
+  "sentdate",
+  "dateemailed",
+];
+
+const STATUS_TEXT_ALIASES: Record<string, LeadStatusValue> = {
+  "email sent": "emailed",
+  emailed: "emailed",
+  sent: "emailed",
+  contacted: "emailed",
+  "not contacted": "new",
+  new: "new",
+  "not emailed": "new",
+  replied: "replied",
+  interested: "interested",
+  subscribed: "subscribed",
+  rejected: "rejected",
+  bounced: "bounced",
+  "no reply": "no_reply",
+  "no response": "no_reply",
+  "do not contact": "do_not_contact",
+  unsubscribed: "do_not_contact",
+  "opted out": "do_not_contact",
+};
+
+function mapLeadStatusText(value: string): LeadStatusValue | null {
+  const key = value
+    .trim()
+    .toLocaleLowerCase("en")
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ");
+  return STATUS_TEXT_ALIASES[key] ?? null;
+}
+
+/** Parses a Last Contacted value into 12:00 noon IST, or null when invalid. */
+function parseHistoryDate(value: string): Date | null {
+  const trimmed = value.trim();
+  let year: number;
+  let month: number;
+  let day: number;
+  const iso = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(trimmed);
+  const dmySlash = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(trimmed);
+  const dmyDash = /^(\d{1,2})-(\d{1,2})-(\d{4})$/.exec(trimmed);
+  const dmyDot = /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(trimmed);
+  if (iso) {
+    year = Number(iso[1]);
+    month = Number(iso[2]);
+    day = Number(iso[3]);
+  } else if (dmySlash || dmyDash || dmyDot) {
+    const match = dmySlash ?? dmyDash ?? dmyDot!;
+    day = Number(match[1]);
+    month = Number(match[2]);
+    year = Number(match[3]);
+  } else {
+    return null;
+  }
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  const calendar = new Date(Date.UTC(year, month - 1, day));
+  if (
+    calendar.getUTCFullYear() !== year ||
+    calendar.getUTCMonth() !== month - 1 ||
+    calendar.getUTCDate() !== day
+  ) return null;
+  // 12:00 IST is 06:30 UTC.
+  return new Date(Date.UTC(year, month - 1, day, 6, 30));
+}
 
 function parseRecords(csv: string): string[][] {
   const records: string[][] = [];
@@ -111,6 +192,9 @@ export function parseLeadCsv(csv: string): LeadCsvRow[] {
   }
 
   const seenEmails = new Set<string>();
+  const statusColumn = headers.findIndex((header) => STATUS_HEADERS.includes(header));
+  const lastContactedColumn = headers.findIndex((header) => LAST_CONTACTED_HEADERS.includes(header));
+  const hasHistoryColumns = statusColumn >= 0 || lastContactedColumn >= 0;
   return records.slice(1, 1001).map((record, index) => {
     const raw = Object.fromEntries(
       [...indexes].map(([key, column]) => [key, record[column] ?? ""]),
@@ -139,6 +223,35 @@ export function parseLeadCsv(csv: string): LeadCsvRow[] {
       return { row: index + 2, data: null, error: "Duplicate email in this CSV." };
     }
     seenEmails.add(parsed.data.email);
-    return { row: index + 2, data: parsed.data, error: null };
+    if (!hasHistoryColumns) return { row: index + 2, data: parsed.data, error: null };
+
+    const rawStatus = statusColumn >= 0 ? (record[statusColumn] ?? "").trim() : "";
+    const rawDate = lastContactedColumn >= 0 ? (record[lastContactedColumn] ?? "").trim() : "";
+    const mappedStatus = rawStatus ? mapLeadStatusText(rawStatus) : null;
+    let lastContactedAt: Date | null = null;
+    if (rawDate) {
+      lastContactedAt = parseHistoryDate(rawDate);
+      if (!lastContactedAt) {
+        return {
+          row: index + 2,
+          data: null,
+          error: "Last Contacted must be a date like 07/10/2026 or 2026-10-07.",
+        };
+      }
+    }
+    if (mappedStatus === "emailed" && !lastContactedAt) {
+      return {
+        row: index + 2,
+        data: null,
+        error: "Rows marked as emailed need a Last Contacted date.",
+      };
+    }
+    const status: LeadStatusValue | null = mappedStatus ?? (lastContactedAt ? "emailed" : null);
+    return {
+      row: index + 2,
+      data: parsed.data,
+      error: null,
+      history: { status, lastContactedAt },
+    };
   });
 }

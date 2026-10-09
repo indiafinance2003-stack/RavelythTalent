@@ -70,6 +70,7 @@ export default async function AssistantSettingsPage() {
             <label className="text-sm font-semibold text-navy">Send window start (IST)<Input className="mt-1" defaultValue={settings?.sendWindowStart ?? "10:00"} name="sendWindowStart" required type="time" /></label>
             <label className="text-sm font-semibold text-navy">Send window end (IST)<Input className="mt-1" defaultValue={settings?.sendWindowEnd ?? "17:00"} name="sendWindowEnd" required type="time" /></label>
           </div>
+          <label className="text-sm font-semibold text-navy">Mark leads as no reply after (days)<Input className="mt-1" defaultValue={settings?.noReplyAfterDays ?? 3} max={90} min={1} name="noReplyAfterDays" required type="number" /></label>
           <label className="text-sm font-semibold text-navy sm:col-span-2">Business description for AI only<Textarea className="mt-1" defaultValue={settings?.businessDescription ?? ""} maxLength={5000} name="businessDescription" rows={4} /></label>
           <label className="text-sm font-semibold text-navy sm:col-span-2">Email signature<Textarea className="mt-1" defaultValue={settings?.signatureText ?? ""} maxLength={2000} name="signatureText" rows={3} /></label>
           <label className="text-sm font-semibold text-navy sm:col-span-2">Opt-out confirmation text<Textarea className="mt-1" defaultValue={settings?.optOutText ?? "Reply to this email with unsubscribe to opt out."} maxLength={500} name="optOutText" required rows={2} /></label>

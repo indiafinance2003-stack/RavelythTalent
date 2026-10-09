@@ -27,8 +27,8 @@ import { getEnv } from "@/lib/env";
 import { getMailAccountCredentials } from "./mail-accounts";
 import {
   campaignActivationBlockReasons,
-  campaignLeadBlockReasons,
   outreachBusinessAddress,
+  planCampaignStep,
   renderCampaignTemplate,
 } from "./campaign-rules";
 import { signUnsubscribeToken } from "./unsubscribe-token";
@@ -60,6 +60,7 @@ const campaignSchema = z.object({
   step3DelayDays: z.coerce.number().int().min(1).max(60),
   step3Subject: z.string().trim().max(998),
   step3Body: z.string().trim().max(20_000),
+  autoApproveFollowups: z.boolean(),
 });
 
 async function saveCampaignImpl(formData: FormData): Promise<void> {
@@ -78,6 +79,7 @@ async function saveCampaignImpl(formData: FormData): Promise<void> {
     step3DelayDays: formData.get("step3DelayDays"),
     step3Subject: formString(formData, "step3Subject"),
     step3Body: formString(formData, "step3Body"),
+    autoApproveFollowups: formString(formData, "autoApproveFollowups") === "on",
   });
   if (!parsed.success) throw new AppError(parsed.error.issues[0]?.message ?? "Invalid campaign.", 422);
   if (
@@ -108,6 +110,7 @@ async function saveCampaignImpl(formData: FormData): Promise<void> {
       subjectTemplate: parsed.data.subjectTemplate,
       bodyTemplate: parsed.data.bodyTemplate,
       followupSequence: sequence,
+      autoApproveFollowups: parsed.data.autoApproveFollowups,
       updatedAt: new Date(),
     }).where(and(eq(outreachCampaigns.id, campaignId), eq(outreachCampaigns.status, "draft")))
       .returning({ id: outreachCampaigns.id });
@@ -120,6 +123,7 @@ async function saveCampaignImpl(formData: FormData): Promise<void> {
       subjectTemplate: parsed.data.subjectTemplate,
       bodyTemplate: parsed.data.bodyTemplate,
       followupSequence: sequence,
+      autoApproveFollowups: parsed.data.autoApproveFollowups,
       createdByUserId: admin.id,
     }).returning({ id: outreachCampaigns.id });
     if (!created) throw new Error("Campaign could not be saved.");
@@ -184,7 +188,17 @@ async function activateCampaignImpl(formData: FormData): Promise<void> {
 
   const now = new Date();
   const unsubscribeBase = `${getEnv().APP_URL.replace(/\/+$/, "")}/api/unsubscribe/`;
+  const selectedLeadIds = [...new Set(parsed.data.leadIds)];
+  const sentRows = await db.select({ leadId: campaignMessages.leadId })
+    .from(campaignMessages)
+    .where(and(
+      inArray(campaignMessages.leadId, selectedLeadIds),
+      eq(campaignMessages.status, "sent"),
+    ));
+  const leadsWithSentMessage = new Set(sentRows.map((row) => row.leadId));
   let queued = 0;
+  let firstEmails = 0;
+  let followUps = 0;
   for (const lead of leads) {
     const emailValid = z.email().safeParse(lead.email).success;
     const [suppressed] = await db.select({ id: suppressedEmails.id })
@@ -208,19 +222,23 @@ async function activateCampaignImpl(formData: FormData): Promise<void> {
         eq(inboxMessages.direction, "inbound"),
       ))
       .limit(1);
-    const blockReasons = campaignLeadBlockReasons({
+    const plan = planCampaignStep({
+      now,
       email: lead.email,
       emailValid,
       suppressed: Boolean(suppressed),
       doNotContact: lead.doNotContact,
       status: lead.status,
+      lastContactedAt: lead.lastContactedAt,
+      hasReplied: Boolean(reply) || lead.status === "replied",
       emailedWithin14Days: Boolean(recentSend) || Boolean(
         lead.lastContactedAt &&
         lead.lastContactedAt.getTime() > now.getTime() - 14 * 24 * 60 * 60 * 1000,
       ),
-      hasReplied: Boolean(reply) || lead.status === "replied",
+      hasSentCampaignMessage: leadsWithSentMessage.has(lead.id),
+      followupSequence: campaign.followupSequence ?? [],
     });
-    if (blockReasons.length) continue;
+    if (plan.action === "blocked" || plan.action === "skipped") continue;
 
     const token = signUnsubscribeToken(lead.email, getEnv().SESSION_SECRET);
     const values = {
@@ -230,16 +248,31 @@ async function activateCampaignImpl(formData: FormData): Promise<void> {
       city: lead.city ?? "",
       unsubscribe_url: `${unsubscribeBase}${token}`,
     };
+    let subject: string;
+    let body: string;
+    if (plan.action === "followup") {
+      const firstFollowup = (campaign.followupSequence ?? [])[0];
+      if (!firstFollowup) continue;
+      subject = renderCampaignTemplate(firstFollowup.subject, values);
+      body = renderCampaignTemplate(firstFollowup.body, values);
+    } else {
+      subject = renderCampaignTemplate(campaign.subjectTemplate, values);
+      body = renderCampaignTemplate(campaign.bodyTemplate, values);
+    }
     const [created] = await db.insert(campaignMessages).values({
       campaignId: campaign.id,
       leadId: lead.id,
-      step: 1,
-      subject: renderCampaignTemplate(campaign.subjectTemplate, values),
-      body: renderCampaignTemplate(campaign.bodyTemplate, values),
+      step: plan.step,
+      subject,
+      body,
       status: "pending_approval",
-      scheduledAt: now,
+      scheduledAt: plan.scheduledAt,
     }).onConflictDoNothing().returning({ id: campaignMessages.id });
-    if (created) queued += 1;
+    if (created) {
+      queued += 1;
+      if (plan.action === "followup") followUps += 1;
+      else firstEmails += 1;
+    }
   }
 
   if (!queued) throw new ConflictError("No selected leads passed all campaign pre-send checks.");
@@ -252,7 +285,7 @@ async function activateCampaignImpl(formData: FormData): Promise<void> {
     entityType: "outreach_campaign",
     entityId: campaign.id,
     description: `Campaign activated with ${queued} message(s) awaiting manual approval.`,
-    metadata: { queued, selected: leads.length },
+    metadata: { queued, selected: leads.length, firstEmails, followUps },
   });
   revalidatePath("/admin/assistant/campaigns");
 }

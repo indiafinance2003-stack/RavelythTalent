@@ -31,10 +31,14 @@ const createdTables = statements
   .map((statement) => /^CREATE TABLE "([^"]+)"/.exec(statement)?.[1] ?? "");
 
 describe("migration 0016 (social posting)", () => {
-  it("exists as the newest journal entry", () => {
+  it("exists as a journal entry after migration 0015", () => {
     expect(entry).toBeDefined();
     expect(migrationSql.length).toBeGreaterThan(0);
-    expect(journal.entries[journal.entries.length - 1]?.idx).toBe(16);
+    // Note: later phases may append newer migrations; this guard checks that
+    // 0016 is present and keeps its position in the journal order.
+    const index = journal.entries.findIndex((item) => item.idx === 16);
+    expect(index).toBeGreaterThan(0);
+    expect(journal.entries[index - 1]?.idx).toBe(15);
   });
 
   it("is additive only - nothing that can lose data", () => {

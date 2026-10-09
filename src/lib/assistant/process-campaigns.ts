@@ -183,6 +183,10 @@ export async function processCampaigns(): Promise<{
         Boolean(item.lead.lastContactedAt && item.lead.lastContactedAt.getTime() > now.getTime() - 14 * 24 * 60 * 60 * 1000)
       ),
       hasReplied: Boolean(reply) || item.lead.status === "replied",
+      noReplyContactedWithin60Days: item.lead.status === "no_reply" && Boolean(
+        item.lead.lastContactedAt &&
+        item.lead.lastContactedAt.getTime() > now.getTime() - 60 * 24 * 60 * 60 * 1000
+      ),
     });
     if (blockReasons.length) {
       await db.update(campaignMessages).set({
@@ -324,7 +328,9 @@ export async function processCampaigns(): Promise<{
           sentAt,
         });
       }
-      const nextStatus = item.lead.status === "new" ? "emailed" : item.lead.status;
+      const nextStatus = item.lead.status === "new" || item.lead.status === "no_reply"
+        ? "emailed"
+        : item.lead.status;
       await tx.update(companyLeads).set({
         status: nextStatus,
         lastContactedAt: sentAt,
@@ -361,6 +367,7 @@ export async function processCampaigns(): Promise<{
           city: item.lead.city ?? "",
           unsubscribe_url: `${getEnv().APP_URL.replace(/\/+$/, "")}/api/unsubscribe/${followupToken}`,
         };
+        const autoApproveFollowups = Boolean(item.campaign.autoApproveFollowups);
         await tx.insert(campaignMessages).values({
           campaignId: item.campaign.id,
           leadId: item.lead.id,
@@ -373,7 +380,8 @@ export async function processCampaigns(): Promise<{
             /\{\{\s*(company|contact_name|designation|city|unsubscribe_url)\s*\}\}/gi,
             (_match, key: string) => values[key.toLocaleLowerCase("en") as keyof typeof values] ?? "",
           ),
-          status: "pending_approval",
+          status: autoApproveFollowups ? "approved" : "pending_approval",
+          approvedAt: autoApproveFollowups ? sentAt : null,
           scheduledAt: new Date(firstStep.getTime() + nextSequence.delayDays * 24 * 60 * 60 * 1000),
         }).onConflictDoNothing();
       }

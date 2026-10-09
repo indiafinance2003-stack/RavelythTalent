@@ -1,0 +1,2 @@
+ALTER TABLE "assistant_settings" ADD COLUMN "no_reply_after_days" integer DEFAULT 3 NOT NULL;--> statement-breakpoint
+ALTER TABLE "outreach_campaigns" ADD COLUMN "auto_approve_followups" boolean DEFAULT false NOT NULL;

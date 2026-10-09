@@ -74,6 +74,31 @@
   provider only. No live `ANTHROPIC_API_KEY` call was made; token/cost
   estimates are approximate and should be checked against the first real
   usage in the provider console.
+- **MEDIUM — Assistant upgrade Phase 1 needs live mailbox and campaign
+  verification:** the quoted-text classification fix (`stripQuotedText`), the
+  stricter bounce rules, the out-of-office no-side-effect path, CSV outreach
+  history import and the follow-up-only campaign activation are covered by 27
+  new pure-logic tests only. Real reply shapes (Gmail/Outlook quoting styles,
+  DSN formats from Indian mail servers), IMAP persistence of OOO messages, the
+  noon-IST history dates written by a real import, and activation of a real
+  draft campaign against PostgreSQL are unverified because PostgreSQL
+  authentication and a live mail server were unavailable. No migration was
+  generated in Phase 1.
+- **MEDIUM — Assistant upgrade Phase 2 needs database and cron verification:**
+  additive migration `0017_colossal_blackheart.sql`
+  (`outreach_campaigns.auto_approve_followups` boolean default false,
+  `assistant_settings.no_reply_after_days` integer default 3) has been
+  generated but not applied locally. Auto-approved follow-up insertion,
+  `markNoReplyLeads()` aggregation queries (max sent-at, pending-status set,
+  inbound join), the 60-day no-reply block at activation/send time and the
+  `no_reply -> emailed` reset on a fresh send are covered by pure-logic tests
+  and code review only; the cron route addition
+  (`/api/internal/cron/process-campaigns` now also runs `markNoReplyLeads`)
+  was not executed against a live database or CRON_SECRET-protected request.
+  One existing test assertion was updated on purpose: the social migration
+  test no longer requires itself to be the *newest* drizzle journal entry
+  (Phase 2 appends 0017); it still guards that 0016 exists and keeps its
+  journal position.
 - **LOW — assistant systemd timers unvalidated:** The new
   `ravelyth-cron-sync-inbox` and `ravelyth-cron-process-campaigns`
   service/timer files are added disabled and were not validated with

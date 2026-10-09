@@ -23,6 +23,8 @@ import {
   classifyMessage,
   extractBounceRecipient,
   extractMessageIds,
+  inboundLeadStatus,
+  inboundMessageEffects,
   matchesFallbackThread,
 } from "./classification";
 import { getMailAccountCredentials } from "./mail-accounts";
@@ -258,6 +260,7 @@ async function persistIncoming(
     subject: message.subject,
     text: message.text,
   });
+  const effects = inboundMessageEffects(classification);
   const bounceRecipient = classification.isBounce
     ? extractBounceRecipient(message.text)
     : null;
@@ -313,23 +316,24 @@ async function persistIncoming(
       }).onConflictDoNothing();
     }
 
-    if (lead) {
-      const status = classification.isOptOut
-        ? "do_not_contact"
-        : classification.isBounce
-          ? "bounced"
-          : "replied";
-      const nextStatus = lead.doNotContact ? "do_not_contact" : status;
-      if (lead.status !== nextStatus || (status === "do_not_contact" && !lead.doNotContact)) {
+    if (lead && effects.updateLeadStatus) {
+      const nextStatus = inboundLeadStatus(classification, lead);
+      const statusChanged = lead.status !== nextStatus ||
+        (classification.isOptOut && !lead.doNotContact);
+      if (statusChanged) {
         await tx.update(companyLeads).set({
           status: nextStatus,
-          doNotContact: status === "do_not_contact" || lead.doNotContact,
+          doNotContact: classification.isOptOut || lead.doNotContact,
           lastContactedAt: message.sentAt,
           updatedAt: new Date(),
         }).where(eq(companyLeads.id, lead.id));
         await tx.insert(leadEvents).values({
           leadId: lead.id,
-          eventType: status === "do_not_contact" ? "opt_out_received" : status,
+          eventType: classification.isOptOut
+            ? "opt_out_received"
+            : classification.isBounce
+              ? "bounced"
+              : "replied",
           fromStatus: lead.status,
           toStatus: nextStatus,
           details: classification.summary,
@@ -347,7 +351,8 @@ async function persistIncoming(
           details: classification.summary,
         });
       }
-      if (classification.isOptOut || classification.isBounce || message.from !== "unknown") {
+      if (effects.updateCampaignMessages &&
+        (classification.isOptOut || classification.isBounce || message.from !== "unknown")) {
         const sentCampaignStatus = classification.isOptOut
           ? "opted_out"
           : classification.isBounce
@@ -383,7 +388,7 @@ async function persistIncoming(
       });
     }
 
-    if (classification.needsHuman || classification.isOptOut) {
+    if (effects.notifyAdmins) {
       const admins = await tx.select({ id: users.id })
         .from(users)
         .where(and(
