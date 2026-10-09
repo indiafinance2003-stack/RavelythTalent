@@ -2,7 +2,8 @@ import { and, asc, eq, inArray, lte } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { emailOutbox, jobAlerts, users } from "@/lib/db/schema";
 import { AppError } from "@/lib/errors";
-import { fromAddress, getTransport } from "./smtp";
+import { getEnv } from "@/lib/env";
+import { fromAddress, getTransport, systemReplyTo } from "./smtp";
 import { mayEmailJobAlerts } from "@/lib/alerts/matching";
 
 /**
@@ -70,8 +71,10 @@ async function deliver(row: OutboxRow): Promise<void> {
       : { filename: a.filename, path: a.path!, contentType: a.contentType },
   );
 
+  const env = getEnv();
   const info = await getTransport().sendMail({
     from: fromAddress(),
+    replyTo: systemReplyTo(env.EMAIL_FROM, env.SUPPORT_EMAIL),
     to: row.toName ? { address: row.toEmail, name: row.toName } : row.toEmail,
     subject: row.subject,
     html: row.html,

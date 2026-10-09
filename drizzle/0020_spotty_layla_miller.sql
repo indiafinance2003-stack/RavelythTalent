@@ -1,0 +1,1 @@
+ALTER TABLE "assistant_faq" ADD COLUMN "safe_to_auto_send" boolean DEFAULT false NOT NULL;

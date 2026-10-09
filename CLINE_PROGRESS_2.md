@@ -21,14 +21,14 @@ complete. Local commits only after each task; never push.
 
 ## Task B - Safe auto-replies for support@
 
-- [ ] B1. Keyword-overlap FAQ matching with documented threshold; safe_to_auto_send on FAQ + autoReplySafe setting (default false); confident match always creates a DRAFT.
-- [ ] B2. Auto-send conditions (category, suppression, automated sender, paused, per-thread 1, 20/day); everything else to needs-attention.
-- [ ] B3. Reply-To support@ravelyth.in on noreply@ system emails; layout test.
-- [ ] B4. Tests for each rule. Local commit.
+- [x] B1. Migration 0020_spotty_layla_miller (additive: assistant_faq.safe_to_auto_send). FAQ matcher src/lib/assistant/faq-reply.ts: significant-token Dice similarity, documented threshold (>=0.4, >=2 shared tokens), confident match ALWAYS creates a "faq" inbox draft. Auto-send uses the existing assistant_settings.auto_send_safe_replies setting (default false, now wired through saveSettings + settings page) AND safe_to_auto_send on the matched FAQ.
+- [x] B2. Auto-reply server module src/lib/assistant/auto-reply.ts enforcing every condition (category general/account only, suppression list, automated sender heuristic, sending_paused blocks, per-thread 1, 20/day cap) — any block leaves the draft for human review with needs_attention. Hooked into sync-inbox.persistIncoming; sent replies mark thread handled, add outbound message, audit log.
+- [x] B3. Reply-To support@ravelyth.in on noreply@ system emails via systemReplyTo in smtp.ts used by outbox deliver (smtp.test.ts covers noreply/support/no-support cases).
+- [x] B4. Tests: faq-reply.test.ts (tokens, Dice threshold, best match, plan always-draft, autoSend only when safe+enabled, all block conditions), smtp.test.ts. Local commit.
 
 ## Resume point
 
-Next: Task B (safe auto-replies for support@): B1 keyword-overlap FAQ matching with safe_to_auto_send + autoReplySafe, B2 auto-send conditions, B3 Reply-To support@ on noreply system emails, B4 tests. New additive migrations needed: FAQ safe_to_auto_send, assistant_settings auto_reply_safe. Reminder: gate automatic reply sending on settings.sendingPaused (red banner already shows pause on every assistant page).
+Next: Task D (plan limits, free posts, internships): D1 free job posts default 3 (schema default + idempotent update when currently 1, copy reads from setting everywhere), D2 monthly job-post limits 9/20/30/55 via idempotent seed upsert, D3 internship fields (additive migration) + posting form + job page/cards/search/emails/social + /internships + home section + search filter + safety scan rules, D4 internship quota free_internship_posts=5 + internship_post_price_paise=39900 with Razorpay credit reuse + dashboard UI, D5 tests (Razorpay mocked). Additive migrations only.
 
 ## Task D - Plan limits, free posts, internships
 

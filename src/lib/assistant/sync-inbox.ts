@@ -28,6 +28,7 @@ import {
   matchesFallbackThread,
 } from "./classification";
 import { getMailAccountCredentials } from "./mail-accounts";
+import { maybeAutoReply } from "./auto-reply";
 
 const MAX_MESSAGES_PER_ACCOUNT = 25;
 const MAX_BODY_BYTES = 128 * 1024;
@@ -412,6 +413,19 @@ async function persistIncoming(
 
     return true;
   });
+
+  if (inserted) {
+    await maybeAutoReply({
+      accountId,
+      threadId: thread.id,
+      from: message.from,
+      subject: message.subject,
+      text: message.text,
+      category: classification.category,
+      isOptOut: classification.isOptOut,
+      isBounce: classification.isBounce,
+    });
+  }
 
   return inserted;
 }

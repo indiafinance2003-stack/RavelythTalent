@@ -112,7 +112,7 @@ export const inboxDrafts = pgTable(
       .notNull()
       .references(() => inboxAccounts.id, { onDelete: "cascade" }),
     body: text("body").notNull(),
-    source: text("source").$type<"manual" | "ai" | "opt_out_confirmation">().notNull().default("manual"),
+    source: text("source").$type<"manual" | "ai" | "opt_out_confirmation" | "faq">().notNull().default("manual"),
     sendStatus: text("send_status").$type<"draft" | "sending" | "sent">().notNull().default("draft"),
     createdByUserId: uuid("created_by_user_id").references(() => users.id, {
       onDelete: "set null",
@@ -150,6 +150,7 @@ export const assistantFaq = pgTable(
     question: text("question").notNull(),
     answer: text("answer").notNull(),
     isActive: boolean("is_active").notNull().default(true),
+    safeToAutoSend: boolean("safe_to_auto_send").notNull().default(false),
     updatedByUserId: uuid("updated_by_user_id").references(() => users.id, {
       onDelete: "set null",
     }),

@@ -33,6 +33,20 @@ export function fromAddress(): string {
   return getEnv().EMAIL_FROM;
 }
 
+/**
+ * Reply-To for outbound system emails. When the message comes from a
+ * noreply-style address and a support address is configured, replies go to
+ * support@ravelyth.in so that real people can answer instead of hitting a dead
+ * mailbox.
+ */
+export function systemReplyTo(
+  from: string,
+  supportEmail: string | null | undefined,
+): string | undefined {
+  if (!supportEmail || !/noreply/i.test(from)) return undefined;
+  return supportEmail.trim() || undefined;
+}
+
 /** Used by the admin "send test email" action and the health checks. */
 export async function verifyTransport(): Promise<{ ok: boolean; error?: string }> {
   try {

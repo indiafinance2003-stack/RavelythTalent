@@ -31,6 +31,7 @@ async function saveSettingsImpl(formData: FormData): Promise<void> {
     sendWindowStart: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/),
     sendWindowEnd: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/),
     noReplyAfterDays: z.coerce.number().int().min(1).max(90),
+    autoSendSafeReplies: z.boolean(),
     sendingPaused: z.boolean(),
     digestEnabled: z.boolean(),
     digestEmail: z.string().trim().toLowerCase().max(254).nullable(),
@@ -44,6 +45,7 @@ async function saveSettingsImpl(formData: FormData): Promise<void> {
     sendWindowStart: formData.get("sendWindowStart"),
     sendWindowEnd: formData.get("sendWindowEnd"),
     noReplyAfterDays: formData.get("noReplyAfterDays") || 3,
+    autoSendSafeReplies: formData.get("autoSendSafeReplies") === "on",
     sendingPaused: formData.get("sendingPaused") === "on",
     digestEnabled: formData.get("digestEnabled") === "on",
     digestEmail: String(formData.get("digestEmail") ?? "").trim() || null,
@@ -63,7 +65,6 @@ async function saveSettingsImpl(formData: FormData): Promise<void> {
     id: 1,
     ...parsed.data,
     model: "claude-haiku-4-5",
-    autoSendSafeReplies: false,
     updatedByUserId: admin.id,
     updatedAt: new Date(),
   }).onConflictDoUpdate({
@@ -72,7 +73,6 @@ async function saveSettingsImpl(formData: FormData): Promise<void> {
       ...parsed.data,
       ...(parsed.data.monthlySpendCapUsd > 0 ? { aiEnabled: parsed.data.aiEnabled } : { aiEnabled: false }),
       model: "claude-haiku-4-5",
-      autoSendSafeReplies: false,
       updatedByUserId: admin.id,
       updatedAt: new Date(),
     },
@@ -89,6 +89,7 @@ async function saveSettingsImpl(formData: FormData): Promise<void> {
       monthlySpendCapUsd: parsed.data.monthlySpendCapUsd,
       dailySendCap: parsed.data.dailySendCap,
       noReplyAfterDays: parsed.data.noReplyAfterDays,
+      autoSendSafeReplies: parsed.data.autoSendSafeReplies,
       sendingPaused: parsed.data.sendingPaused,
       digestEnabled: parsed.data.digestEnabled,
       digestEmail: parsed.data.digestEmail ?? null,
@@ -142,10 +143,12 @@ async function saveFaqImpl(formData: FormData): Promise<void> {
     id: z.uuid().optional(),
     question: z.string().trim().min(1).max(1_000),
     answer: z.string().trim().min(1).max(5_000),
+    safeToAutoSend: z.boolean(),
   }).safeParse({
     id: String(formData.get("id") ?? "") || undefined,
     question: formData.get("question"),
     answer: formData.get("answer"),
+    safeToAutoSend: formData.get("safeToAutoSend") === "on",
   });
   if (!parsed.success) throw new AppError(parsed.error.issues[0]?.message ?? "Invalid FAQ entry.", 422);
 
@@ -153,6 +156,7 @@ async function saveFaqImpl(formData: FormData): Promise<void> {
     const [updated] = await db.update(assistantFaq).set({
       question: parsed.data.question,
       answer: parsed.data.answer,
+      safeToAutoSend: parsed.data.safeToAutoSend,
       updatedByUserId: admin.id,
       updatedAt: new Date(),
     }).where(eq(assistantFaq.id, parsed.data.id))
@@ -162,6 +166,7 @@ async function saveFaqImpl(formData: FormData): Promise<void> {
     await db.insert(assistantFaq).values({
       question: parsed.data.question,
       answer: parsed.data.answer,
+      safeToAutoSend: parsed.data.safeToAutoSend,
       updatedByUserId: admin.id,
     });
   }

@@ -65,6 +65,10 @@ export default async function AssistantSettingsPage() {
             <input defaultChecked={Boolean(settings?.aiEnabled && configured)} disabled={!configured} name="aiEnabled" type="checkbox" />
             Enable optional AI features
           </label>
+          <label className="flex items-center gap-2 text-sm font-semibold text-navy sm:col-span-2">
+            <input defaultChecked={Boolean(settings?.autoSendSafeReplies)} name="autoSendSafeReplies" type="checkbox" />
+            Auto-send replies when a FAQ match is marked safe
+          </label>
           <label className="text-sm font-semibold text-navy">Model<Input className="mt-1" disabled value={settings?.model ?? "claude-haiku-4-5"} /></label>
           <label className="text-sm font-semibold text-navy">Monthly spend cap (USD)<Input className="mt-1" defaultValue={capUsd} max={100000} min={0} name="monthlySpendCapUsd" required type="number" /></label>
           <label className="text-sm font-semibold text-navy">Campaign daily cap (max 40 per sender)<Input className="mt-1" defaultValue={settings?.dailySendCap ?? 15} max={40} min={1} name="dailySendCap" required type="number" /></label>
@@ -97,6 +101,10 @@ export default async function AssistantSettingsPage() {
         <form action={saveFaqAction} className="space-y-3 rounded-xl border border-slate-200 p-4">
           <label className="block text-sm font-semibold text-navy">Question<Input className="mt-1" maxLength={1000} name="question" required /></label>
           <label className="block text-sm font-semibold text-navy">Answer<Textarea className="mt-1" maxLength={5000} name="answer" required rows={4} /></label>
+          <label className="flex items-center gap-2 text-sm font-semibold text-navy">
+            <input name="safeToAutoSend" type="checkbox" />
+            Safe to reply automatically
+          </label>
           <Button type="submit" variant="secondary">Add FAQ entry</Button>
         </form>
         {faqs.length ? (
@@ -107,6 +115,10 @@ export default async function AssistantSettingsPage() {
                   <input name="id" type="hidden" value={faq.id} />
                   <label className="block text-sm font-semibold text-navy">Question<Input className="mt-1" maxLength={1000} name="question" required defaultValue={faq.question} /></label>
                   <label className="block text-sm font-semibold text-navy">Answer<Textarea className="mt-1" maxLength={5000} name="answer" required rows={4} defaultValue={faq.answer} /></label>
+                  <label className="flex items-center gap-2 text-sm font-semibold text-navy">
+                    <input defaultChecked={Boolean(faq.safeToAutoSend)} name="safeToAutoSend" type="checkbox" />
+                    Safe to reply automatically
+                  </label>
                   <Button size="sm" type="submit" variant="secondary">Save FAQ</Button>
                 </form>
                 <div className="flex flex-wrap items-center justify-between gap-3">
