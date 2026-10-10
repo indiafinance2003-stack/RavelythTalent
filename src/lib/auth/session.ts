@@ -20,14 +20,15 @@ export type SessionUser = {
   id: string;
   email: string;
   fullName: string;
-  role: "job_seeker" | "recruiter" | "admin";
+  role: "candidate" | "recruiter" | "admin" | "job_seeker";
   status: "active" | "suspended" | "deactivated";
   emailVerifiedAt: Date | null;
   phone: string | null;
   phoneVerifiedAt: Date | null;
   avatarPath: string | null;
-  lastLoginAt: Date | null;
   createdAt: Date;
+  lastLoginAt: Date | null;
+  chatMuteUntil: Date | null;
 };
 
 /** Uses X-Real-IP, which the deployment proxy overwrites with its peer IP. */
@@ -137,6 +138,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
       avatarPath: users.avatarPath,
       createdAt: users.createdAt,
       lastLoginAt: users.lastLoginAt,
+      chatMuteUntil: users.chatMuteUntil,
     })
     .from(sessions)
     .innerJoin(users, eq(users.id, sessions.userId))
