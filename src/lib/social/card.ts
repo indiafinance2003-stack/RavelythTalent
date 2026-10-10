@@ -1,4 +1,10 @@
-import { formatSalaryRange, JOB_TYPE_LABEL, WORK_MODE_LABEL, labelFor } from "@/lib/utils";
+import {
+  formatSalaryRange,
+  formatStipendRange,
+  JOB_TYPE_LABEL,
+  WORK_MODE_LABEL,
+  labelFor,
+} from "@/lib/utils";
 import type { SocialCaptionJob } from "./content";
 
 /**
@@ -36,11 +42,16 @@ export function buildSocialCardModel(
   companyName: string,
 ): SocialCardModel {
   const location = [job.city, job.state].filter(Boolean).join(", ") || "India";
+  const isInternship = job.jobType === "internship";
   const showSalary =
-    !job.salaryHidden && (Boolean(job.salaryMinPaise) || Boolean(job.salaryMaxPaise));
-  const salary = showSalary
-    ? formatSalaryRange(job.salaryMinPaise, job.salaryMaxPaise, job.salaryPeriod, false)
-    : null;
+    !isInternship &&
+    !job.salaryHidden &&
+    (Boolean(job.salaryMinPaise) || Boolean(job.salaryMaxPaise));
+  const salary = isInternship
+    ? formatStipendRange(job.stipendMinPaise, job.stipendMaxPaise, job.stipendType)
+    : showSalary
+      ? formatSalaryRange(job.salaryMinPaise, job.salaryMaxPaise, job.salaryPeriod, false)
+      : null;
 
   return {
     brand: SOCIAL_CARD_BRAND,

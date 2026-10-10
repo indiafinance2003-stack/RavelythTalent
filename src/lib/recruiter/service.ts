@@ -13,7 +13,9 @@ import {
 import { AppError } from "@/lib/errors";
 import {
   activeCandidatePremiumSql,
+  checkInternshipQuota,
   checkJobQuota,
+  getInternshipQuota,
   listUserCompanies,
   quotaPeriodKey,
   requireCompanyMembership,
@@ -370,6 +372,14 @@ export type JobFormInput = {
   salaryHidden: boolean;
   experienceMinYears: number | null;
   experienceMaxYears: number | null;
+  stipendType: string | null;
+  stipendMinRupees: number | null;
+  stipendMaxRupees: number | null;
+  durationMonths: number | null;
+  startDate: Date | null;
+  eligibility: string | null;
+  ppoPossible: boolean;
+  certificateProvided: boolean;
   openings: number;
   deadline: Date | null;
 };
@@ -403,6 +413,16 @@ function jobValuesForInsert(
       input.experienceMinYears === null ? null : String(input.experienceMinYears),
     experienceMaxYears:
       input.experienceMaxYears === null ? null : String(input.experienceMaxYears),
+    stipendType: input.stipendType as never,
+    stipendMinPaise:
+      input.stipendMinRupees === null ? null : Math.round(input.stipendMinRupees * 100),
+    stipendMaxPaise:
+      input.stipendMaxRupees === null ? null : Math.round(input.stipendMaxRupees * 100),
+    durationMonths: input.durationMonths,
+    startDate: input.startDate,
+    eligibility: input.eligibility?.trim() || null,
+    ppoPossible: input.ppoPossible,
+    certificateProvided: input.certificateProvided,
     openings: input.openings,
     deadline: input.deadline,
   };
@@ -434,7 +454,12 @@ export async function createCompanyJob(params: {
   }
 
   await assertCompanyApproved(params.companyId);
-  await assertJobQuotaAvailable(params.companyId);
+  const internship = params.input.jobType === "internship";
+  if (internship) {
+    await assertInternshipQuotaAvailable(params.companyId);
+  } else {
+    await assertJobQuotaAvailable(params.companyId);
+  }
   const scan = await scanCompanyJob(params.companyId, params.input);
   const settings = await getSiteSettings();
   const decision = resolveJobScanDecision(scan, settings.autoPublishJobs);
@@ -466,10 +491,16 @@ export async function createCompanyJob(params: {
     return { id: job.id, status: "rejected", reasons: decision.reasons };
   }
 
-  const allowance = await assertCanSubmit(params.companyId);
+  const allowance = internship ? null : await assertCanSubmit(params.companyId);
+  const internshipQuota = internship
+    ? await getInternshipQuota(params.companyId)
+    : null;
   const result = await db.transaction(async (tx) => {
-    const freeUsed = allowance.usesFreeCredit
+    const freeUsed = allowance
       ? await claimFreeJobCredit(tx, params.companyId, allowance.limit)
+      : null;
+    const internshipClaimed = internship
+      ? await claimInternshipSlot(tx, params.companyId, internshipQuota!.freeLimit)
       : null;
     const [job] = await tx
       .insert(jobs)
@@ -481,7 +512,7 @@ export async function createCompanyJob(params: {
       })
       .returning({ id: jobs.id });
     if (!job) throw new AppError("Could not create the job post.", 500);
-    return { id: job.id, freeUsed };
+    return { id: job.id, freeUsed, internshipClaimed };
   });
   let finalStatus: JobSubmissionResult["status"] = "pending_approval";
   if (decision.status === "published") {
@@ -501,8 +532,8 @@ export async function createCompanyJob(params: {
     await notifyFreeJobCreditUsage(
       params.companyId,
       result.freeUsed,
-      allowance.limit,
-      allowance.warningThreshold,
+      allowance!.limit,
+      allowance!.warningThreshold,
     );
   }
   return { id: result.id, status: finalStatus, reasons: decision.reasons };
@@ -523,15 +554,24 @@ export async function submitCompanyJob(
     );
   }
   await assertCompanyApproved(companyId);
-  await assertJobQuotaAvailable(companyId);
+  const internship = job.jobType === "internship";
+  if (internship) {
+    await assertInternshipQuotaAvailable(companyId);
+  } else {
+    await assertJobQuotaAvailable(companyId);
+  }
   const scan = await scanCompanyJob(companyId, {
     title: job.title,
     description: job.description,
     responsibilities: job.responsibilities,
     requirements: job.requirements,
+    jobType: job.jobType,
     salaryMinPaise: job.salaryMinPaise,
     salaryMaxPaise: job.salaryMaxPaise,
     salaryPeriod: job.salaryPeriod,
+    stipendType: job.stipendType,
+    stipendMinPaise: job.stipendMinPaise,
+    stipendMaxPaise: job.stipendMaxPaise,
     experienceMinYears: job.experienceMinYears,
     experienceMaxYears: job.experienceMaxYears,
   }, job.id);
@@ -565,11 +605,18 @@ export async function submitCompanyJob(
     return { id: jobId, status: "rejected", reasons: decision.reasons };
   }
 
-  const allowance = await assertCanSubmit(companyId);
+  const allowance = internship ? null : await assertCanSubmit(companyId);
+  const internshipQuota = internship
+    ? await getInternshipQuota(companyId)
+    : null;
   const freeUsed = await db.transaction(async (tx) => {
-    const consumed = allowance.usesFreeCredit
-      ? await claimFreeJobCredit(tx, companyId, allowance.limit)
-      : null;
+    const consumed = allowance
+      ? allowance.usesFreeCredit
+        ? await claimFreeJobCredit(tx, companyId, allowance.limit)
+        : null
+      : internship
+        ? await claimInternshipSlot(tx, companyId, internshipQuota!.freeLimit)
+        : null;
     await tx
       .update(jobs)
       .set({
@@ -595,7 +642,7 @@ export async function submitCompanyJob(
       reasons: decision.reasons,
     });
   }
-  if (freeUsed !== null) {
+  if (freeUsed !== null && allowance) {
     await notifyFreeJobCreditUsage(
       companyId,
       freeUsed,
@@ -633,6 +680,54 @@ async function assertJobQuotaAvailable(companyId: string): Promise<void> {
   if (!decision.allowed) {
     throw new AppError(decision.reason, 403, "quota_exceeded");
   }
+}
+
+async function assertInternshipQuotaAvailable(companyId: string): Promise<void> {
+  const decision = await checkInternshipQuota(companyId);
+  if (!decision.allowed) {
+    throw new AppError(decision.reason ?? "Internship quota exceeded.", 403, "quota_exceeded");
+  }
+}
+
+async function claimInternshipSlot(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  companyId: string,
+  freeLimit: number,
+): Promise<null> {
+  const freeRows = await tx
+    .update(companies)
+    .set({
+      freeInternshipPostsUsed: sql`${companies.freeInternshipPostsUsed} + 1`,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(companies.id, companyId),
+        eq(companies.status, "approved"),
+        sql`${companies.freeInternshipPostsUsed} < ${freeLimit}`,
+      ),
+    )
+    .returning({ id: companies.id });
+  if (freeRows[0]) return null;
+
+  const creditRows = await tx
+    .update(companies)
+    .set({
+      internshipPostCredits: sql`greatest(${companies.internshipPostCredits} - 1, 0)`,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(eq(companies.id, companyId), sql`${companies.internshipPostCredits} > 0`),
+    )
+    .returning({ internshipPostCredits: companies.internshipPostCredits });
+  if (!creditRows[0]) {
+    throw new AppError(
+      "Your company has used all its free internship posts. Buy internship credits to post another internship.",
+      403,
+      "quota_exceeded",
+    );
+  }
+  return null;
 }
 
 async function assertCompanyApproved(companyId: string): Promise<void> {
@@ -675,6 +770,14 @@ async function scanCompanyJob(
     description: input.description,
     responsibilities: input.responsibilities,
     requirements: input.requirements,
+    jobType: input.jobType,
+    stipendType: "stipendType" in input ? input.stipendType : null,
+    stipendMinPaise: "stipendMinRupees" in input
+      ? input.stipendMinRupees === null ? null : Math.round((input.stipendMinRupees ?? 0) * 100)
+      : input.stipendMinPaise,
+    stipendMaxPaise: "stipendMaxRupees" in input
+      ? input.stipendMaxRupees === null ? null : Math.round((input.stipendMaxRupees ?? 0) * 100)
+      : input.stipendMaxPaise,
     salaryMinPaise: "salaryMinRupees" in input
       ? input.salaryMinRupees === null ? null : Math.round((input.salaryMinRupees ?? 0) * 100)
       : input.salaryMinPaise,
@@ -1031,6 +1134,20 @@ export async function updateCompanyJob(params: {
         params.input.experienceMaxYears === null
           ? null
           : String(params.input.experienceMaxYears),
+      stipendType: params.input.stipendType as never,
+      stipendMinPaise:
+        params.input.stipendMinRupees === null
+          ? null
+          : Math.round(params.input.stipendMinRupees * 100),
+      stipendMaxPaise:
+        params.input.stipendMaxRupees === null
+          ? null
+          : Math.round(params.input.stipendMaxRupees * 100),
+      durationMonths: params.input.durationMonths,
+      startDate: params.input.startDate,
+      eligibility: params.input.eligibility?.trim() || null,
+      ppoPossible: params.input.ppoPossible,
+      certificateProvided: params.input.certificateProvided,
       openings: params.input.openings,
       deadline: params.input.deadline,
       updatedAt: new Date(),

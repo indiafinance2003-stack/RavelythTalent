@@ -22,6 +22,7 @@ import {
   jobStatusEnum,
   jobTypeEnum,
   salaryPeriodEnum,
+  stipendTypeEnum,
   workModeEnum,
 } from "./enums";
 import { type AnyPgColumn } from "drizzle-orm/pg-core";
@@ -89,6 +90,15 @@ export const jobs = pgTable(
     experienceMaxYears: numeric("experience_max_years", { precision: 4, scale: 1 }),
     educationRequirement: text("education_requirement"),
     openings: integer("openings").notNull().default(1),
+    /** Internship-only fields; null for every other job type. */
+    stipendType: stipendTypeEnum("stipend_type"),
+    stipendMinPaise: bigint("stipend_min_paise", { mode: "number" }),
+    stipendMaxPaise: bigint("stipend_max_paise", { mode: "number" }),
+    durationMonths: integer("duration_months"),
+    startDate: timestamp("start_date", { withTimezone: true }),
+    eligibility: text("eligibility"),
+    ppoPossible: boolean("ppo_possible").notNull().default(false),
+    certificateProvided: boolean("certificate_provided").notNull().default(false),
     deadline: timestamp("deadline", { withTimezone: true }),
     status: jobStatusEnum("status").notNull().default("draft"),
     isFeatured: boolean("is_featured").notNull().default(false),

@@ -5,9 +5,11 @@ import type { JobCard } from "@/lib/jobs/queries";
 import {
   JOB_TYPE_LABEL,
   WORK_MODE_LABEL,
+  formatDurationMonths,
   formatIndianDateTime,
   formatExperience,
   formatSalaryRange,
+  formatStipendRange,
   labelFor,
 } from "@/lib/utils";
 import { Badge } from "@/components/ui/primitives";
@@ -102,6 +104,13 @@ export function JobCardView({
                 {formatExperience(job.experienceMinYears, job.experienceMaxYears)}
               </span>
             </div>
+            {job.jobType === "internship" && formatDurationMonths(job.durationMonths) ? (
+              <div className="flex items-center gap-1.5">
+                <span className="font-semibold text-navy">
+                  {formatDurationMonths(job.durationMonths)}
+                </span>
+              </div>
+            ) : null}
             <div className="flex items-center gap-1.5">
               <Clock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
               <dd>{formatIndianDateTime(job.publishedAt ?? job.createdAt)}</dd>
@@ -110,12 +119,18 @@ export function JobCardView({
 
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm font-bold text-teal">
-              {formatSalaryRange(
-                job.salaryMinPaise,
-                job.salaryMaxPaise,
-                job.salaryPeriod,
-                job.salaryHidden,
-              )}
+              {job.jobType === "internship"
+                ? formatStipendRange(
+                    job.stipendMinPaise,
+                    job.stipendMaxPaise,
+                    job.stipendType,
+                  )
+                : formatSalaryRange(
+                    job.salaryMinPaise,
+                    job.salaryMaxPaise,
+                    job.salaryPeriod,
+                    job.salaryHidden,
+                  )}
             </p>
             {job.categoryName ? (
               <Link href={`/jobs?category=${job.categorySlug}`}>

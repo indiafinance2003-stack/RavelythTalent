@@ -29,6 +29,9 @@ export type JobPostingInput = {
     salaryCurrency: string;
     salaryPeriod: string;
     salaryHidden: boolean;
+    stipendType?: string | null;
+    stipendMinPaise?: number | null;
+    stipendMaxPaise?: number | null;
     city: string | null;
     state: string | null;
     country: string | null;
@@ -91,7 +94,20 @@ export function buildJobPostingJsonLd(input: JobPostingInput): string {
 
   if (job.categoryName) data.occupationalCategory = job.categoryName;
 
-  if (!job.salaryHidden && (job.salaryMinPaise || job.salaryMaxPaise)) {
+  if (job.jobType === "internship") {
+    if (job.stipendType && job.stipendType !== "unpaid" && (job.stipendMinPaise || job.stipendMaxPaise)) {
+      data.baseSalary = {
+        "@type": "MonetaryAmount",
+        currency: job.salaryCurrency || "INR",
+        value: {
+          "@type": "QuantitativeValue",
+          minValue: (job.stipendMinPaise ?? job.stipendMaxPaise ?? 0) / 100,
+          maxValue: (job.stipendMaxPaise ?? job.stipendMinPaise ?? 0) / 100,
+          unitText: "MONTH",
+        },
+      };
+    }
+  } else if (!job.salaryHidden && (job.salaryMinPaise || job.salaryMaxPaise)) {
     data.baseSalary = {
       "@type": "MonetaryAmount",
       currency: job.salaryCurrency || "INR",
@@ -113,4 +129,54 @@ export function buildJobPostingJsonLd(input: JobPostingInput): string {
   if (job.workMode === "remote") data.jobLocationType = "TELECOMMUTE";
 
   return JSON.stringify(data);
+}
+
+export type InternshipListItem = {
+  id: string;
+  slug: string;
+  title: string;
+  city: string | null;
+  state: string | null;
+  publishedAt: Date | null;
+  createdAt: Date;
+  companyName: string;
+};
+
+/** schema.org ItemList of JobPosting entries with employmentType INTERN. */
+export function buildInternshipListJsonLd(
+  rows: InternshipListItem[],
+  appUrl: string,
+): string {
+  const base = appUrl.replace(/\/+$/, "");
+  return JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    itemListElement: rows.map((row, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      item: {
+        "@type": "JobPosting",
+        title: row.title,
+        employmentType: "INTERN",
+        datePosted: (row.publishedAt ?? row.createdAt).toISOString(),
+        url: `${base}/jobs/${row.slug}`,
+        identifier: {
+          "@type": "PropertyValue",
+          name: "Ravelyth Talent",
+          value: row.id,
+        },
+        hiringOrganization: { "@type": "Organization", name: row.companyName },
+        jobLocation: {
+          "@type": "Place",
+          address: {
+            "@type": "PostalAddress",
+            addressLocality: row.city ?? "India",
+            addressRegion: row.state ?? undefined,
+            addressCountry: "IN",
+          },
+        },
+        directApply: true,
+      },
+    })),
+  });
 }

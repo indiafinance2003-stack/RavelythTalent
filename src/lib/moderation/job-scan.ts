@@ -11,9 +11,13 @@ export type JobScanInput = {
   description: string;
   responsibilities?: string | null;
   requirements?: string | null;
+  jobType?: string | null;
   salaryMinPaise?: number | null;
   salaryMaxPaise?: number | null;
   salaryPeriod?: "year" | "month" | "day" | "hour" | string;
+  stipendType?: string | null;
+  stipendMinPaise?: number | null;
+  stipendMaxPaise?: number | null;
   experienceMinYears?: number | string | null;
   experienceMaxYears?: number | string | null;
   duplicateByCompany?: boolean;
@@ -138,6 +142,29 @@ export function scanJob(job: JobScanInput): JobScanResult {
   if (nonContactFlag && personalContactRule?.pattern.test(text)) {
     score += personalContactRule.score;
     reasons.push(personalContactRule.reason);
+  }
+
+  // Internships must never ask the intern to pay, and must not mislabel pay.
+  if (job.jobType === "internship") {
+    const internPayPattern =
+      /\b(refundable deposit|security deposit|registration fee|training (?:fee|charges?)|interns?(?:hip)? (?:must|should|will) pay|pay (?:a|the) (?:fee|deposit)|pay to (?:join|start|intern))\b/i;
+    if (internPayPattern.test(text)) {
+      score += 100;
+      hardBlock = true;
+      reasons.push("The internship appears to ask the intern to pay a fee, deposit, or charge.");
+    }
+    const saysUnpaid =
+      /\b(unpaid|no stipend|without stipend|stipend[- ]free|not paid)\b/i.test(text);
+    const saysPaid =
+      /\b(paid internship|monthly stipend|stipend of|receive a stipend|paid stipend)\b/i.test(text);
+    if (job.stipendType === "paid" && saysUnpaid) {
+      score += 50;
+      reasons.push("The internship is marked as paid but the description says it is unpaid.");
+    }
+    if (job.stipendType === "unpaid" && saysPaid) {
+      score += 50;
+      reasons.push("The internship is marked as unpaid but the description mentions payment.");
+    }
   }
 
   score = Math.min(100, score);

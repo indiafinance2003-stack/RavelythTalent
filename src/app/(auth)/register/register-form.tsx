@@ -7,7 +7,7 @@ import { registerAction } from "@/lib/auth/actions";
 import { initialFormState } from "@/lib/form-state";
 import { Alert, Button, Checkbox, Field, Input } from "@/components/ui/primitives";
 
-export function RegisterForm() {
+export function RegisterForm({ freeJobPosts = 1 }: { freeJobPosts?: number }) {
   const [state, formAction, pending] = useActionState(
     registerAction,
     initialFormState,
@@ -18,8 +18,9 @@ export function RegisterForm() {
     <div className="surface p-6 sm:p-8">
       <h1 className="text-2xl font-bold text-navy">Create your account</h1>
       <p className="mt-1 text-sm text-slate-600">
-        Applying is free for candidates. Every approved company gets one free
-        job post to start hiring.
+        Applying is free for candidates. Every approved company gets{" "}
+        {freeJobPosts} free job {freeJobPosts === 1 ? "post" : "posts"} to start
+        hiring.
       </p>
 
       {state.status === "error" && state.message ? (
@@ -190,7 +191,7 @@ function CompanyFields({ errors }: { errors?: Record<string, string> }) {
         label="Company contact phone"
         htmlFor="phone"
         error={errors?.phone}
-        hint="Optional; used to protect one free credit per company"
+        hint="Optional; used to protect free credits per company"
       >
         <Input
           id="phone"

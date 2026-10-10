@@ -169,8 +169,27 @@ const jobSchema = z.object({
   salaryHidden: z.boolean(),
   experienceMinYears: z.coerce.number().min(0).max(50).optional().or(z.literal("")),
   experienceMaxYears: z.coerce.number().min(0).max(50).optional().or(z.literal("")),
+  stipendType: z.enum(["paid", "unpaid", "performance_based"]).optional().or(z.literal("")),
+  stipendMinRupees: z.coerce.number().min(0).max(1_000_000_000).optional().or(z.literal("")),
+  stipendMaxRupees: z.coerce.number().min(0).max(1_000_000_000).optional().or(z.literal("")),
+  durationMonths: z.coerce.number().int().min(1).max(60).optional().or(z.literal("")),
+  startDate: z.string().optional(),
+  eligibility: z.string().trim().max(4000).optional(),
+  ppoPossible: z.boolean(),
+  certificateProvided: z.boolean(),
   openings: z.coerce.number().int().min(1).max(500),
   deadline: z.string().optional(),
+}).superRefine((data, ctx) => {
+  if (data.jobType !== "internship") return;
+  if (!data.stipendType) {
+    ctx.addIssue({ code: "custom", path: ["stipendType"], message: "Choose a stipend type for this internship." });
+  }
+  if (typeof data.durationMonths !== "number") {
+    ctx.addIssue({ code: "custom", path: ["durationMonths"], message: "Add the internship duration in months." });
+  }
+  if (data.stipendType === "paid" && typeof data.stipendMinRupees !== "number" && typeof data.stipendMaxRupees !== "number") {
+    ctx.addIssue({ code: "custom", path: ["stipendMinRupees"], message: "Add the monthly stipend amount for a paid internship." });
+  }
 });
 
 function parseJob(formData: FormData) {
@@ -190,12 +209,21 @@ function parseJob(formData: FormData) {
     salaryHidden: formData.get("salaryHidden") === "on",
     experienceMinYears: formData.get("experienceMinYears") ?? "",
     experienceMaxYears: formData.get("experienceMaxYears") ?? "",
+    stipendType: formData.get("stipendType") ?? "",
+    stipendMinRupees: formData.get("stipendMinRupees") ?? "",
+    stipendMaxRupees: formData.get("stipendMaxRupees") ?? "",
+    durationMonths: formData.get("durationMonths") ?? "",
+    startDate: String(formData.get("startDate") ?? "").trim(),
+    eligibility: String(formData.get("eligibility") ?? "").trim() || undefined,
+    ppoPossible: formData.get("ppoPossible") === "on",
+    certificateProvided: formData.get("certificateProvided") === "on",
     openings: formData.get("openings") ?? "1",
     deadline: String(formData.get("deadline") ?? "").trim(),
   });
 }
 
 function jobInputFrom(d: z.infer<typeof jobSchema>): JobFormInput {
+  const isInternship = d.jobType === "internship";
   return {
     title: d.title,
     description: d.description,
@@ -214,6 +242,17 @@ function jobInputFrom(d: z.infer<typeof jobSchema>): JobFormInput {
       typeof d.experienceMinYears === "number" ? d.experienceMinYears : null,
     experienceMaxYears:
       typeof d.experienceMaxYears === "number" ? d.experienceMaxYears : null,
+    stipendType: isInternship && d.stipendType ? d.stipendType : null,
+    stipendMinRupees:
+      isInternship && typeof d.stipendMinRupees === "number" ? d.stipendMinRupees : null,
+    stipendMaxRupees:
+      isInternship && typeof d.stipendMaxRupees === "number" ? d.stipendMaxRupees : null,
+    durationMonths:
+      isInternship && typeof d.durationMonths === "number" ? d.durationMonths : null,
+    startDate: isInternship && d.startDate ? new Date(`${d.startDate}T00:00:00+05:30`) : null,
+    eligibility: isInternship ? d.eligibility ?? null : null,
+    ppoPossible: isInternship ? d.ppoPossible : false,
+    certificateProvided: isInternship ? d.certificateProvided : false,
     openings: d.openings,
     deadline: d.deadline ? new Date(`${d.deadline}T23:59:59+05:30`) : null,
   };
@@ -231,6 +270,12 @@ function jobFormValues(formData: FormData): Record<string, string> {
     "salaryMaxRupees",
     "experienceMinYears",
     "experienceMaxYears",
+    "stipendType",
+    "stipendMinRupees",
+    "stipendMaxRupees",
+    "durationMonths",
+    "startDate",
+    "eligibility",
   ];
   const values: Record<string, string> = {};
   for (const key of keep) {

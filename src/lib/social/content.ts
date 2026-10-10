@@ -1,5 +1,11 @@
 import type { SocialPlatform } from "@/lib/db/schema";
-import { formatSalaryRange, JOB_TYPE_LABEL, WORK_MODE_LABEL, labelFor } from "@/lib/utils";
+import {
+  formatSalaryRange,
+  formatStipendRange,
+  JOB_TYPE_LABEL,
+  WORK_MODE_LABEL,
+  labelFor,
+} from "@/lib/utils";
 
 /**
  * Caption building for social auto-posting (Task 9.3/9.4).
@@ -21,6 +27,9 @@ export type SocialCaptionJob = {
   salaryMaxPaise: number | null;
   salaryPeriod: string;
   salaryHidden: boolean;
+  stipendType?: string | null;
+  stipendMinPaise?: number | null;
+  stipendMaxPaise?: number | null;
 };
 
 export type SocialCaptionInput = {
@@ -65,10 +74,16 @@ export function normalizeHashtags(raw: string): string {
 export function buildSocialCaption(input: SocialCaptionInput): string {
   const { job } = input;
   const location = [job.city, job.state].filter(Boolean).join(", ");
-  const showSalary = !job.salaryHidden && (Boolean(job.salaryMinPaise) || Boolean(job.salaryMaxPaise));
-  const salary = showSalary
-    ? formatSalaryRange(job.salaryMinPaise, job.salaryMaxPaise, job.salaryPeriod, false)
-    : "";
+  const isInternship = job.jobType === "internship";
+  const showSalary =
+    !isInternship &&
+    !job.salaryHidden &&
+    (Boolean(job.salaryMinPaise) || Boolean(job.salaryMaxPaise));
+  const salary = isInternship
+    ? formatStipendRange(job.stipendMinPaise, job.stipendMaxPaise, job.stipendType)
+    : showSalary
+      ? formatSalaryRange(job.salaryMinPaise, job.salaryMaxPaise, job.salaryPeriod, false)
+      : "";
   const link = socialJobUrl(input.appUrl, job.slug, input.platform);
   const jobType = labelFor(JOB_TYPE_LABEL, job.jobType, "");
   const workMode = labelFor(WORK_MODE_LABEL, job.workMode, "");

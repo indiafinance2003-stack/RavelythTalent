@@ -170,6 +170,44 @@ export const JOB_TYPE_LABEL: Record<string, string> = {
   freelance: "Freelance",
 };
 
+export const STIPEND_TYPE_LABEL: Record<string, string> = {
+  paid: "Paid",
+  unpaid: "Unpaid",
+  performance_based: "Performance-based",
+};
+
+/** Human label for an internship stipend, e.g. "₹15,000 - ₹20,000 per month". */
+export function formatStipendRange(
+  min: number | null | undefined,
+  max: number | null | undefined,
+  stipendType: string | null | undefined,
+): string {
+  if (stipendType === "unpaid") return "Unpaid";
+  if (stipendType === "performance_based") {
+    return min || max
+      ? `${formatStipendAmount(min, max)} (performance-based)`
+      : "Performance-based";
+  }
+  if (!min && !max) {
+    return stipendType === "paid" ? "Paid" : "Not disclosed";
+  }
+  return `${formatStipendAmount(min, max)} per month`;
+}
+
+function formatStipendAmount(
+  min: number | null | undefined,
+  max: number | null | undefined,
+): string {
+  if (min && max && min !== max) return `${formatPaise(min)} - ${formatPaise(max)}`;
+  return formatPaise(min ?? max ?? 0);
+}
+
+/** "3 months" / "6 months"; empty string when unknown. */
+export function formatDurationMonths(months: number | null | undefined): string {
+  if (!months || months <= 0) return "";
+  return `${months} month${months > 1 ? "s" : ""}`;
+}
+
 export const WORK_MODE_LABEL: Record<string, string> = {
   remote: "Remote",
   hybrid: "Hybrid",

@@ -23,10 +23,13 @@ import { buildJobPostingJsonLd } from "@/lib/seo/job-posting";
 import { appUrl } from "@/lib/email/urls";
 import {
   JOB_TYPE_LABEL,
+  STIPEND_TYPE_LABEL,
   WORK_MODE_LABEL,
   formatDate,
+  formatDurationMonths,
   formatExperience,
   formatSalaryRange,
+  formatStipendRange,
   labelFor,
 } from "@/lib/utils";
 import { ApplyPanel } from "@/components/jobs/apply-panel";
@@ -199,15 +202,21 @@ export default async function JobDetailPage({ params }: { params: Params }) {
                 <dl className="mt-5 grid gap-3 border-t border-slate-100 pt-5 sm:grid-cols-3">
                   <div>
                     <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Salary
+                      {job.jobType === "internship" ? "Stipend" : "Salary"}
                     </dt>
                     <dd className="mt-0.5 text-sm font-bold text-teal">
-                      {formatSalaryRange(
-                        job.salaryMinPaise,
-                        job.salaryMaxPaise,
-                        job.salaryPeriod,
-                        job.salaryHidden,
-                      )}
+                      {job.jobType === "internship"
+                        ? formatStipendRange(
+                            job.stipendMinPaise,
+                            job.stipendMaxPaise,
+                            job.stipendType,
+                          )
+                        : formatSalaryRange(
+                            job.salaryMinPaise,
+                            job.salaryMaxPaise,
+                            job.salaryPeriod,
+                            job.salaryHidden,
+                          )}
                     </dd>
                   </div>
                   <div>
@@ -269,6 +278,73 @@ export default async function JobDetailPage({ params }: { params: Params }) {
                   </p>
                 ) : null}
               </Card>
+
+              {job.jobType === "internship" ? (
+                <Card className="mt-6">
+                  <h2 className="text-base font-bold text-navy">Internship details</h2>
+                  <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Stipend
+                      </dt>
+                      <dd className="mt-0.5 text-sm font-semibold text-navy">
+                        {formatStipendRange(
+                          job.stipendMinPaise,
+                          job.stipendMaxPaise,
+                          job.stipendType,
+                        )}
+                        {job.stipendType
+                          ? ` · ${labelFor(STIPEND_TYPE_LABEL, job.stipendType)}`
+                          : ""}
+                      </dd>
+                    </div>
+                    {job.durationMonths ? (
+                      <div>
+                        <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Duration
+                        </dt>
+                        <dd className="mt-0.5 text-sm font-semibold text-navy">
+                          {formatDurationMonths(job.durationMonths)}
+                        </dd>
+                      </div>
+                    ) : null}
+                    {job.startDate ? (
+                      <div>
+                        <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Preferred start
+                        </dt>
+                        <dd className="mt-0.5 text-sm font-semibold text-navy">
+                          {formatDate(job.startDate)}
+                        </dd>
+                      </div>
+                    ) : null}
+                    <div>
+                      <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Pre-placement offer
+                      </dt>
+                      <dd className="mt-0.5 text-sm font-semibold text-navy">
+                        {job.ppoPossible ? "Possible" : "Not offered"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Certificate
+                      </dt>
+                      <dd className="mt-0.5 text-sm font-semibold text-navy">
+                        {job.certificateProvided ? "Provided" : "Not provided"}
+                      </dd>
+                    </div>
+                  </dl>
+                  {job.eligibility ? (
+                    <div className="mt-4 border-t border-slate-100 pt-4">
+                      <h3 className="text-sm font-bold text-navy">Eligibility</h3>
+                      <p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-slate-700">
+                        {job.eligibility}
+                      </p>
+                    </div>
+                  ) : null}
+                </Card>
+              ) : null}
 
               <Card className="mt-6">
                 <h2 className="text-base font-bold text-navy">

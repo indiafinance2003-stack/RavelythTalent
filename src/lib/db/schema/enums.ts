@@ -148,6 +148,17 @@ export const paymentStatusEnum = pgEnum("payment_status", [
 export const paymentPurposeEnum = pgEnum("payment_purpose", [
   "subscription",
   "addon",
+  "internship_post",
+]);
+
+/* -------------------------------------------------------------------------- */
+/* Internships                                                                */
+/* -------------------------------------------------------------------------- */
+
+export const stipendTypeEnum = pgEnum("stipend_type", [
+  "paid",
+  "unpaid",
+  "performance_based",
 ]);
 
 export const invoiceStatusEnum = pgEnum("invoice_status", [

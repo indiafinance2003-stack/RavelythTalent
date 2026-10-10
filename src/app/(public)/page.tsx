@@ -8,7 +8,7 @@ import {
   UserRoundPlus,
 } from "lucide-react";
 import { getCategoriesWithCounts, getTopCompanies } from "@/lib/companies/queries";
-import { getFeaturedJobs, getLatestJobs } from "@/lib/jobs/queries";
+import { getFeaturedJobs, getLatestInternships, getLatestJobs } from "@/lib/jobs/queries";
 import { getSiteSettings } from "@/lib/settings";
 import { JobCardView } from "@/components/jobs/job-card";
 import {
@@ -61,11 +61,12 @@ const STEPS = [
 ];
 
 export default async function HomePage() {
-  const [settings, categories, featured, latest, topCompanies] = await Promise.all([
+  const [settings, categories, featured, latest, internships, topCompanies] = await Promise.all([
     getSiteSettings(),
     getCategoriesWithCounts(20),
     getFeaturedJobs(6),
     getLatestJobs(6),
+    getLatestInternships(6),
     getTopCompanies(6),
   ]);
 
@@ -233,6 +234,39 @@ export default async function HomePage() {
               action={<ButtonLink href="/register?role=recruiter">Post the first job</ButtonLink>}
             />
           )}
+        </div>
+      </section>
+
+      {/* Internships */}
+      <section className="bg-white py-16">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <h2 className="text-2xl font-bold text-navy sm:text-3xl">
+                Latest internships
+              </h2>
+              <p className="mt-1 text-slate-600">
+                Kick-start your career with paid and unpaid internships from
+                verified companies.
+              </p>
+            </div>
+            <Link
+              href="/internships"
+              className="inline-flex items-center gap-1.5 text-sm font-semibold text-royal hover:underline"
+            >
+              Browse internships <ArrowRight className="h-4 w-4" aria-hidden="true" />
+            </Link>
+          </div>
+
+          <div className="mt-8">
+            {internships.length > 0 ? (
+              <div className="grid gap-4 lg:grid-cols-2">
+                {internships.map((job) => (
+                  <JobCardView key={job.id} job={job} />
+                ))}
+              </div>
+            ) : null}
+          </div>
         </div>
       </section>
 

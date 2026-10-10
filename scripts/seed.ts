@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import {
   addons,
   categories,
@@ -41,7 +41,17 @@ async function seedPlans(): Promise<void> {
         isFeatured: plan.isFeatured ?? false,
         sortOrder: plan.sortOrder,
       })
-      .onConflictDoNothing({ target: plans.code })
+      .onConflictDoUpdate({
+        target: plans.code,
+        set: {
+          name: plan.name,
+          description: plan.description,
+          jobPostsPerMonth: plan.jobPostsPerMonth,
+          isFeatured: plan.isFeatured ?? false,
+          sortOrder: plan.sortOrder,
+          updatedAt: new Date(),
+        },
+      })
       .returning({ id: plans.id });
 
     let planId = rows.at(0)?.id;
@@ -65,12 +75,17 @@ async function seedPlans(): Promise<void> {
           isEnabled: feature.isEnabled,
           limitValue: feature.limitValue,
         })
-        .onConflictDoNothing({
+        .onConflictDoUpdate({
           target: [planFeatures.planId, planFeatures.featureKey],
+          set: {
+            label: feature.label,
+            isEnabled: feature.isEnabled,
+            limitValue: feature.limitValue,
+          },
         });
     }
   }
-  log(`plans: ${PLAN_SEED.length} plans and their entitlements ensured`);
+  log(`plans: ${PLAN_SEED.length} plans and their entitlements upserted`);
 }
 
 async function seedPromotion(): Promise<void> {
@@ -155,10 +170,24 @@ async function seedSiteSettings(): Promise<void> {
       subTagline: "Right People | Better Opportunities | Stronger Tomorrow",
       country: "India",
       currency: "INR",
-      freeJobPosts: 1,
+      freeJobPosts: 3,
     })
     .onConflictDoNothing({ target: siteSettings.id });
-  log("site_settings: singleton row ensured (legal details left blank for admin)");
+
+  // One-time migration of the legacy default (1 free job post -> 3). Only
+  // touches the value when it is still the old untouched default, so an admin's
+  // deliberate setting is never overwritten on every re-seed.
+  const migrated = await db
+    .update(siteSettings)
+    .set({ freeJobPosts: 3, updatedAt: new Date() })
+    .where(and(eq(siteSettings.id, 1), eq(siteSettings.freeJobPosts, 1)))
+    .returning({ id: siteSettings.id });
+
+  log(
+    migrated.length > 0
+      ? "site_settings: bumped free job posts from 1 to 3"
+      : "site_settings: singleton row ensured (legal details left blank for admin)",
+  );
 }
 
 async function main(): Promise<void> {

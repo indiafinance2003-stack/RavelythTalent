@@ -9,6 +9,7 @@ import { requireApiVerifiedUser } from "@/lib/auth/current-user";
 import { requireCompanyMembership } from "@/lib/entitlements";
 import { createRazorpayOrder, publicKeyId, razorpayCheckoutConfigured } from "@/lib/billing/razorpay";
 import { resolveSubscriptionCompanyId } from "@/lib/billing/subscription-owner";
+import { getSiteSettings } from "@/lib/settings";
 import { AppError } from "@/lib/errors";
 
 export const runtime = "nodejs";
@@ -26,7 +27,12 @@ const addonBodySchema = z.object({
   companyId: z.uuid(),
   jobId: z.uuid().optional(),
 });
-const bodySchema = z.union([subscriptionBodySchema, addonBodySchema]);
+const internshipBodySchema = z.object({
+  purpose: z.literal("internship_post"),
+  companyId: z.uuid(),
+  count: z.number().int().min(1).max(50),
+});
+const bodySchema = z.union([subscriptionBodySchema, addonBodySchema, internshipBodySchema]);
 
 /** POST /api/billing/order - creates the payment row and a Razorpay Order. */
 export const POST = handleApi(async (request: Request) => {
@@ -133,6 +139,65 @@ export const POST = handleApi(async (request: Request) => {
       purpose: "addon",
       addonName: addon.name,
       companyId: body.companyId,
+    });
+  }
+
+  if ("purpose" in body && body.purpose === "internship_post") {
+    await requireCompanyMembership(user.id, body.companyId);
+    const company = (
+      await db
+        .select({ status: companies.status })
+        .from(companies)
+        .where(eq(companies.id, body.companyId))
+        .limit(1)
+    ).at(0);
+    if (company?.status !== "approved") {
+      throw new AppError("Your company must be approved to buy internship credits.", 403, "company_not_approved");
+    }
+
+    const settings = await getSiteSettings();
+    const pricePaise = settings.internshipPostPricePaise;
+    if (!Number.isInteger(pricePaise) || pricePaise <= 0) {
+      throw new AppError("Internship credits are not available for purchase yet.", 503, "internship_credits_unconfigured");
+    }
+
+    const amountPaise = pricePaise * body.count;
+    const receipt = `rcpt_${Date.now().toString(36)}_${user.id.slice(0, 8)}`;
+    const order = await createRazorpayOrder({
+      amountPaise,
+      receipt,
+      notes: {
+        userId: user.id,
+        companyId: body.companyId,
+        count: String(body.count),
+        purpose: "internship_post",
+      },
+    });
+
+    await db.insert(payments).values({
+      userId: user.id,
+      companyId: body.companyId,
+      purpose: "internship_post",
+      orderId: order.id,
+      amountPaise,
+      currency: "INR",
+      status: "created",
+      notes: JSON.stringify({ count: body.count }),
+    });
+
+    return jsonOk({
+      keyId: publicKeyId(),
+      orderId: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      purpose: "internship_post",
+      count: body.count,
+      unitPricePaise: pricePaise,
+      companyId: body.companyId,
+      planName:
+        body.count === 1
+          ? "Internship post credit"
+          : `${body.count} internship post credits`,
     });
   }
 

@@ -391,9 +391,69 @@ export async function checkJobQuota(companyId: string): Promise<QuotaDecision> {
       allowed: false,
       quota,
       reason: quota.usesFreeCredit
-        ? "Your company's one-time free job post has been used. Upgrade to a paid employer plan to post another job."
+        ? "Your company's free job posts have been used. Upgrade to a paid employer plan to post another job."
         : `You have used all ${quota.limit} job posts included in your plan for ${quota.periodLabel}.`,
     };
   }
   return { allowed: true, quota };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Internship quota (separate from the job quota and free-job credit)         */
+/* -------------------------------------------------------------------------- */
+
+export type InternshipQuota = {
+  freeLimit: number;
+  freeUsed: number;
+  freeRemaining: number;
+  /** Purchased credit balance for extra internship posts. */
+  credits: number;
+  /** Remaining posts the company may submit right now. */
+  remaining: number;
+};
+
+export async function getInternshipQuota(
+  companyId: string,
+): Promise<InternshipQuota> {
+  const [settings, company] = await Promise.all([
+    getSiteSettings(),
+    db
+      .select({
+        freeUsed: companies.freeInternshipPostsUsed,
+        credits: companies.internshipPostCredits,
+      })
+      .from(companies)
+      .where(eq(companies.id, companyId))
+      .limit(1),
+  ]);
+  const row = company.at(0);
+  if (!row) {
+    throw new AppError("Company not found.", 404, "company_not_found");
+  }
+  const freeLimit = Math.max(0, settings.freeInternshipPosts);
+  const freeUsed = Math.min(row.freeUsed, freeLimit);
+  const freeRemaining = Math.max(0, freeLimit - freeUsed);
+  const credits = Math.max(0, row.credits);
+  return {
+    freeLimit,
+    freeUsed,
+    freeRemaining,
+    credits,
+    remaining: freeRemaining + credits,
+  };
+}
+
+export async function checkInternshipQuota(
+  companyId: string,
+): Promise<{ allowed: boolean; quota: InternshipQuota; reason: string | null }> {
+  const quota = await getInternshipQuota(companyId);
+  if (quota.remaining <= 0) {
+    return {
+      allowed: false,
+      quota,
+      reason:
+        "Your company has used all its free internship posts. Buy internship credits to post another internship.",
+    };
+  }
+  return { allowed: true, quota, reason: null };
 }

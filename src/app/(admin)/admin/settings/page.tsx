@@ -137,6 +137,16 @@ export default async function AdminSettingsPage() {
               <input className={inputClass} defaultValue={settings.freeJobPosts} max="100" min="0" name="freeJobPosts" required type="number" />
               <span className="mt-1 block text-xs font-normal text-slate-500">Default is 1. Changing this affects the lifetime allowance available to companies; it does not reset credits already used.</span>
             </label>
+            <label className="text-sm font-medium text-navy">
+              Free lifetime internship posts per company
+              <input className={inputClass} defaultValue={settings.freeInternshipPosts} max="1000" min="0" name="freeInternshipPosts" required type="number" />
+              <span className="mt-1 block text-xs font-normal text-slate-500">Separate from the job-post allowance. Changing it does not reset credits already used.</span>
+            </label>
+            <label className="text-sm font-medium text-navy">
+              Internship post credit price (paise)
+              <input className={inputClass} defaultValue={settings.internshipPostPricePaise} min="0" name="internshipPostPricePaise" required type="number" />
+              <span className="mt-1 block text-xs font-normal text-slate-500">Per-post price in paise (e.g. 39900 = Rs 399) charged when a company buys extra internship credits.</span>
+            </label>
           </div>
         </Card>
         <button className="rounded-xl bg-royal px-5 py-3 text-sm font-semibold text-white hover:bg-navy" type="submit">Save settings</button>

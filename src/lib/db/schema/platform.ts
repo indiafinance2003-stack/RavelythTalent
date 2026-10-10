@@ -64,7 +64,11 @@ export const siteSettings = pgTable("site_settings", {
 
   resumeDbViewLimit: integer("resume_db_view_limit").notNull().default(50),
   jobPostWarningThreshold: integer("job_post_warning_threshold").notNull().default(80),
-  freeJobPosts: integer("free_job_posts").notNull().default(1),
+  freeJobPosts: integer("free_job_posts").notNull().default(3),
+  freeInternshipPosts: integer("free_internship_posts").notNull().default(5),
+  internshipPostPricePaise: integer("internship_post_price_paise")
+    .notNull()
+    .default(39900),
   autoApproveCompanies: boolean("auto_approve_companies").notNull().default(true),
   autoPublishJobs: boolean("auto_publish_jobs").notNull().default(true),
 

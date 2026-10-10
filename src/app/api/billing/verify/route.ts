@@ -9,6 +9,7 @@ import { AppError } from "@/lib/errors";
 import { verifyCheckoutSignature } from "@/lib/billing/razorpay";
 import { activateSubscriptionFromPayment } from "@/lib/billing/payment-activation";
 import { activateAddonPayment } from "@/lib/billing/addons";
+import { activateInternshipPostPayment } from "@/lib/billing/internship-posts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -63,6 +64,20 @@ export const POST = handleApi(async (request: Request) => {
       verified: true,
       alreadyProcessed: result.alreadyProcessed,
       purchaseId: result.purchaseId,
+    });
+  }
+  if (payment.purpose === "internship_post") {
+    const result = await activateInternshipPostPayment({
+      orderId: payment.orderId,
+      paymentId: body.razorpay_payment_id,
+      amountPaise: payment.amountPaise,
+      signatureVerified: true,
+    });
+    return jsonOk({
+      verified: true,
+      alreadyProcessed: result.alreadyProcessed,
+      count: result.count,
+      companyId: result.companyId,
     });
   }
   if (!payment.planId) {

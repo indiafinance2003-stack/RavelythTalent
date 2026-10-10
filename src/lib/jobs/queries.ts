@@ -24,6 +24,10 @@ export type JobSearchInput = {
   experienceMin?: number | undefined;
   experienceMax?: number | undefined;
   postedWithinDays?: number | undefined;
+  /** Internship filters. */
+  stipendType?: string | undefined;
+  durationMonths?: number | undefined;
+  startsWithinDays?: number | undefined;
   sort?: JobSort | undefined;
   page?: number | undefined;
   pageSize?: number | undefined;
@@ -44,6 +48,12 @@ export type JobCard = {
   salaryHidden: boolean;
   experienceMinYears: string | null;
   experienceMaxYears: string | null;
+  stipendType: string | null;
+  stipendMinPaise: number | null;
+  stipendMaxPaise: number | null;
+  durationMonths: number | null;
+  ppoPossible: boolean;
+  certificateProvided: boolean;
   isFeatured: boolean;
   isUrgent: boolean;
   publishedAt: Date | null;
@@ -73,6 +83,12 @@ const CARD_COLUMNS = {
   salaryHidden: jobs.salaryHidden,
   experienceMinYears: jobs.experienceMinYears,
   experienceMaxYears: jobs.experienceMaxYears,
+  stipendType: jobs.stipendType,
+  stipendMinPaise: jobs.stipendMinPaise,
+  stipendMaxPaise: jobs.stipendMaxPaise,
+  durationMonths: jobs.durationMonths,
+  ppoPossible: jobs.ppoPossible,
+  certificateProvided: jobs.certificateProvided,
   isFeatured: jobs.isFeatured,
   isUrgent: jobs.isUrgent,
   publishedAt: jobs.publishedAt,
@@ -152,6 +168,17 @@ function buildConditions(input: JobSearchInput): SQL[] {
   if (typeof input.postedWithinDays === "number" && input.postedWithinDays > 0) {
     conditions.push(
       sql<boolean>`coalesce("jobs"."published_at", "jobs"."created_at") >= now() - (${input.postedWithinDays} * interval '1 day')`,
+    );
+  }
+  if (input.stipendType?.trim()) {
+    conditions.push(eq(jobs.stipendType, input.stipendType.trim() as never));
+  }
+  if (typeof input.durationMonths === "number" && input.durationMonths > 0) {
+    conditions.push(sql<boolean>`coalesce("jobs"."duration_months", 0) <= ${input.durationMonths}`);
+  }
+  if (typeof input.startsWithinDays === "number" && input.startsWithinDays > 0) {
+    conditions.push(
+      sql<boolean>`"jobs"."start_date" is not null and "jobs"."start_date" <= now() + (${input.startsWithinDays} * interval '1 day')`,
     );
   }
 
@@ -291,6 +318,27 @@ export async function getLatestJobs(limit = 6): Promise<JobCard[]> {
       and(
         eq(jobs.status, "published"),
         isNull(jobs.deletedAt),
+        eq(companies.status, "approved"),
+        sql`("jobs"."expires_at" is null or "jobs"."expires_at" > now())`,
+      ),
+    )
+    .orderBy(desc(jobs.publishedAt), desc(jobs.createdAt))
+    .limit(limit);
+  return rows;
+}
+
+/** Latest published internships for the home page. */
+export async function getLatestInternships(limit = 6): Promise<JobCard[]> {
+  const rows = await db
+    .select(CARD_COLUMNS)
+    .from(jobs)
+    .innerJoin(companies, eq(companies.id, jobs.companyId))
+    .leftJoin(categories, eq(categories.id, jobs.categoryId))
+    .where(
+      and(
+        eq(jobs.status, "published"),
+        isNull(jobs.deletedAt),
+        eq(jobs.jobType, "internship"),
         eq(companies.status, "approved"),
         sql`("jobs"."expires_at" is null or "jobs"."expires_at" > now())`,
       ),

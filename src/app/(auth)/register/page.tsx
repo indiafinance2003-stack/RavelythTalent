@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { getSiteSettings } from "@/lib/settings";
 import { RegisterForm } from "./register-form";
 
 export const metadata: Metadata = {
@@ -13,5 +14,6 @@ export const metadata: Metadata = {
 export default async function RegisterPage() {
   const user = await getCurrentUser();
   if (user) redirect("/dashboard");
-  return <RegisterForm />;
+  const settings = await getSiteSettings();
+  return <RegisterForm freeJobPosts={settings.freeJobPosts} />;
 }

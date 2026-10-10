@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { AlertCircle, Briefcase, Inbox, Plus, UsersRound } from "lucide-react";
 import { requireUser } from "@/lib/auth/current-user";
-import { getJobQuota, listUserCompanies } from "@/lib/entitlements";
+import { getInternshipQuota, getJobQuota, listUserCompanies } from "@/lib/entitlements";
 import {
   countApplicationsByStatus,
   listCompanyJobs,
@@ -23,6 +23,9 @@ import {
 } from "@/components/dashboard/kit";
 import { BarsChart, ChartCard } from "@/components/dashboard/charts";
 import { PipelineBoard } from "@/components/recruiter/pipeline-board";
+import { InternshipCreditPurchase } from "@/components/billing/internship-credit-purchase";
+import { getSiteSettings } from "@/lib/settings";
+import { razorpayCheckoutConfigured } from "@/lib/billing/razorpay";
 import { formatDate, formatIndianDateTime, labelFor } from "@/lib/utils";
 import { formatCount } from "@/lib/dashboard/format";
 import {
@@ -111,15 +114,17 @@ export default async function RecruiterOverviewPage({
     );
   }
 
-  const [quota, jobs, applicationCounts, board, funnel, interviews] =
+  const [quota, internshipQuota, jobs, applicationCounts, board, funnel, interviews] =
     await Promise.all([
       getJobQuota(company.id),
+      getInternshipQuota(company.id),
       listCompanyJobs(company.id),
       countApplicationsByStatus(company.id),
       getBoardApplicants(company.id, 30),
       getJobFunnel(company.id),
       getCompanyUpcomingInterviews(company.id),
     ]);
+  const settings = await getSiteSettings();
 
   const totalApplications = applicationCounts.reduce((sum, row) => sum + row.value, 0);
   const openJobs = jobs.filter((j) => j.status === "published").length;
@@ -376,6 +381,34 @@ export default async function RecruiterOverviewPage({
               Your free credit is lifetime and is not restored if a post is rejected,
               closed or deleted. Choose a paid employer plan to submit another job.
             </Alert>
+          ) : null}
+        </div>
+      </SectionCard>
+
+      {/* Internship quota */}
+      <SectionCard
+        description="Separate from your job-post quota. Free credits are lifetime and consumed once per posted internship; purchased credits top up the balance."
+        title="Internship quota"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600">
+            {internshipQuota.freeRemaining} of {internshipQuota.freeLimit} free
+            internship posts remaining
+            {internshipQuota.credits > 0
+              ? ` · ${internshipQuota.credits} purchased credit${internshipQuota.credits === 1 ? "" : "s"} available`
+              : ""}
+          </p>
+          {internshipQuota.freeRemaining === 0 && internshipQuota.credits === 0 ? (
+            <Alert tone="warning" title="Free internship posts used">
+              Buy internship credits below to post another internship.
+            </Alert>
+          ) : null}
+          {company.status === "approved" && settings.internshipPostPricePaise > 0 ? (
+            <InternshipCreditPurchase
+              companyId={company.id}
+              paymentAvailable={razorpayCheckoutConfigured()}
+              unitPricePaise={settings.internshipPostPricePaise}
+            />
           ) : null}
         </div>
       </SectionCard>

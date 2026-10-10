@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { saveJobAction } from "@/lib/recruiter/actions";
 import { initialFormState } from "@/lib/form-state";
 import {
@@ -30,6 +30,14 @@ export type JobFormValues = {
   salaryHidden: boolean;
   experienceMinYears: string;
   experienceMaxYears: string;
+  stipendType: string;
+  stipendMinRupees: string;
+  stipendMaxRupees: string;
+  durationMonths: string;
+  startDate: string;
+  eligibility: string;
+  ppoPossible: boolean;
+  certificateProvided: boolean;
   openings: number;
   deadline: string;
 };
@@ -50,6 +58,14 @@ export const EMPTY_JOB_VALUES: JobFormValues = {
   salaryHidden: false,
   experienceMinYears: "",
   experienceMaxYears: "",
+  stipendType: "",
+  stipendMinRupees: "",
+  stipendMaxRupees: "",
+  durationMonths: "",
+  startDate: "",
+  eligibility: "",
+  ppoPossible: false,
+  certificateProvided: false,
   openings: 1,
   deadline: "",
 };
@@ -84,6 +100,9 @@ export function JobForm({
     ? ({ ...values, ...(state.values as Partial<JobFormValues>) } as JobFormValues)
     : values;
   const errors = { ...fieldErrors, ...(state.fieldErrors ?? {}) };
+  const [jobType, setJobType] = useState(v.jobType);
+  const isInternship = jobType === "internship";
+  const [stipendType, setStipendType] = useState(v.stipendType);
 
   return (
     <form action={formAction} className="space-y-6">
@@ -128,7 +147,12 @@ export function JobForm({
               </Select>
             </Field>
             <Field label="Job type" htmlFor="jobType">
-              <Select id="jobType" name="jobType" defaultValue={v.jobType}>
+              <Select
+                id="jobType"
+                name="jobType"
+                value={jobType}
+                onChange={(event) => setJobType(event.target.value)}
+              >
                 <option value="full_time">Full-time</option>
                 <option value="part_time">Part-time</option>
                 <option value="contract">Contract</option>
@@ -198,6 +222,60 @@ export function JobForm({
           </div>
         </div>
       </Card>
+
+      {isInternship ? (
+        <Card>
+          <h2 className="text-base font-bold text-navy">Internship details</h2>
+          <div className="mt-4 space-y-4">
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Field label="Stipend type" htmlFor="stipendType" required error={errors.stipendType}>
+                <Select
+                  id="stipendType"
+                  name="stipendType"
+                  value={stipendType}
+                  onChange={(event) => setStipendType(event.target.value)}
+                >
+                  <option value="">Choose…</option>
+                  <option value="paid">Paid</option>
+                  <option value="unpaid">Unpaid</option>
+                  <option value="performance_based">Performance-based</option>
+                </Select>
+              </Field>
+              <Field label="Duration (months)" htmlFor="durationMonths" required error={errors.durationMonths}>
+                <Input id="durationMonths" name="durationMonths" type="number" min={1} max={60} defaultValue={v.durationMonths} placeholder="6" required />
+              </Field>
+              <Field label="Preferred start date" htmlFor="startDate">
+                <Input id="startDate" name="startDate" type="date" defaultValue={v.startDate} />
+              </Field>
+            </div>
+
+            {stipendType !== "unpaid" ? (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Stipend from (₹/month)" htmlFor="stipendMinRupees" error={errors.stipendMinRupees}>
+                  <Input id="stipendMinRupees" name="stipendMinRupees" type="number" min={0} max={10000000} defaultValue={v.stipendMinRupees} placeholder="15000" />
+                </Field>
+                <Field label="Stipend to (₹/month)" htmlFor="stipendMaxRupees" error={errors.stipendMaxRupees}>
+                  <Input id="stipendMaxRupees" name="stipendMaxRupees" type="number" min={0} max={10000000} defaultValue={v.stipendMaxRupees} placeholder="20000" />
+                </Field>
+              </div>
+            ) : (
+              <>
+                <input type="hidden" name="stipendMinRupees" value="" />
+                <input type="hidden" name="stipendMaxRupees" value="" />
+              </>
+            )}
+
+            <Field label="Eligibility" htmlFor="eligibility" hint="Who can apply - degree, year, skills. Optional." error={errors.eligibility}>
+              <Textarea id="eligibility" name="eligibility" rows={3} maxLength={4000} defaultValue={v.eligibility} />
+            </Field>
+
+            <div className="flex flex-col gap-3 sm:flex-row sm:gap-6">
+              <Checkbox id="ppoPossible" name="ppoPossible" defaultChecked={values.ppoPossible} label="Pre-placement offer (PPO) possible" />
+              <Checkbox id="certificateProvided" name="certificateProvided" defaultChecked={values.certificateProvided} label="Certificate provided" />
+            </div>
+          </div>
+        </Card>
+      ) : null}
       </fieldset>
 
       {mode === "edit" ? (

@@ -221,7 +221,9 @@ export function PricingPlans({
 
               {plan.code === "employer_free" ? (
                 <p className="mt-2 text-sm font-semibold text-navy">
-                  One lifetime free job post per company
+                  {plan.features.find((f) => f.key === "job_posts_per_month")
+                    ?.limit ?? 1}{" "}
+                  lifetime free job posts per company
                 </p>
               ) : plan.jobPostsPerMonth ? (
                 <p className="mt-2 text-sm font-semibold text-navy">

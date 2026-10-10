@@ -53,6 +53,12 @@ export const companies = pgTable(
     contactPhone: text("contact_phone"),
     normalizedContactPhone: text("normalized_contact_phone"),
     freeJobPostsUsed: integer("free_job_posts_used").notNull().default(0),
+    /** Lifetime free internship posts consumed (independent of job quota). */
+    freeInternshipPostsUsed: integer("free_internship_posts_used")
+      .notNull()
+      .default(0),
+    /** Paid internship-post credits balance purchased one-time via Razorpay. */
+    internshipPostCredits: integer("internship_post_credits").notNull().default(0),
     gstin: text("gstin"),
     status: companyStatusEnum("status").notNull().default("pending"),
     statusReason: text("status_reason"),

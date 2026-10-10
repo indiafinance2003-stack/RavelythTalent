@@ -44,7 +44,7 @@ describe("default legal policy text", () => {
       "social media channels, free of charge",
       "opt out of this promotion at any time in company settings",
       "remove any such post at any time",
-      "one free job post",
+      "free job posts",
       "do not automatically renew",
       "Candidate Premium",
       "Limitation of liability",

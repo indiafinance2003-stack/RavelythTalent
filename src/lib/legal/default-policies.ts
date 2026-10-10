@@ -91,7 +91,7 @@ export function defaultTermsSections(settings: SiteSettings): PolicySection[] {
     },
     {
       heading: "Employer post limits and free post",
-      body: "Each company receives one free job post for its lifetime, subject to the free-credit setting in effect when it submits a post. The credit is consumed when a post is submitted and has no cash value; a post rejected after submission does not restore the credit, except where an automatic safety scan blocks it before publication. After the free credit is used, an active paid employer plan is required. Paid plan posting limits are determined by the selected plan and apply for its active billing period.",
+      body: `Each company receives ${settings.freeJobPosts} free job post${settings.freeJobPosts === 1 ? "" : "s"} for its lifetime, subject to the free-credit setting in effect when it submits a post. A credit is consumed when a post is submitted and has no cash value; a post rejected after submission does not restore the credit, except where an automatic safety scan blocks it before publication. After the free credits are used, an active paid employer plan is required. Paid plan posting limits are determined by the selected plan and apply for its active billing period.`,
     },
     {
       heading: "Plans, payments and expiry",
@@ -141,7 +141,7 @@ export function defaultRefundSections(settings: SiteSettings): PolicySection[] {
     },
     {
       heading: "Free services",
-      body: "The employer's one-time free job post has no cash value and cannot be redeemed for money or transferred to another company. Candidates are never charged for browsing or applying to jobs.",
+      body: "The employer's free job posts have no cash value and cannot be redeemed for money or transferred to another company. Candidates are never charged for browsing or applying to jobs.",
     },
     {
       heading: "How to request help",

@@ -6,6 +6,7 @@ import { verifyWebhookSignature } from "@/lib/billing/razorpay";
 import { recordFailedPayment } from "@/lib/billing/activate";
 import { activateSubscriptionFromPayment } from "@/lib/billing/payment-activation";
 import { activateAddonPayment } from "@/lib/billing/addons";
+import { activateInternshipPostPayment } from "@/lib/billing/internship-posts";
 import { AppError } from "@/lib/errors";
 
 export const runtime = "nodejs";
@@ -121,6 +122,19 @@ async function handleCaptured(event: RazorpayEvent): Promise<void> {
       throw new AppError("Captured add-on payment has invalid amount or currency.", 400, "invalid_payment");
     }
     await activateAddonPayment({
+      orderId,
+      paymentId: entity.id,
+      amountPaise: entity.amount,
+      method: entity.method ?? null,
+      signatureVerified: true,
+    });
+    return;
+  }
+  if (payment.purpose === "internship_post") {
+    if (typeof entity.amount !== "number" || entity.currency !== "INR") {
+      throw new AppError("Captured internship payment has invalid amount or currency.", 400, "invalid_payment");
+    }
+    await activateInternshipPostPayment({
       orderId,
       paymentId: entity.id,
       amountPaise: entity.amount,

@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { requireUser } from "@/lib/auth/current-user";
-import { getJobQuota } from "@/lib/entitlements";
+import { getInternshipQuota, getJobQuota } from "@/lib/entitlements";
 import {
   listCompanyJobs,
   resolveRecruiterCompany,
@@ -57,8 +57,9 @@ export default async function RecruiterJobsPage({
     );
   }
 
-  const [quota, allJobs] = await Promise.all([
+  const [quota, internshipQuota, allJobs] = await Promise.all([
     getJobQuota(company.id),
+    getInternshipQuota(company.id),
     listCompanyJobs(company.id, { status }),
   ]);
 
@@ -78,13 +79,9 @@ export default async function RecruiterJobsPage({
         }
       />
 
-      {quota.usesFreeCredit && quota.freeRemaining === 0 ? (
-        <Alert tone="warning" title="Upgrade to submit another job">
-          Your company&apos;s one-time free posting credit has been used.{" "}
-          <Link className="font-semibold text-royal hover:underline" href="/pricing?audience=employer">
-            Compare employer plans
-          </Link>
-          .
+{internshipQuota.freeRemaining === 0 && internshipQuota.credits === 0 ? (
+        <Alert tone="warning" title="Free internship posts used">
+          Buy internship credits from the overview or billing page to post another internship.
         </Alert>
       ) : null}
 
