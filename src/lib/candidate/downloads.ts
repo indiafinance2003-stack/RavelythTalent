@@ -38,7 +38,7 @@ export function resumeDownloadNotFound() {
 export async function resumeDownloadAuthorised(
   resumeId: string,
   viewerUserId: string,
-  viewerRole: "job_seeker" | "recruiter" | "admin",
+  viewerRole: "job_seeker" | "recruiter" | "admin" | "candidate",
 ): Promise<ResumeDownloadAccess | null> {
   const resume = await db
     .select({
