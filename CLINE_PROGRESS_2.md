@@ -32,11 +32,11 @@ Next: Task D (plan limits, free posts, internships): D1 free job posts default 3
 
 ## Task D - Plan limits, free posts, internships
 
-- [ ] D1. free job posts default 3 (schema default + idempotent update when currently 1); copy reads from setting everywhere.
-- [ ] D2. Monthly job-post limits 9/20/30/55 via idempotent seed upsert; pages read DB.
-- [ ] D3. Internship fields (additive migration), posting form, job page/cards/search/emails/social display, /internships page + home section + search filter, safety scan rules.
-- [ ] D4. Internship quota: free_internship_posts=5, internship_post_price_paise=39900, no subscription needed, credits via Razorpay reuse, consume/restore, dashboard UI.
-- [ ] D5. Tests (Razorpay mocked). Local commit.
+- [x] D1. free job posts default 3 (schema default + idempotent update when currently 1); copy reads from setting everywhere.
+- [x] D2. Monthly job-post limits 9/20/30/55 via idempotent seed upsert; pages read DB.
+- [x] D3. Internship fields (additive migration), posting form, job page/cards/search/emails/social display, /internships page + home section + search filter, safety scan rules.
+- [x] D4. Internship quota: free_internship_posts=5, internship_post_price_paise=39900, no subscription needed, credits via Razorpay reuse, consume/restore, dashboard UI.
+- [x] D5. Tests (Razorpay mocked). Local commit.
 
 ## Task E - Chat between employers and candidates
 

@@ -43,6 +43,7 @@ export const users = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    chatMuteUntil: timestamp("chat_mute_until", { withTimezone: true }),
   },
   (t) => [
     uniqueIndex("users_email_key").on(t.email),

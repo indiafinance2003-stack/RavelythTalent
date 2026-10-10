@@ -72,6 +72,8 @@ export const companies = pgTable(
     isFeatured: boolean("is_featured").notNull().default(false),
     /** Employer opt-out from Ravelyth's own social-media promotion (Task 9). */
     socialPromotionOptOut: boolean("social_promotion_opt_out").notNull().default(false),
+    chatEnabled: boolean("chat_enabled").notNull().default(true),
+    chatBeforeApplyEnabled: boolean("chat_before_apply_enabled").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),

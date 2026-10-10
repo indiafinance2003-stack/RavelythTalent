@@ -13,3 +13,4 @@ export * from "./platform";
 export * from "./assistant";
 export * from "./targets";
 export * from "./social";
+export * from "./chat";
