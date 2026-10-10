@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ApplicantStatusForm } from "@/components/recruiter/pipeline-status-form";
+import { startEmployerConversationAction } from "@/lib/chat/actions/create-conversation";
 import type { PipelineRow } from "@/lib/recruiter/service";
 import { APPLICATION_STATUS_LABEL, formatDate } from "@/lib/utils";
 import { Alert, Badge, ButtonLink, EmptyState } from "@/components/ui/primitives";
@@ -52,10 +53,12 @@ export function PipelineList({
   rows,
   jobId,
   jobs,
+  chatEnabled = false,
 }: {
   rows: PipelineRow[];
   jobId?: string;
   jobs: Array<{ id: string; title: string }>;
+  chatEnabled?: boolean;
 }) {
   const activeKnown = !jobId || jobs.some((j) => j.id === jobId);
   return (
@@ -89,6 +92,17 @@ export function PipelineList({
               </div>
               <div className="flex flex-wrap items-center gap-3 border-t border-slate-100 pt-3">
                 <ApplicantStatusForm applicationId={a.id} current={a.status} />
+                {chatEnabled ? (
+                  <form action={startEmployerConversationAction}>
+                    <input type="hidden" name="applicationId" value={a.id} />
+                    <button
+                      type="submit"
+                      className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-navy hover:border-royal"
+                    >
+                      Message
+                    </button>
+                  </form>
+                ) : null}
                 {a.status === "shortlisted" || a.status === "interview" ? (
                   <Link href={`/recruiter/interviews?application=${a.id}`}
                     className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-navy hover:border-royal">

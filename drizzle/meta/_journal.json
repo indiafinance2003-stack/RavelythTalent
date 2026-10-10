@@ -162,6 +162,13 @@
       "when": 1791617545562,
       "tag": "0022_gray_shinko_yamashiro",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1791649256682,
+      "tag": "0023_remarkable_mastermind",
+      "breakpoints": true
     }
   ]
 }

@@ -47,6 +47,7 @@ const settingsSchema = z.object({
   internshipPostPricePaise: z.coerce.number().int().min(0).max(100_000_000),
   autoApproveCompanies: z.boolean(),
   autoPublishJobs: z.boolean(),
+  chatEnabled: z.boolean(),
   maintenanceMode: z.boolean(),
 });
 
@@ -90,6 +91,7 @@ async function saveSiteSettingsActionImpl(formData: FormData): Promise<void> {
     internshipPostPricePaise: formData.get("internshipPostPricePaise"),
     autoApproveCompanies: formData.get("autoApproveCompanies") === "on",
     autoPublishJobs: formData.get("autoPublishJobs") === "on",
+    chatEnabled: formData.get("chatEnabled") === "on",
     maintenanceMode: formData.get("maintenanceMode") === "on",
   });
   if (!parsed.success) {

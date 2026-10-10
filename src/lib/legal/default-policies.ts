@@ -23,6 +23,10 @@ export function defaultPrivacySections(settings: SiteSettings): PolicySection[] 
       body: "We use this information to create and secure accounts, operate candidate profiles and job applications, provide employer recruiting tools, administer subscriptions and invoices, send service and security communications, moderate listings and prevent fraud or abuse, answer support requests, maintain and improve the portal, and meet legal and accounting duties. We process information as needed to provide a service you request, to meet legal obligations, and for legitimate interests such as security and service reliability, subject to applicable data-protection law.",
     },
     {
+      heading: "Chat messages",
+      body: "When chat is enabled, we store the plain-text messages you send and receive, along with the conversation, job, participants, timestamps and read status, so the feature can work and so reports can be reviewed. Chat is plain text only; do not send payment details, identity documents or other sensitive information. We send the other party an email notification that a message is waiting but do not include the message text in that email. Reported conversations may be reviewed by our administrators, and every such review is recorded in our audit log. We flag messages that appear to request payment and may temporarily mute an account that repeatedly sends such messages.",
+    },
+    {
       heading: "Sharing with employers and recruiters",
       body: "When you apply for a job, the employer responsible for that listing receives the information you submit with that application. Recruiters may access candidate profile and resume information through resume search only when their active plan permits that feature and the candidate has opted in to being discoverable. We do not make a candidate discoverable solely because they have a paid plan.",
     },
@@ -80,6 +84,10 @@ export function defaultTermsSections(settings: SiteSettings): PolicySection[] {
     {
       heading: "Employer duties and prohibited job content",
       body: "Employers are solely responsible for the accuracy, legality and currency of company details, job requirements, compensation and hiring communications, and for compliance with employment, privacy and anti-discrimination laws. Employers must never charge candidates any fee, deposit or other amount to apply for, interview for, or obtain a job. Posts must not contain scams, misleading earnings claims, unlawful discrimination, adult content, unlawful offers, deceptive links, requests for candidate payment, or other prohibited or harmful material.",
+    },
+    {
+      heading: "Chat and messaging rules",
+      body: `When chat is enabled, a candidate may send one plain-text question per job before applying, and each party may continue the conversation after an application exists. Employers may start a conversation only after a candidate has applied. Messages are limited to 1000 characters and must be plain text; no candidate or employer may request or send payment to obtain a job. We flag messages that appear to request payment, may temporarily mute an account that repeatedly sends them, and may restrict accounts or conversations that breach these rules. Reported conversations may be reviewed by our administrators only when reported. Users can block another user and can report a conversation.`,
     },
     {
       heading: "Moderation and account restrictions",

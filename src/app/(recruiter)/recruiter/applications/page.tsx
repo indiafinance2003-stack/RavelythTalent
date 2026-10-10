@@ -8,6 +8,7 @@ import {
 } from "@/lib/recruiter/service";
 import { ButtonLink, EmptyState, PageHeader } from "@/components/ui/primitives";
 import { PipelineFilters, PipelineList } from "@/components/recruiter/pipeline-list";
+import { isGlobalChatEnabled } from "@/lib/chat/gate";
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +45,7 @@ export default async function RecruiterApplicationsPage({
     listJobOptions(company.id),
   ]);
   const total = counts.reduce((sum, r) => sum + r.value, 0);
+  const chatEnabled = await isGlobalChatEnabled();
 
   return (
     <div className="space-y-6">
@@ -52,7 +54,12 @@ export default async function RecruiterApplicationsPage({
         description={total === 0 ? "No applications yet." : `${total} applications across your jobs.`}
       />
       <PipelineFilters jobId={jobIdParam} status={status} jobs={jobOptions} />
-      <PipelineList rows={rows} jobId={jobIdParam} jobs={jobOptions} />
+      <PipelineList
+        rows={rows}
+        jobId={jobIdParam}
+        jobs={jobOptions}
+        chatEnabled={chatEnabled}
+      />
     </div>
   );
 }

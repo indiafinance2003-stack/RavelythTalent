@@ -121,6 +121,10 @@ export default async function AdminSettingsPage() {
             <Toggle checked={settings.featureReviews} label="Company reviews enabled" name="featureReviews" />
             <Toggle checked={settings.featureSalaryInsights} label="Salary insights enabled" name="featureSalaryInsights" />
             <Toggle checked={settings.featureResumeDatabase} label="Resume database enabled" name="featureResumeDatabase" />
+            <div>
+              <Toggle checked={settings.chatEnabled} label="Employer-candidate chat enabled" name="chatEnabled" />
+              <p className="mt-1 text-xs text-slate-500">Off by default. While off, every chat link and button is hidden and all chat actions are refused on the server.</p>
+            </div>
             <Toggle checked={settings.maintenanceMode} label="Maintenance mode" name="maintenanceMode" />
           </div>
           <div className="grid gap-3 md:grid-cols-2">

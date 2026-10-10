@@ -72,6 +72,9 @@ export const siteSettings = pgTable("site_settings", {
   autoApproveCompanies: boolean("auto_approve_companies").notNull().default(true),
   autoPublishJobs: boolean("auto_publish_jobs").notNull().default(true),
 
+  /** Global switch for employer-candidate chat. Off until an admin turns it on. */
+  chatEnabled: boolean("chat_enabled").notNull().default(false),
+
   maintenanceMode: boolean("maintenance_mode").notNull().default(false),
   updatedByUserId: uuid("updated_by_user_id").references(() => users.id, {
     onDelete: "set null",

@@ -1,6 +1,7 @@
 ﻿import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { isGlobalChatEnabled } from "@/lib/chat/gate";
 import { DashboardShell } from "@/components/dashboard/shell";
 import { Logo } from "@/components/brand/logo";
 
@@ -17,6 +18,8 @@ export default async function RecruiterLayout({
   if (!user.emailVerifiedAt) redirect("/verify-email");
   if (user.role === "job_seeker") redirect("/dashboard");
 
+  const chatEnabled = await isGlobalChatEnabled();
+
   return (
     <DashboardShell
       bell={{
@@ -24,6 +27,7 @@ export default async function RecruiterLayout({
         label: "Applicants",
       }}
       brand={<Logo href="/recruiter" />}
+      chatEnabled={chatEnabled}
       user={{ name: user.fullName, role: user.role }}
       variant="employer"
     >

@@ -22,6 +22,7 @@ import {
 } from "@/lib/db/schema";
 import { AppError } from "@/lib/errors";
 import { deleteStoredFiles } from "@/lib/storage";
+import { deleteUserChatData } from "@/lib/chat/cleanup";
 import {
   shouldDeleteOwnedCompany,
   userDeletionBlockReason,
@@ -145,6 +146,8 @@ export async function deleteAdminManagedUser(input: {
       files.push(...verificationFiles.map((row) => row.storagePath));
       await tx.delete(companies).where(inArray(companies.id, companiesToDelete));
     }
+
+    await deleteUserChatData(tx, target.id);
 
     await tx.insert(auditLogs).values({
       actorUserId: input.actorUserId,

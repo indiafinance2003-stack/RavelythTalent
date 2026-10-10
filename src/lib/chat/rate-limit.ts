@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { chatConversations, chatMessages } from "@/lib/db/schema";
-import { and, count, eq, gte, sql } from "drizzle-orm";
+import { and, count, eq, gte } from "drizzle-orm";
 
 export async function countMessagesLastHour(userId: string): Promise<number> {
   const hourAgo = new Date(Date.now() - 60 * 60 * 1000);

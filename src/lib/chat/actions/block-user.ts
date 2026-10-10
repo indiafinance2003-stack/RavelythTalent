@@ -7,6 +7,7 @@ import { AppError } from "@/lib/errors";
 import { requireApiVerifiedUser } from "@/lib/auth/current-user";
 import { db } from "@/lib/db";
 import { chatBlocks } from "@/lib/db/schema";
+import { assertGlobalChatEnabled } from "@/lib/chat/gate";
 
 const schema = z.object({
   blockedUserId: z.uuid(),
@@ -15,6 +16,7 @@ const schema = z.object({
 export async function blockUser(formData: FormData) {
   await assertSameOrigin();
   const user = await requireApiVerifiedUser();
+  await assertGlobalChatEnabled();
   const parsed = schema.safeParse({
     blockedUserId: formData.get("blockedUserId"),
   });

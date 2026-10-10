@@ -13,6 +13,9 @@ import {
 } from "@/components/candidate/employer-conversion";
 import { getSwitchBackBlockReason } from "@/lib/auth/employer-conversion";
 import { setSocialPromotionOptOutAction } from "@/lib/social/company-opt-out";
+import { updateCompanyChatSettings } from "@/lib/chat/company-actions";
+import { getCompanyChatFlags } from "@/lib/chat/queries";
+import { isGlobalChatEnabled } from "@/lib/chat/gate";
 
 export const dynamic = "force-dynamic";
 
@@ -50,6 +53,10 @@ export default async function CompanyPage({
   }
 
   const detail = await getCompanyForEdit(user.id, company.id);
+  const [chatGloballyEnabled, chatFlags] = await Promise.all([
+    isGlobalChatEnabled(),
+    getCompanyChatFlags(detail.id),
+  ]);
 
   const values: CompanyFormValues = {
     companyId: detail.id,
@@ -138,6 +145,44 @@ export default async function CompanyPage({
           </Button>
         </form>
       </Card>
+
+      {chatGloballyEnabled ? (
+        <Card>
+          <h2 className="text-sm font-bold text-navy">Candidate chat</h2>
+          <p className="mt-1 text-sm text-slate-600">
+            Let candidates message you. Pre-application questions let a candidate
+            ask one plain-text question per job before they apply. You can only
+            start a conversation with a candidate after they apply.
+          </p>
+          <form
+            action={updateCompanyChatSettings}
+            className="mt-4 space-y-3"
+          >
+            <input name="companyId" type="hidden" value={detail.id} />
+            <label className="flex items-start gap-2.5 text-sm text-slate-700">
+              <input
+                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-royal focus:ring-royal"
+                defaultChecked={chatFlags?.chatEnabled ?? false}
+                name="chatEnabled"
+                type="checkbox"
+              />
+              Enable chat for my company
+            </label>
+            <label className="flex items-start gap-2.5 text-sm text-slate-700">
+              <input
+                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-royal focus:ring-royal"
+                defaultChecked={chatFlags?.chatBeforeApplyEnabled ?? false}
+                name="chatBeforeApplyEnabled"
+                type="checkbox"
+              />
+              Allow one pre-application question per job
+            </label>
+            <Button size="sm" type="submit">
+              Save chat settings
+            </Button>
+          </form>
+        </Card>
+      ) : null}
 
       {detail.ownerUserId === user.id ? (
         <SwitchToCandidateForm reason={await getSwitchBackBlockReason(user.id)} />

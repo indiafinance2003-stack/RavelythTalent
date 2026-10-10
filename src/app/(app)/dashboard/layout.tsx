@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { countUnreadNotifications } from "@/lib/notifications";
+import { isGlobalChatEnabled } from "@/lib/chat/gate";
 import { DashboardShell } from "@/components/dashboard/shell";
 import { Logo } from "@/components/brand/logo";
 
@@ -17,6 +18,7 @@ export default async function DashboardLayout({
   if (!user.emailVerifiedAt) redirect("/verify-email");
 
   const unread = await countUnreadNotifications(user.id);
+  const chatEnabled = await isGlobalChatEnabled();
 
   return (
     <DashboardShell
@@ -26,6 +28,7 @@ export default async function DashboardLayout({
         label: "Notifications",
       }}
       brand={<Logo href="/dashboard" />}
+      chatEnabled={chatEnabled}
       user={{ name: user.fullName, role: user.role }}
       variant="candidate"
     >

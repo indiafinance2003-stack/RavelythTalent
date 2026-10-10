@@ -40,11 +40,12 @@ Next: Task D (plan limits, free posts, internships): D1 free job posts default 3
 
 ## Task E - Chat between employers and candidates
 
-- [ ] E1. Schema: chat_conversations, chat_messages, chat_reports, chat_blocks, users.chat_mute_until, companies.chat_enabled (true), companies.chat_before_apply_enabled (false); employer toggles.
-- [ ] E2. Server-enforced rules (post-apply messaging, one pre-apply message, rate limits, flagging + auto-mute, blocks, IDOR).
-- [ ] E3. UI: /dashboard/messages, /recruiter/messages (poll 10s), job page "Ask a question", applicant "Message", in-app notification, hourly outbox email per conversation.
-- [ ] E4. Admin /admin/chat-reports with audit log on open; user deletion cleanup; privacy/terms text updates.
-- [ ] E5. Tests for every rule. Local commit.
+- [x] E1. Schema (existing migrations 0022_gray_shinko_yamashiro: chat_conversations, chat_messages, chat_reports, chat_blocks; users.chat_mute_until). Employer toggles now wired on /recruiter/company (companies.chat_enabled default true, companies.chat_before_apply_enabled default false) via updateCompanyChatSettings. Added NEW additive migration 0023_remarkable_mastermind.sql: site_settings.chat_enabled boolean default false (global master switch).
+- [x] E2. Server-enforced rules in pure module src/lib/chat/rules.ts (decidePreApplyQuestion, decideEmployerStart, decideSendMessage, canViewConversation, shouldAutoMute, muteUntilFrom, chatEmailDecision, sanitizePlainText/checkMessageBody): post-apply messaging, one pre-apply question per job, apply-first, employer cannot start before application, plain text/1000-char limit, 20 msg/hour + 5 conversations/day, blocked/muted checks, IDOR guard. Actions enforce the global switch (src/lib/chat/gate.ts) and notify/audit.
+- [x] E3. UI: /dashboard/messages + /recruiter/messages (conversation list with unread counts, thread view), 10s polling via GET /api/chat/conversations/[id]/messages (no websockets), "Ask a question" on job page (src/components/jobs/ask-question-panel.tsx), "Message" on applicant cards (startEmployerConversationAction), nav links gated by chatEnabled. In-app notification on every new message (src/lib/chat/notify.ts) + outbox email at most once per conversation per hour with link, no message text (src/lib/email/templates/chat.ts, metadata->>'conversationId').
+- [x] E4. /admin/chat-reports lists reported conversations only, /admin/chat-reports/[id] opens the conversation and writes an audit log entry on view (chat_report.view) with a resolve action. User deletion cleanup (src/lib/chat/cleanup.ts deleteUserChatData) wired into src/lib/admin/user-deletion.ts. Privacy Policy + Terms updated with chat data/review/retention and messaging rules.
+- [x] E5. Tests: rules.test.ts (pre-apply, employer start, send, IDOR candidate/company, rate limits, mute/email throttle), scam-scan.test.ts (flagging), cleanup.test.ts (deletion). Suite: 428 passed (was 401). Local commit.
+- [x] E6 (user request). Global switch site_settings.chat_enabled default FALSE: editable in /admin/settings (settings-actions + page), nav links hidden and every chat server action refuses while off (assertGlobalChatEnabled).
 
 ## Task F - Quality, docs, final report
 

@@ -47,6 +47,7 @@ export const FALLBACK_SETTINGS: SiteSettings = {
   internshipPostPricePaise: 39900,
   autoApproveCompanies: true,
   autoPublishJobs: true,
+  chatEnabled: false,
   maintenanceMode: false,
   updatedByUserId: null,
   updatedAt: new Date(0),

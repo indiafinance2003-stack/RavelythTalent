@@ -17,6 +17,7 @@ import {
   Mail,
   Menu,
   MessageSquareText,
+  MessagesSquare,
   Package,
   PenLine,
   PieChart,
@@ -45,6 +46,8 @@ type NavItem = {
   icon: LucideIcon;
   /** Match the path exactly (used for the dashboard home links). */
   exact?: boolean;
+  /** Only shown while the global chat feature is enabled. */
+  chat?: boolean;
 };
 
 type NavGroup = {
@@ -109,6 +112,7 @@ const CANDIDATE_NAV: NavGroup[] = [
       { href: "/dashboard/alerts", label: "Job alerts", icon: Bell },
       { href: "/dashboard/resume-builder", label: "Resume builder", icon: FileText },
       { href: "/dashboard/interviews", label: "Interviews", icon: CalendarDays },
+      { href: "/dashboard/messages", label: "Messages", icon: MessagesSquare, chat: true },
       { href: "/dashboard/notifications", label: "Notifications", icon: MessageSquareText },
       { href: "/dashboard/settings", label: "Settings", icon: Settings },
     ],
@@ -129,6 +133,7 @@ const EMPLOYER_NAV: NavGroup[] = [
       { href: "/recruiter", label: "Overview", icon: LayoutDashboard, exact: true },
       { href: "/recruiter/jobs", label: "Jobs", icon: FileText },
       { href: "/recruiter/applications", label: "Applicants", icon: UsersRound },
+      { href: "/recruiter/messages", label: "Messages", icon: MessagesSquare, chat: true },
       { href: "/recruiter/interviews", label: "Interviews", icon: CalendarDays },
       { href: "/recruiter/company", label: "Company profile", icon: Building2 },
       { href: "/recruiter/billing", label: "Billing", icon: CreditCard },
@@ -155,6 +160,20 @@ const VARIANT_LABEL: Record<ShellVariant, string> = {
 function isActive(pathname: string, item: NavItem): boolean {
   if (item.exact) return pathname === item.href;
   return pathname === item.href || pathname.startsWith(`${item.href}/`);
+}
+
+/** Drops chat-only links (and any now-empty groups) when chat is disabled. */
+function withChatVisibility(
+  groups: NavGroup[],
+  chatEnabled: boolean,
+): NavGroup[] {
+  if (chatEnabled) return groups;
+  return groups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => !item.chat),
+    }))
+    .filter((group) => group.items.length > 0);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -219,6 +238,7 @@ export function DashboardShell({
   search,
   bell,
   user,
+  chatEnabled = false,
   actions,
   children,
 }: {
@@ -231,12 +251,14 @@ export function DashboardShell({
   bell?: { href: string; count?: number; label: string };
   /** Signed-in user shown as an initials avatar. */
   user: { name: string; role: string };
+  /** Whether chat links should be shown in the navigation. */
+  chatEnabled?: boolean;
   /** Extra server-rendered content above the page (e.g. action errors). */
   actions?: ReactNode;
   children: ReactNode;
 }) {
   const pathname = usePathname();
-  const groups = NAV_BY_VARIANT[variant];
+  const groups = withChatVisibility(NAV_BY_VARIANT[variant], chatEnabled);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);

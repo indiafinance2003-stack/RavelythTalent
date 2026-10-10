@@ -11,7 +11,7 @@ import {
   Users,
 } from "lucide-react";
 import { db } from "@/lib/db";
-import { applications, resumes } from "@/lib/db/schema";
+import { applications, chatConversations, resumes } from "@/lib/db/schema";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import {
   getJobSkillNames,
@@ -19,6 +19,8 @@ import {
   searchJobs,
 } from "@/lib/jobs/queries";
 import { isJobSaved } from "@/lib/applications/service";
+import { isGlobalChatEnabled } from "@/lib/chat/gate";
+import { getCompanyChatFlags } from "@/lib/chat/queries";
 import { buildJobPostingJsonLd } from "@/lib/seo/job-posting";
 import { appUrl } from "@/lib/email/urls";
 import {
@@ -33,6 +35,7 @@ import {
   labelFor,
 } from "@/lib/utils";
 import { ApplyPanel } from "@/components/jobs/apply-panel";
+import { AskQuestionPanel } from "@/components/jobs/ask-question-panel";
 import { ReportJobButton } from "@/components/jobs/report-job-button";
 import { JobCardView } from "@/components/jobs/job-card";
 import {
@@ -117,6 +120,31 @@ export default async function JobDetailPage({ params }: { params: Params }) {
 
   const alreadyApplied = Boolean(appliedRows.at(0));
   const saved = user ? await isJobSaved(user.id, job.id) : false;
+
+  const [globalChat, companyChat, preApplyRows] = await Promise.all([
+    isGlobalChatEnabled(),
+    getCompanyChatFlags(job.companyId),
+    user
+      ? db
+          .select({ id: chatConversations.id })
+          .from(chatConversations)
+          .where(
+            and(
+              eq(chatConversations.jobId, job.id),
+              eq(chatConversations.candidateUserId, user.id),
+              eq(chatConversations.preApply, true),
+            ),
+          )
+          .limit(1)
+      : Promise.resolve([]),
+  ]);
+  const existingPreApplyId = preApplyRows.at(0)?.id ?? null;
+  const chatQuestionAvailable =
+    globalChat &&
+    Boolean(companyChat?.chatEnabled) &&
+    Boolean(companyChat?.chatBeforeApplyEnabled);
+  const canAskQuestion =
+    chatQuestionAvailable && Boolean(user) && !alreadyApplied;
   const resumeOptions = resumeRows.map((r) => ({
     id: r.id,
     label: r.label ?? r.originalName,
@@ -372,6 +400,13 @@ export default async function JobDetailPage({ params }: { params: Params }) {
                 saved={saved}
                 resumes={resumeOptions}
               />
+              {chatQuestionAvailable ? (
+                <AskQuestionPanel
+                  jobId={job.id}
+                  existingConversationId={existingPreApplyId}
+                  canAsk={canAskQuestion}
+                />
+              ) : null}
               <ReportJobButton jobId={job.id} />
 
               <Card>
