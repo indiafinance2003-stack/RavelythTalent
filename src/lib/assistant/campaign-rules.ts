@@ -36,6 +36,10 @@ export type PlanCampaignStepInput = {
   emailedWithin14Days: boolean;
   hasSentCampaignMessage: boolean;
   followupSequence: Array<{ delayDays: number; subject: string; body: string; enabled: boolean }>;
+  /** Campaign option: this campaign deliberately follows up an earlier email. */
+  followsUpPrevious?: boolean;
+  /** Minimum whole days since `lastContactedAt` before the follow-up mode applies. */
+  minDaysSinceLastContact?: number;
 };
 
 export type CampaignStepPlan =
@@ -46,6 +50,12 @@ export type CampaignStepPlan =
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const NO_REPLY_WAIT_DAYS = 60;
+
+/** Clamps the "minimum days since last contact" option (default 3, minimum 2). */
+export function campaignFollowupMinDays(value: number | null | undefined): number {
+  if (value === null || value === undefined || !Number.isFinite(value)) return 3;
+  return Math.max(2, Math.floor(value));
+}
 
 /**
  * Decides which campaign message (if any) a lead should receive when a draft
@@ -58,12 +68,33 @@ const NO_REPLY_WAIT_DAYS = 60;
  * and the 14-day recency rule does not block them. Every other lead keeps the
  * existing behaviour (step 1, scheduled now). `no_reply` leads are blocked
  * while their last contact is within the 60-day waiting window.
+ *
+ * When the campaign opts into "follows up an earlier email", an `emailed` lead
+ * whose last contact is at least `minDaysSinceLastContact` days ago (boundary
+ * inclusive) may receive this campaign's FIRST message even though the normal
+ * 14-day first-contact rule would otherwise block it. Every other guard
+ * (suppression, do-not-contact, bounced, rejected, replied, no-reply wait,
+ * invalid email) still applies.
  */
 export function planCampaignStep(input: PlanCampaignStepInput): CampaignStepPlan {
+  const minDays = campaignFollowupMinDays(input.minDaysSinceLastContact);
+  const daysSinceLastContact = input.lastContactedAt
+    ? (input.now.getTime() - input.lastContactedAt.getTime()) / DAY_MS
+    : null;
+  const followupModeApplies =
+    Boolean(input.followsUpPrevious) &&
+    input.status === "emailed" &&
+    input.lastContactedAt !== null &&
+    !input.hasSentCampaignMessage &&
+    daysSinceLastContact !== null &&
+    daysSinceLastContact >= minDays;
+
   const emailedOutsideSystem =
     input.status === "emailed" &&
     input.lastContactedAt !== null &&
     !input.hasSentCampaignMessage;
+
+  const waiveRecency = followupModeApplies || emailedOutsideSystem;
 
   const reasons = campaignLeadBlockReasons({
     email: input.email,
@@ -71,13 +102,17 @@ export function planCampaignStep(input: PlanCampaignStepInput): CampaignStepPlan
     suppressed: input.suppressed,
     doNotContact: input.doNotContact,
     status: input.status,
-    emailedWithin14Days: emailedOutsideSystem ? false : input.emailedWithin14Days,
+    emailedWithin14Days: waiveRecency ? false : input.emailedWithin14Days,
     hasReplied: input.hasReplied,
     noReplyContactedWithin60Days: input.status === "no_reply" &&
       input.lastContactedAt !== null &&
       input.lastContactedAt.getTime() > input.now.getTime() - NO_REPLY_WAIT_DAYS * DAY_MS,
   });
   if (reasons.length) return { action: "blocked", reasons };
+
+  if (followupModeApplies) {
+    return { action: "first_email", step: 1, scheduledAt: input.now };
+  }
 
   if (emailedOutsideSystem) {
     const firstFollowup = input.followupSequence[0];
@@ -96,6 +131,63 @@ export function planCampaignStep(input: PlanCampaignStepInput): CampaignStepPlan
   }
 
   return { action: "first_email", step: 1, scheduledAt: input.now };
+}
+
+export type EvaluateCampaignLeadInput = PlanCampaignStepInput & {
+  /** The most recent time this address was emailed (in-system or imported). */
+  lastEmailedAt?: Date | null;
+};
+
+export type CampaignLeadEvaluation = {
+  plan: CampaignStepPlan;
+  eligible: boolean;
+  reasons: string[];
+  /** When the only blocker is the 14-day recency rule, the date it clears. */
+  eligibleFrom: Date | null;
+};
+
+const RECENCY_REASON = "Lead was emailed in the last 14 days.";
+const RECENCY_WINDOW_DAYS = 14;
+
+/**
+ * Shared decision used by BOTH the activation action and the admin UI so the
+ * reason shown next to a lead can never drift from what the server enforces.
+ */
+export function evaluateCampaignLead(input: EvaluateCampaignLeadInput): CampaignLeadEvaluation {
+  const plan = planCampaignStep(input);
+  const reasons = plan.action === "blocked" ? plan.reasons : [];
+  const eligibleFrom =
+    reasons.length === 1 &&
+    reasons[0] === RECENCY_REASON &&
+    input.lastEmailedAt instanceof Date
+      ? new Date(input.lastEmailedAt.getTime() + RECENCY_WINDOW_DAYS * DAY_MS)
+      : null;
+  return { plan, eligible: plan.action !== "blocked", reasons, eligibleFrom };
+}
+
+export type CampaignDeletionDecision = { allowed: boolean; reason: string | null };
+
+const DELIVERED_MESSAGE_STATUSES = new Set(["sending", "sent", "replied", "bounced", "opted_out"]);
+
+/**
+ * A campaign may only be hard-deleted while none of its messages were already
+ * handed to SMTP. Once anything was sent (or is mid-send), deletion is refused
+ * and the admin is offered Pause / archive instead.
+ */
+export function campaignDeletionDecision(input: {
+  messageStatuses: string[];
+}): CampaignDeletionDecision {
+  const delivered = input.messageStatuses.filter((status) =>
+    DELIVERED_MESSAGE_STATUSES.has(status),
+  );
+  if (delivered.length) {
+    return {
+      allowed: false,
+      reason:
+        "This campaign already has messages that were sent, so it cannot be deleted. Pause it instead, or archive it to hide it from the campaigns list.",
+    };
+  }
+  return { allowed: true, reason: null };
 }
 
 export function campaignActivationBlockReasons(input: {

@@ -153,6 +153,19 @@
   `systemctl start ravelyth-offsite-backup.service`, `rclone ls`
   verification) and confirm the rclone config and passphrase files are
   readable only by `ravelyth`.
+- **MEDIUM — outreach campaign management not exercised against PostgreSQL:**
+  the campaigns page gained an edit-only view, per-lead eligibility, a batched
+  activation summary, delete/duplicate/archive and a follow-up campaign mode.
+  The pure rules (follow-up mode boundary, `evaluateCampaignLead`,
+  `campaignDeletionDecision`), the form parsers and the error-URL fix are unit
+  tested, but PostgreSQL authentication remains unavailable, so the actual
+  queries, the delete transaction, the `onConflictDoNothing` unique-key
+  behaviour, the audit metadata round-trip and the rendered page still need a
+  staging/local smoke test. Additive migration
+  `0024_loose_blue_blade.sql` (adds `outreach_campaigns.follows_up_previous`,
+  `min_days_since_last_contact`, `archived_at` + an index; no drops or renames)
+  has not been applied locally. No automated UI/render test exists for the
+  campaigns page or the client lead selector.
 
 Do not treat this application as launch-ready until database access, owner
 configuration, staging walkthroughs and the outstanding actions in

@@ -306,13 +306,19 @@ export const outreachCampaigns = pgTable(
       .notNull()
       .default([]),
     autoApproveFollowups: boolean("auto_approve_followups").notNull().default(false),
+    followsUpPrevious: boolean("follows_up_previous").notNull().default(false),
+    minDaysSinceLastContact: integer("min_days_since_last_contact").notNull().default(3),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
     createdByUserId: uuid("created_by_user_id").references(() => users.id, {
       onDelete: "set null",
     }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index("outreach_campaigns_status_idx").on(t.status)],
+  (t) => [
+    index("outreach_campaigns_status_idx").on(t.status),
+    index("outreach_campaigns_archived_idx").on(t.archivedAt),
+  ],
 );
 
 export const campaignMessages = pgTable(

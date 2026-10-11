@@ -1,23 +1,21 @@
 "use server";
 
-import { and, eq, gt, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createTransport } from "nodemailer";
 import { z } from "zod";
 import { requireApiAdmin } from "@/lib/auth/current-user";
 import { runAdminFormAction } from "@/lib/admin/form-errors";
+import { adminFormErrorUrl } from "@/lib/admin/form-error-message";
 import { db } from "@/lib/db";
 import {
   auditLogs,
   campaignMessages,
   companyLeads,
-  inboxMessages,
-  inboxThreads,
   inboxAccounts,
   outreachCampaigns,
   siteSettings,
-  suppressedEmails,
   users,
 } from "@/lib/db/schema";
 import { AppError, ConflictError, NotFoundError } from "@/lib/errors";
@@ -27,10 +25,18 @@ import { getEnv } from "@/lib/env";
 import { getMailAccountCredentials } from "./mail-accounts";
 import {
   campaignActivationBlockReasons,
+  campaignDeletionDecision,
   outreachBusinessAddress,
-  planCampaignStep,
   renderCampaignTemplate,
 } from "./campaign-rules";
+import { evaluateLeadsForCampaign } from "./campaign-eligibility";
+import {
+  ACTIVATION_SELECTION_ERROR,
+  activationFormSchema,
+  parseCampaignForm,
+  parseDeleteCampaignForm,
+  parseDuplicateCampaignForm,
+} from "./campaign-form";
 import { signUnsubscribeToken } from "./unsubscribe-token";
 
 const campaignMutationLimit = { limit: 20, windowSeconds: 60 };
@@ -46,41 +52,30 @@ function formString(form: FormData, name: string): string {
   return String(form.get(name) ?? "");
 }
 
-const campaignSchema = z.object({
-  id: z.uuid().optional(),
-  name: z.string().trim().min(1).max(200),
-  senderAccountId: z.enum(["support", "gmail"]),
-  subjectTemplate: z.string().trim().min(1).max(998),
-  bodyTemplate: z.string().trim().min(1).max(20_000),
-  step2Enabled: z.boolean(),
-  step2DelayDays: z.coerce.number().int().min(1).max(60),
-  step2Subject: z.string().trim().max(998),
-  step2Body: z.string().trim().max(20_000),
-  step3Enabled: z.boolean(),
-  step3DelayDays: z.coerce.number().int().min(1).max(60),
-  step3Subject: z.string().trim().max(998),
-  step3Body: z.string().trim().max(20_000),
-  autoApproveFollowups: z.boolean(),
-});
+function campaignEditPath(id: string): string {
+  return `/admin/assistant/campaigns?edit=${id}`;
+}
+
+export type ActivationSummary = {
+  queued: number;
+  skipped: number;
+  firstEmails: number;
+  followUps: number;
+  selected: number;
+  skipReasons: Array<{ reason: string; count: number }>;
+};
+
+function addSkipReason(map: Map<string, number>, reason: string): void {
+  map.set(reason, (map.get(reason) ?? 0) + 1);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Save (draft/paused) and save + activate                                    */
+/* -------------------------------------------------------------------------- */
 
 async function saveCampaignImpl(formData: FormData): Promise<void> {
   const admin = await adminActor();
-  const parsed = campaignSchema.safeParse({
-    id: formString(formData, "id") || undefined,
-    name: formString(formData, "name"),
-    senderAccountId: formString(formData, "senderAccountId"),
-    subjectTemplate: formString(formData, "subjectTemplate"),
-    bodyTemplate: formString(formData, "bodyTemplate"),
-    step2Enabled: formString(formData, "step2Enabled") === "on",
-    step2DelayDays: formData.get("step2DelayDays"),
-    step2Subject: formString(formData, "step2Subject"),
-    step2Body: formString(formData, "step2Body"),
-    step3Enabled: formString(formData, "step3Enabled") === "on",
-    step3DelayDays: formData.get("step3DelayDays"),
-    step3Subject: formString(formData, "step3Subject"),
-    step3Body: formString(formData, "step3Body"),
-    autoApproveFollowups: formString(formData, "autoApproveFollowups") === "on",
-  });
+  const parsed = parseCampaignForm(formData);
   if (!parsed.success) throw new AppError(parsed.error.issues[0]?.message ?? "Invalid campaign.", 422);
   if (
     (parsed.data.step2Enabled && (!parsed.data.step2Subject || !parsed.data.step2Body)) ||
@@ -111,10 +106,14 @@ async function saveCampaignImpl(formData: FormData): Promise<void> {
       bodyTemplate: parsed.data.bodyTemplate,
       followupSequence: sequence,
       autoApproveFollowups: parsed.data.autoApproveFollowups,
+      followsUpPrevious: parsed.data.followsUpPrevious,
+      minDaysSinceLastContact: parsed.data.minDaysSinceLastContact,
       updatedAt: new Date(),
-    }).where(and(eq(outreachCampaigns.id, campaignId), eq(outreachCampaigns.status, "draft")))
-      .returning({ id: outreachCampaigns.id });
-    if (!updated) throw new ConflictError("Only draft campaigns can be edited.");
+    }).where(and(
+      eq(outreachCampaigns.id, campaignId),
+      inArray(outreachCampaigns.status, ["draft", "paused"]),
+    )).returning({ id: outreachCampaigns.id });
+    if (!updated) throw new ConflictError("Only draft or paused campaigns can be edited.");
     campaignId = updated.id;
   } else {
     const [created] = await db.insert(outreachCampaigns).values({
@@ -124,6 +123,8 @@ async function saveCampaignImpl(formData: FormData): Promise<void> {
       bodyTemplate: parsed.data.bodyTemplate,
       followupSequence: sequence,
       autoApproveFollowups: parsed.data.autoApproveFollowups,
+      followsUpPrevious: parsed.data.followsUpPrevious,
+      minDaysSinceLastContact: parsed.data.minDaysSinceLastContact,
       createdByUserId: admin.id,
     }).returning({ id: outreachCampaigns.id });
     if (!created) throw new Error("Campaign could not be saved.");
@@ -135,30 +136,59 @@ async function saveCampaignImpl(formData: FormData): Promise<void> {
     action: "assistant.campaign_saved",
     entityType: "outreach_campaign",
     entityId: campaignId,
-    description: "Outreach campaign saved as a draft.",
+    description: "Outreach campaign saved.",
   });
   revalidatePath("/admin/assistant/campaigns");
-  redirect(`/admin/assistant/campaigns?edit=${campaignId}`);
+
+  if (formString(formData, "intent") === "activate") {
+    let summary: ActivationSummary | null = null;
+    let activationError: unknown = null;
+    try {
+      summary = await activateCampaignImpl(formData, campaignId);
+    } catch (error) {
+      activationError = error;
+    }
+    if (activationError) {
+      const url = adminFormErrorUrl(campaignEditPath(campaignId), activationError);
+      if (url) redirect(url);
+      throw activationError;
+    }
+    if (summary) {
+      redirect(`${campaignEditPath(campaignId)}&activated=1`);
+    }
+  }
+  redirect(`${campaignEditPath(campaignId)}&saved=1`);
 }
 
 export async function saveCampaignAction(formData: FormData): Promise<void> {
-  return runAdminFormAction("/admin/assistant/campaigns", () => saveCampaignImpl(formData));
+  const id = z.uuid().safeParse(formString(formData, "id") || undefined);
+  const path = id.success ? campaignEditPath(id.data) : "/admin/assistant/campaigns";
+  return runAdminFormAction(path, () => saveCampaignImpl(formData));
 }
 
-async function activateCampaignImpl(formData: FormData): Promise<void> {
+/* -------------------------------------------------------------------------- */
+/* Activation                                                                 */
+/* -------------------------------------------------------------------------- */
+
+async function activateCampaignImpl(
+  formData: FormData,
+  campaignIdOverride?: string,
+): Promise<ActivationSummary> {
   const admin = await adminActor();
-  const parsed = z.object({
-    campaignId: z.uuid(),
-    leadIds: z.array(z.uuid()).min(1).max(1000),
-  }).safeParse({
-    campaignId: formString(formData, "campaignId"),
+  const parsed = activationFormSchema.safeParse({
+    campaignId: campaignIdOverride ?? (formString(formData, "campaignId") || undefined),
     leadIds: formData.getAll("leadIds"),
   });
-  if (!parsed.success) throw new AppError("Select a campaign and one or more leads.", 422);
+  if (!parsed.success) throw new AppError(ACTIVATION_SELECTION_ERROR, 422);
+
   const [campaign] = await db.select().from(outreachCampaigns)
-    .where(and(eq(outreachCampaigns.id, parsed.data.campaignId), eq(outreachCampaigns.status, "draft")))
+    .where(and(
+      eq(outreachCampaigns.id, parsed.data.campaignId),
+      inArray(outreachCampaigns.status, ["draft", "paused"]),
+    ))
     .limit(1);
-  if (!campaign) throw new NotFoundError("Draft campaign not found.");
+  if (!campaign) throw new NotFoundError("Draft or paused campaign not found.");
+
   const [legal] = await db.select().from(siteSettings).where(eq(siteSettings.id, 1)).limit(1);
   const address = legal ? outreachBusinessAddress(legal) : "";
   const legalName = legal?.legalCompanyName?.trim() ?? "";
@@ -180,66 +210,29 @@ async function activateCampaignImpl(formData: FormData): Promise<void> {
   const credentials = getMailAccountCredentials()
     .find((account) => account.id === campaign.senderAccountId);
   if (!credentials) throw new AppError(`The ${campaign.senderAccountId} sender account is not configured.`, 503);
+
+  const selectedLeadIds = [...new Set(parsed.data.leadIds)];
   const leads = await db.select().from(companyLeads)
-    .where(inArray(companyLeads.id, [...new Set(parsed.data.leadIds)]));
-  if (leads.length !== new Set(parsed.data.leadIds).size) {
+    .where(inArray(companyLeads.id, selectedLeadIds));
+  if (leads.length !== selectedLeadIds.length) {
     throw new NotFoundError("One or more selected leads no longer exist.");
   }
 
   const now = new Date();
   const unsubscribeBase = `${getEnv().APP_URL.replace(/\/+$/, "")}/api/unsubscribe/`;
-  const selectedLeadIds = [...new Set(parsed.data.leadIds)];
-  const sentRows = await db.select({ leadId: campaignMessages.leadId })
-    .from(campaignMessages)
-    .where(and(
-      inArray(campaignMessages.leadId, selectedLeadIds),
-      eq(campaignMessages.status, "sent"),
-    ));
-  const leadsWithSentMessage = new Set(sentRows.map((row) => row.leadId));
+  const evaluated = await evaluateLeadsForCampaign(campaign, leads, now);
+
+  const skipReasons = new Map<string, number>();
   let queued = 0;
   let firstEmails = 0;
   let followUps = 0;
-  for (const lead of leads) {
-    const emailValid = z.email().safeParse(lead.email).success;
-    const [suppressed] = await db.select({ id: suppressedEmails.id })
-      .from(suppressedEmails)
-      .where(sql`lower(${suppressedEmails.email}) = ${lead.email.toLocaleLowerCase("en")}`)
-      .limit(1);
-    const recentCutoff = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
-    const [recentSend] = await db.select({ id: campaignMessages.id })
-      .from(campaignMessages)
-      .where(and(
-        eq(campaignMessages.leadId, lead.id),
-        eq(campaignMessages.status, "sent"),
-        gt(campaignMessages.sentAt, recentCutoff),
-      ))
-      .limit(1);
-    const [reply] = await db.select({ id: inboxMessages.id })
-      .from(inboxThreads)
-      .innerJoin(inboxMessages, eq(inboxMessages.threadId, inboxThreads.id))
-      .where(and(
-        eq(inboxThreads.leadId, lead.id),
-        eq(inboxMessages.direction, "inbound"),
-      ))
-      .limit(1);
-    const plan = planCampaignStep({
-      now,
-      email: lead.email,
-      emailValid,
-      suppressed: Boolean(suppressed),
-      doNotContact: lead.doNotContact,
-      status: lead.status,
-      lastContactedAt: lead.lastContactedAt,
-      hasReplied: Boolean(reply) || lead.status === "replied",
-      emailedWithin14Days: Boolean(recentSend) || Boolean(
-        lead.lastContactedAt &&
-        lead.lastContactedAt.getTime() > now.getTime() - 14 * 24 * 60 * 60 * 1000,
-      ),
-      hasSentCampaignMessage: leadsWithSentMessage.has(lead.id),
-      followupSequence: campaign.followupSequence ?? [],
-    });
-    if (plan.action === "blocked" || plan.action === "skipped") continue;
-
+  for (const lead of evaluated) {
+    const plan = lead.plan;
+    if (!lead.eligible || (plan.action !== "first_email" && plan.action !== "followup")) {
+      const reason = lead.reasons[0] ?? "This lead is not eligible for outreach.";
+      addSkipReason(skipReasons, reason);
+      continue;
+    }
     const token = signUnsubscribeToken(lead.email, getEnv().SESSION_SECRET);
     const values = {
       company: lead.company,
@@ -252,7 +245,10 @@ async function activateCampaignImpl(formData: FormData): Promise<void> {
     let body: string;
     if (plan.action === "followup") {
       const firstFollowup = (campaign.followupSequence ?? [])[0];
-      if (!firstFollowup) continue;
+      if (!firstFollowup) {
+        addSkipReason(skipReasons, "Follow-up step 1 is not configured for this campaign.");
+        continue;
+      }
       subject = renderCampaignTemplate(firstFollowup.subject, values);
       body = renderCampaignTemplate(firstFollowup.body, values);
     } else {
@@ -272,27 +268,59 @@ async function activateCampaignImpl(formData: FormData): Promise<void> {
       queued += 1;
       if (plan.action === "followup") followUps += 1;
       else firstEmails += 1;
+    } else {
+      addSkipReason(skipReasons, "A message was already queued for this lead and step.");
     }
   }
 
-  if (!queued) throw new ConflictError("No selected leads passed all campaign pre-send checks.");
-  await db.update(outreachCampaigns).set({ status: "active", updatedAt: now })
-    .where(eq(outreachCampaigns.id, campaign.id));
+  const summary: ActivationSummary = {
+    queued,
+    skipped: [...skipReasons.values()].reduce((total, value) => total + value, 0),
+    firstEmails,
+    followUps,
+    selected: evaluated.length,
+    skipReasons: [...skipReasons.entries()]
+      .map(([reason, count]) => ({ reason, count }))
+      .sort((a, b) => b.count - a.count),
+  };
+
+  if (queued > 0) {
+    await db.update(outreachCampaigns).set({ status: "active", updatedAt: now })
+      .where(eq(outreachCampaigns.id, campaign.id));
+  }
   await db.insert(auditLogs).values({
     actorUserId: admin.id,
     actorRole: "admin",
     action: "assistant.campaign_activated",
     entityType: "outreach_campaign",
     entityId: campaign.id,
-    description: `Campaign activated with ${queued} message(s) awaiting manual approval.`,
-    metadata: { queued, selected: leads.length, firstEmails, followUps },
+    description: queued
+      ? `Campaign activated with ${queued} message(s) awaiting manual approval.`
+      : "Campaign activation attempt queued no messages.",
+    metadata: { ...summary },
   });
   revalidatePath("/admin/assistant/campaigns");
+  return summary;
+}
+
+function parseCampaignId(form: FormData): string | null {
+  const parsed = z.uuid().safeParse(formString(form, "campaignId"));
+  return parsed.success ? parsed.data : null;
 }
 
 export async function activateCampaignAction(formData: FormData): Promise<void> {
-  return runAdminFormAction("/admin/assistant/campaigns", () => activateCampaignImpl(formData));
+  const campaignId = parseCampaignId(formData);
+  const path = campaignId ? campaignEditPath(campaignId) : "/admin/assistant/campaigns";
+  return runAdminFormAction(path, async () => {
+    await activateCampaignImpl(formData);
+    if (campaignId) redirect(`${campaignEditPath(campaignId)}&activated=1`);
+    redirect("/admin/assistant/campaigns?activated=1");
+  });
 }
+
+/* -------------------------------------------------------------------------- */
+/* Message approval                                                           */
+/* -------------------------------------------------------------------------- */
 
 async function approveCampaignMessagesImpl(formData: FormData): Promise<void> {
   const admin = await adminActor();
@@ -325,6 +353,10 @@ export async function approveCampaignMessagesAction(formData: FormData): Promise
   return runAdminFormAction("/admin/assistant/campaigns", () => approveCampaignMessagesImpl(formData));
 }
 
+/* -------------------------------------------------------------------------- */
+/* Pause / resume / archive                                                   */
+/* -------------------------------------------------------------------------- */
+
 async function pauseCampaignImpl(formData: FormData): Promise<void> {
   const admin = await adminActor();
   const parsed = z.object({
@@ -355,6 +387,122 @@ async function pauseCampaignImpl(formData: FormData): Promise<void> {
 export async function updateCampaignStatusAction(formData: FormData): Promise<void> {
   return runAdminFormAction("/admin/assistant/campaigns", () => pauseCampaignImpl(formData));
 }
+
+async function setArchivedImpl(formData: FormData): Promise<void> {
+  const admin = await adminActor();
+  const parsed = z.object({
+    campaignId: z.uuid(),
+    archived: z.enum(["true", "false"]),
+  }).safeParse({
+    campaignId: formString(formData, "campaignId"),
+    archived: formString(formData, "archived"),
+  });
+  if (!parsed.success) throw new AppError("Invalid archive request.", 422);
+  const archived = parsed.data.archived === "true";
+  const [campaign] = await db.update(outreachCampaigns).set({
+    archivedAt: archived ? new Date() : null,
+    updatedAt: new Date(),
+  }).where(eq(outreachCampaigns.id, parsed.data.campaignId))
+    .returning({ id: outreachCampaigns.id });
+  if (!campaign) throw new NotFoundError("Campaign not found.");
+  await db.insert(auditLogs).values({
+    actorUserId: admin.id,
+    actorRole: "admin",
+    action: archived ? "assistant.campaign_archived" : "assistant.campaign_unarchived",
+    entityType: "outreach_campaign",
+    entityId: campaign.id,
+    description: archived ? "Campaign archived (hidden from the list)." : "Campaign restored from the archive.",
+  });
+  revalidatePath("/admin/assistant/campaigns");
+  redirect(archived ? "/admin/assistant/campaigns?archived=1" : "/admin/assistant/campaigns");
+}
+
+export async function setCampaignArchivedAction(formData: FormData): Promise<void> {
+  return runAdminFormAction("/admin/assistant/campaigns", () => setArchivedImpl(formData));
+}
+
+/* -------------------------------------------------------------------------- */
+/* Delete and duplicate                                                       */
+/* -------------------------------------------------------------------------- */
+
+async function deleteCampaignImpl(formData: FormData): Promise<void> {
+  const admin = await adminActor();
+  const parsed = parseDeleteCampaignForm(formData);
+  if (!parsed.success) throw new AppError(parsed.error.issues[0]?.message ?? "Invalid delete request.", 422);
+  const [campaign] = await db.select().from(outreachCampaigns)
+    .where(eq(outreachCampaigns.id, parsed.data.campaignId)).limit(1);
+  if (!campaign) throw new NotFoundError("Campaign not found.");
+  if (parsed.data.confirmName !== campaign.name.trim()) {
+    throw new AppError("The typed name does not match this campaign. Type the campaign name exactly to confirm deletion.", 422);
+  }
+  const statusRows = await db.select({ status: campaignMessages.status })
+    .from(campaignMessages)
+    .where(eq(campaignMessages.campaignId, campaign.id));
+  const decision = campaignDeletionDecision({ messageStatuses: statusRows.map((row) => row.status) });
+  if (!decision.allowed) {
+    throw new AppError(decision.reason ?? "This campaign cannot be deleted.", 409, "campaign_has_sent_messages");
+  }
+  await db.transaction(async (tx) => {
+    await tx.delete(campaignMessages).where(eq(campaignMessages.campaignId, campaign.id));
+    await tx.delete(outreachCampaigns).where(eq(outreachCampaigns.id, campaign.id));
+    await tx.insert(auditLogs).values({
+      actorUserId: admin.id,
+      actorRole: "admin",
+      action: "assistant.campaign_deleted",
+      entityType: "outreach_campaign",
+      entityId: campaign.id,
+      description: `Campaign "${campaign.name}" deleted with ${statusRows.length} unsent message(s).`,
+      metadata: { name: campaign.name, messages: statusRows.length },
+    });
+  });
+  revalidatePath("/admin/assistant/campaigns");
+  redirect("/admin/assistant/campaigns?deleted=1");
+}
+
+export async function deleteCampaignAction(formData: FormData): Promise<void> {
+  return runAdminFormAction("/admin/assistant/campaigns", () => deleteCampaignImpl(formData));
+}
+
+async function duplicateCampaignImpl(formData: FormData): Promise<void> {
+  const admin = await adminActor();
+  const parsed = parseDuplicateCampaignForm(formData);
+  if (!parsed.success) throw new AppError("Invalid duplicate request.", 422);
+  const [campaign] = await db.select().from(outreachCampaigns)
+    .where(eq(outreachCampaigns.id, parsed.data.campaignId)).limit(1);
+  if (!campaign) throw new NotFoundError("Campaign not found.");
+  const [created] = await db.insert(outreachCampaigns).values({
+    name: `${campaign.name} (copy)`.slice(0, 200),
+    senderAccountId: campaign.senderAccountId,
+    status: "draft",
+    subjectTemplate: campaign.subjectTemplate,
+    bodyTemplate: campaign.bodyTemplate,
+    followupSequence: campaign.followupSequence,
+    autoApproveFollowups: campaign.autoApproveFollowups,
+    followsUpPrevious: campaign.followsUpPrevious,
+    minDaysSinceLastContact: campaign.minDaysSinceLastContact,
+    createdByUserId: admin.id,
+  }).returning({ id: outreachCampaigns.id });
+  if (!created) throw new AppError("The campaign could not be duplicated.", 500);
+  await db.insert(auditLogs).values({
+    actorUserId: admin.id,
+    actorRole: "admin",
+    action: "assistant.campaign_duplicated",
+    entityType: "outreach_campaign",
+    entityId: created.id,
+    description: `Campaign duplicated from "${campaign.name}".`,
+    metadata: { sourceCampaignId: campaign.id },
+  });
+  revalidatePath("/admin/assistant/campaigns");
+  redirect(`${campaignEditPath(created.id)}&duplicated=1`);
+}
+
+export async function duplicateCampaignAction(formData: FormData): Promise<void> {
+  return runAdminFormAction("/admin/assistant/campaigns", () => duplicateCampaignImpl(formData));
+}
+
+/* -------------------------------------------------------------------------- */
+/* Test send                                                                  */
+/* -------------------------------------------------------------------------- */
 
 async function sendTestImpl(formData: FormData): Promise<void> {
   const admin = await adminActor();

@@ -23,4 +23,21 @@ describe("admin form error redirects", () => {
     expect(adminFormErrorUrl("/admin/plans", new AppError("Unexpected failure.", 500)))
       .toBeNull();
   });
+
+  it("preserves an existing query string such as an edit id", () => {
+    const url = adminFormErrorUrl(
+      "/admin/assistant/campaigns?edit=11111111-1111-4111-8111-111111111111",
+      new AppError("Select a campaign and one or more leads.", 422),
+    );
+    expect(url).not.toBeNull();
+    const parsed = new URL(url!, "https://example.test");
+    expect(parsed.pathname).toBe("/admin/assistant/campaigns");
+    expect(parsed.searchParams.get("edit")).toBe("11111111-1111-4111-8111-111111111111");
+    expect(parsed.searchParams.get("adminError")).toBe("Select a campaign and one or more leads.");
+  });
+
+  it("keeps paths without a query string working", () => {
+    expect(adminFormErrorUrl("/admin/billing", new AppError("Try again.", 422)))
+      .toBe("/admin/billing?adminError=Try%20again.");
+  });
 });

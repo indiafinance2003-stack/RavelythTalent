@@ -1,21 +1,30 @@
 import Link from "next/link";
-import { count, desc, eq, inArray } from "drizzle-orm";
-import { Alert, Badge, Button, Card, Input, PageHeader, Select, Textarea } from "@/components/ui/primitives";
+import { and, count, desc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
+import { Alert, Badge, Button, Card, Input, PageHeader, Select } from "@/components/ui/primitives";
+import { CampaignEditor } from "@/components/admin/assistant/campaign-editor";
+import {
+  CampaignLeadSelector,
+  type CampaignLeadOption,
+} from "@/components/admin/assistant/campaign-lead-selector";
 import { db } from "@/lib/db";
 import {
+  auditLogs,
   campaignMessages,
   companyLeads,
   outreachCampaigns,
 } from "@/lib/db/schema";
 import { getMailAccountStatuses } from "@/lib/assistant/mail-accounts";
 import { renderCampaignTemplate } from "@/lib/assistant/campaign-rules";
+import { evaluateLeadsForCampaign } from "@/lib/assistant/campaign-eligibility";
 import { signUnsubscribeToken } from "@/lib/assistant/unsubscribe-token";
 import { getEnv } from "@/lib/env";
 import {
   activateCampaignAction,
   approveCampaignMessagesAction,
-  saveCampaignAction,
+  deleteCampaignAction,
+  duplicateCampaignAction,
   sendCampaignTestAction,
+  setCampaignArchivedAction,
   updateCampaignStatusAction,
 } from "@/lib/assistant/campaign-actions";
 import { formatDateTime } from "@/lib/utils";
@@ -23,7 +32,24 @@ import { z } from "zod";
 
 export const dynamic = "force-dynamic";
 
-type SearchParams = { edit?: string };
+type SearchParams = {
+  edit?: string;
+  saved?: string;
+  activated?: string;
+  duplicated?: string;
+  deleted?: string;
+  archived?: string;
+  showArchived?: string;
+};
+
+type ActivationSummaryMetadata = {
+  queued?: number;
+  skipped?: number;
+  firstEmails?: number;
+  followUps?: number;
+  selected?: number;
+  skipReasons?: Array<{ reason: string; count: number }>;
+};
 
 export default async function AssistantCampaignsPage({
   searchParams,
@@ -32,8 +58,15 @@ export default async function AssistantCampaignsPage({
 }) {
   const params = await searchParams;
   const editId = z.uuid().safeParse(params.edit).success ? params.edit : undefined;
-  const [campaigns, leads, pendingMessages, selected] = await Promise.all([
-    db.select().from(outreachCampaigns).orderBy(desc(outreachCampaigns.updatedAt)).limit(100),
+  const showArchived = params.showArchived === "1";
+
+  const [campaigns, archivedCountRow, leads, pendingMessages, selected] = await Promise.all([
+    db.select().from(outreachCampaigns)
+      .where(showArchived ? undefined : isNull(outreachCampaigns.archivedAt))
+      .orderBy(desc(outreachCampaigns.updatedAt))
+      .limit(100),
+    db.select({ total: count() }).from(outreachCampaigns)
+      .where(isNotNull(outreachCampaigns.archivedAt)),
     db.select({
       id: companyLeads.id,
       company: companyLeads.company,
@@ -43,6 +76,7 @@ export default async function AssistantCampaignsPage({
       city: companyLeads.city,
       status: companyLeads.status,
       doNotContact: companyLeads.doNotContact,
+      lastContactedAt: companyLeads.lastContactedAt,
     }).from(companyLeads).orderBy(desc(companyLeads.updatedAt)).limit(1000),
     db.select({
       message: campaignMessages,
@@ -58,7 +92,25 @@ export default async function AssistantCampaignsPage({
       ? db.select().from(outreachCampaigns).where(eq(outreachCampaigns.id, editId)).limit(1)
       : Promise.resolve([]),
   ]);
+
   const campaign = selected[0];
+  const editable = campaign?.status === "draft" || campaign?.status === "paused";
+
+  const [activationAudit] = editId
+    ? await db.select({ metadata: auditLogs.metadata, createdAt: auditLogs.createdAt })
+      .from(auditLogs)
+      .where(and(
+        eq(auditLogs.action, "assistant.campaign_activated"),
+        eq(auditLogs.entityType, "outreach_campaign"),
+        eq(auditLogs.entityId, editId),
+      ))
+      .orderBy(desc(auditLogs.createdAt))
+      .limit(1)
+    : [];
+  const activationSummary = (activationAudit?.metadata ?? undefined) as
+    | ActivationSummaryMetadata
+    | undefined;
+
   const campaignIds = campaigns.map((item) => item.id);
   const messageCounts = campaignIds.length
     ? await db.select({
@@ -75,19 +127,29 @@ export default async function AssistantCampaignsPage({
     counts.set(row.status, row.total);
     countsByCampaign.set(row.campaignId, counts);
   }
+
+  const evaluated = campaign && editable
+    ? await evaluateLeadsForCampaign(campaign, leads, new Date())
+    : [];
+  const leadOptions: CampaignLeadOption[] = evaluated.map((lead) => ({
+    id: lead.id,
+    label: `${lead.company} · ${lead.contactName ?? lead.email}`,
+    status: lead.status,
+    eligible: lead.eligible,
+    reason: lead.reasons[0] ?? null,
+    eligibleFrom: lead.eligibleFrom ? formatDateTime(lead.eligibleFrom) : null,
+  }));
+
   const statuses = getMailAccountStatuses();
   const configuredAccounts = statuses.filter((item) => item.configured);
   const previewLead = leads[0];
-  const previewValues = previewLead ? {
+  const previewValues = previewLead && campaign ? {
     company: previewLead.company,
     contact_name: previewLead.contactName ?? "",
     designation: previewLead.designation ?? "",
     city: previewLead.city ?? "",
     unsubscribe_url: `${getEnv().APP_URL.replace(/\/+$/, "")}/api/unsubscribe/${signUnsubscribeToken(previewLead.email, getEnv().SESSION_SECRET)}`,
   } : null;
-  const followups = campaign?.followupSequence ?? [];
-  const step2 = followups[0];
-  const step3 = followups[1];
 
   return (
     <div className="space-y-6">
@@ -99,111 +161,196 @@ export default async function AssistantCampaignsPage({
         <Link className="text-royal hover:underline" href="/admin/assistant/settings">Settings and FAQ</Link>
       </nav>
 
+      {params.saved ? <Alert tone="success">Campaign saved.</Alert> : null}
+      {params.activated ? <Alert tone="success">Activation finished. See the result below.</Alert> : null}
+      {params.duplicated ? <Alert tone="success">Campaign duplicated into a new draft.</Alert> : null}
+      {params.deleted ? <Alert tone="success">Campaign deleted.</Alert> : null}
+      {params.archived ? <Alert tone="success">Campaign archived. Hide it from this list to keep it out of the way.</Alert> : null}
+
       {!configuredAccounts.length ? (
         <Alert tone="warning" title="No sender account is configured">
           Campaigns can be drafted, but activation and sending require a configured support or Gmail account in the server environment.
         </Alert>
       ) : null}
-      <Card className="space-y-4">
-        <h2 className="text-lg font-bold text-navy">{campaign ? "Edit draft campaign" : "Create campaign"}</h2>
-        {campaign?.status !== undefined && campaign.status !== "draft" ? (
-          <Alert tone="info">This campaign is {campaign.status}; its content is locked. Create a new draft to change the templates.</Alert>
-        ) : (
-          <form action={saveCampaignAction} className="space-y-4">
-            {campaign ? <input name="id" type="hidden" value={campaign.id} /> : null}
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label className="text-sm font-semibold text-navy">Campaign name<Input className="mt-1" maxLength={200} name="name" required defaultValue={campaign?.name ?? ""} /></label>
-              <label className="text-sm font-semibold text-navy">Sender account<Select className="mt-1" name="senderAccountId" defaultValue={campaign?.senderAccountId ?? "gmail"}>{statuses.map((account) => <option key={account.id} value={account.id}>{account.id}{account.configured ? "" : " (Not configured)"}</option>)}</Select></label>
-              <label className="text-sm font-semibold text-navy sm:col-span-2">Subject template<Input className="mt-1" maxLength={998} name="subjectTemplate" required defaultValue={campaign?.subjectTemplate ?? "A hiring resource for {{company}}"} /></label>
-              <label className="text-sm font-semibold text-navy sm:col-span-2">First email body<Textarea className="mt-1" maxLength={20_000} name="bodyTemplate" required defaultValue={campaign?.bodyTemplate ?? "Hi {{contact_name}},\n\nI am reaching out about hiring at {{company}} in {{city}}.\n\nIf you do not want to receive further emails, unsubscribe here: {{unsubscribe_url}}"} rows={8} /></label>
-            </div>
-            <p className="text-xs text-slate-500">Variables: {"{{company}}, {{contact_name}}, {{designation}}, {{city}}"}; include an explicit unsubscribe line with {"{{unsubscribe_url}}"} to activate.</p>
-            <details className="rounded-xl border border-slate-200 p-4" open={Boolean(step2 || step3)}>
-              <summary className="cursor-pointer font-semibold text-navy">Follow-up sequence (step 2 after 3 days; step 3 after 7 days from step 1)</summary>
-              <div className="mt-4 grid gap-4">
-                <label className="flex items-center gap-2 text-sm font-semibold text-navy"><input defaultChecked={step2?.enabled ?? false} name="step2Enabled" type="checkbox" /> Enable step 2</label>
-                <label className="text-sm font-medium text-slate-700">Step 2 delay in days<Input defaultValue={step2?.delayDays ?? 3} max={60} min={1} name="step2DelayDays" required type="number" /></label>
-                <Input aria-label="Step 2 subject" defaultValue={step2?.subject ?? "Following up"} maxLength={998} name="step2Subject" placeholder="Step 2 subject" />
-                <Textarea aria-label="Step 2 body" defaultValue={step2?.body ?? "Hi {{contact_name}},\n\nA quick follow-up about {{company}}. Opt out: {{unsubscribe_url}}"} maxLength={20_000} name="step2Body" rows={5} />
-                <label className="flex items-center gap-2 text-sm font-semibold text-navy"><input defaultChecked={step3?.enabled ?? false} name="step3Enabled" type="checkbox" /> Enable step 3</label>
-                <label className="text-sm font-medium text-slate-700">Step 3 delay in days from step 1<Input defaultValue={step3?.delayDays ?? 7} max={60} min={1} name="step3DelayDays" required type="number" /></label>
-                <Input aria-label="Step 3 subject" defaultValue={step3?.subject ?? "One last note"} maxLength={998} name="step3Subject" placeholder="Step 3 subject" />
-                <Textarea aria-label="Step 3 body" defaultValue={step3?.body ?? "Hi {{contact_name}},\n\nOne last note about {{company}}. Opt out: {{unsubscribe_url}}"} maxLength={20_000} name="step3Body" rows={5} />
-              </div>
-            </details>
-            <label className="flex items-center gap-2 text-sm font-semibold text-navy">
-              <input defaultChecked={campaign?.autoApproveFollowups ?? false} name="autoApproveFollowups" type="checkbox" />
-              Auto-approve follow-ups after I approve the first email
-            </label>
-            <Button type="submit">Save draft</Button>
-          </form>
-        )}
-      </Card>
 
-      {campaign?.status === "draft" ? (
+      {campaign ? (
+        <Card className="space-y-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-lg font-bold text-navy">{campaign.name}</h2>
+                <Badge tone={campaign.status === "active" ? "success" : campaign.status === "paused" ? "warning" : "neutral"}>
+                  {campaign.status}
+                </Badge>
+                {campaign.archivedAt ? <Badge tone="neutral">archived</Badge> : null}
+              </div>
+              <p className="mt-1 text-xs text-slate-500">Sender: {campaign.senderAccountId} · updated {formatDateTime(campaign.updatedAt)}</p>
+            </div>
+            <Link className="text-sm font-semibold text-royal hover:underline" href="/admin/assistant/campaigns">← All campaigns</Link>
+          </div>
+          {campaign.status === "active" ? (
+            <Alert tone="info">This campaign is active and its content is locked. Pause it to make changes.</Alert>
+          ) : null}
+          {campaign.status === "paused" ? (
+            <Alert tone="warning">This campaign is paused. You can edit it and activate it again when ready.</Alert>
+          ) : null}
+        </Card>
+      ) : null}
+
+      {campaign && activationSummary ? (
+        <Card className="space-y-3">
+          <h2 className="text-lg font-bold text-navy">Last activation result</h2>
+          <p className="text-sm text-slate-700">
+            Queued <strong>{activationSummary.queued ?? 0}</strong> of {activationSummary.selected ?? 0} selected
+            ({activationSummary.firstEmails ?? 0} first emails, {activationSummary.followUps ?? 0} follow-ups). Skipped {activationSummary.skipped ?? 0}.
+          </p>
+          {activationSummary.skipReasons?.length ? (
+            <ul className="list-disc space-y-1 pl-5 text-sm text-slate-700">
+              {activationSummary.skipReasons.map((item) => (
+                <li key={item.reason}>{item.count} × {item.reason}</li>
+              ))}
+            </ul>
+          ) : null}
+          <Link className="text-sm font-semibold text-royal hover:underline" href="/admin/assistant/campaigns#approval-queue">
+            Go to the approval queue →
+          </Link>
+        </Card>
+      ) : null}
+
+      {campaign && editable ? (
+        <Card className="space-y-4">
+          <h2 className="text-lg font-bold text-navy">Edit campaign</h2>
+          <CampaignEditor allowActivate campaign={campaign} statuses={statuses} />
+        </Card>
+      ) : null}
+
+      {campaign && editable && previewLead ? (
+        <Card className="space-y-4">
+          <h2 className="text-lg font-bold text-navy">Preview and send a test</h2>
+          <p className="text-sm text-slate-600">Preview uses a real lead: {previewLead.company} · {previewLead.email}. Test messages go only to your administrator account.</p>
+          <div className="rounded-xl bg-slate-50 p-4 text-sm">
+            <p className="font-semibold text-navy">{previewValues ? renderCampaignTemplate(campaign.subjectTemplate, previewValues) : campaign.subjectTemplate}</p>
+            <p className="mt-2 whitespace-pre-wrap text-slate-700">{previewValues ? renderCampaignTemplate(campaign.bodyTemplate, previewValues) : campaign.bodyTemplate}</p>
+          </div>
+          <form action={sendCampaignTestAction} className="flex flex-wrap items-end gap-3">
+            <input name="campaignId" type="hidden" value={campaign.id} />
+            <label className="text-sm font-semibold text-navy">
+              Preview lead
+              <Select className="mt-1" name="leadId">
+                {leads.map((lead) => <option key={lead.id} value={lead.id}>{lead.company} — {lead.email}</option>)}
+              </Select>
+            </label>
+            <Button size="sm" type="submit" variant="secondary">Send a test to myself</Button>
+          </form>
+        </Card>
+      ) : null}
+
+      {campaign && editable ? (
+        <Card className="space-y-4">
+          <h2 className="text-lg font-bold text-navy">Choose leads to activate</h2>
+          <p className="text-sm text-slate-600">
+            Activation checks each selected lead and queues only eligible messages for manual approval. Up to 1,000 leads can be selected.
+          </p>
+          <CampaignLeadSelector action={activateCampaignAction} campaignId={campaign.id} leads={leadOptions} />
+        </Card>
+      ) : null}
+
+      {campaign ? (
+        <Card className="space-y-4">
+          <h2 className="text-lg font-bold text-navy">Manage campaign</h2>
+          <div className="flex flex-wrap gap-3">
+            <form action={duplicateCampaignAction}>
+              <input name="campaignId" type="hidden" value={campaign.id} />
+              <Button size="sm" type="submit" variant="secondary">Duplicate as new draft</Button>
+            </form>
+            <form action={setCampaignArchivedAction}>
+              <input name="campaignId" type="hidden" value={campaign.id} />
+              <input name="archived" type="hidden" value={campaign.archivedAt ? "false" : "true"} />
+              <Button size="sm" type="submit" variant="secondary">{campaign.archivedAt ? "Restore from archive" : "Archive"}</Button>
+            </form>
+            {campaign.status === "active" || campaign.status === "paused" ? (
+              <form action={updateCampaignStatusAction}>
+                <input name="campaignId" type="hidden" value={campaign.id} />
+                <input name="status" type="hidden" value={campaign.status === "active" ? "paused" : "active"} />
+                <Button size="sm" type="submit" variant="secondary">{campaign.status === "active" ? "Pause" : "Resume"}</Button>
+              </form>
+            ) : null}
+          </div>
+          <details className="rounded-xl border border-red-200 p-4">
+            <summary className="cursor-pointer font-semibold text-red-700">Delete this campaign</summary>
+            <p className="mt-2 text-sm text-slate-600">
+              Deletion is permanent and removes any messages that were never sent. Campaigns with sent messages cannot be deleted; pause or archive them instead.
+            </p>
+            <form action={deleteCampaignAction} className="mt-3 flex flex-wrap items-end gap-3">
+              <input name="campaignId" type="hidden" value={campaign.id} />
+              <label className="text-sm font-semibold text-navy">
+                Type &quot;{campaign.name}&quot; to confirm
+                <Input className="mt-1" name="confirmName" required />
+              </label>
+              <Button size="sm" type="submit" variant="danger">Delete campaign</Button>
+            </form>
+          </details>
+        </Card>
+      ) : null}
+
+      {!campaign ? (
         <>
           <Card className="space-y-4">
-            <h2 className="text-lg font-bold text-navy">Preview and send a test</h2>
-            {previewLead ? (
-              <>
-                <p className="text-sm text-slate-600">Preview uses a real lead: {previewLead.company} · {previewLead.email}. Test messages go only to your administrator account.</p>
-                <div className="rounded-xl bg-slate-50 p-4 text-sm"><p className="font-semibold text-navy">{previewValues ? renderCampaignTemplate(campaign.subjectTemplate, previewValues) : campaign.subjectTemplate}</p><p className="mt-2 whitespace-pre-wrap text-slate-700">{previewValues ? renderCampaignTemplate(campaign.bodyTemplate, previewValues) : campaign.bodyTemplate}</p></div>
-                <form action={sendCampaignTestAction} className="flex flex-wrap items-end gap-3">
-                  <input name="campaignId" type="hidden" value={campaign.id} />
-                  <label className="text-sm font-semibold text-navy">Preview lead<Select className="mt-1" name="leadId">{leads.map((lead) => <option key={lead.id} value={lead.id}>{lead.company} — {lead.email}</option>)}</Select></label>
-                  <Button size="sm" type="submit" variant="secondary">Send a test to myself</Button>
-                </form>
-              </>
-            ) : <p className="text-sm text-slate-600">Add a lead to preview this campaign.</p>}
+            <h2 className="text-lg font-bold text-navy">Create campaign</h2>
+            <CampaignEditor statuses={statuses} />
           </Card>
+
           <Card className="space-y-4">
-            <h2 className="text-lg font-bold text-navy">Choose leads to activate</h2>
-            <p className="text-sm text-slate-600">Activation checks each selected lead and queues only eligible first-step messages for manual approval. Up to 1,000 leads can be selected.</p>
-            {leads.length ? (
-              <form action={activateCampaignAction} className="space-y-3">
-                <input name="campaignId" type="hidden" value={campaign.id} />
-                <div className="max-h-80 space-y-2 overflow-auto rounded-xl border border-slate-200 p-3">
-                  {leads.map((lead) => (
-                    <label className={`flex items-center gap-2 text-sm ${lead.doNotContact || lead.status === "bounced" || lead.status === "rejected" ? "text-slate-400" : "text-slate-700"}`} key={lead.id}>
-                      <input disabled={lead.doNotContact || lead.status === "bounced" || lead.status === "rejected"} name="leadIds" type="checkbox" value={lead.id} />
-                      {lead.company} · {lead.contactName ?? lead.email} · {lead.status.replaceAll("_", " ")}
-                    </label>
-                  ))}
-                </div>
-                <Button type="submit">Activate and queue for approval</Button>
-              </form>
-            ) : <p className="text-sm text-slate-600">No leads are available. Add them manually or import a CSV first.</p>}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-lg font-bold text-navy">{showArchived ? "All campaigns" : "Campaigns and stats"}</h2>
+              <Link className="text-sm font-semibold text-royal hover:underline" href={showArchived ? "/admin/assistant/campaigns" : "/admin/assistant/campaigns?showArchived=1"}>
+                {showArchived ? "Hide archived" : `Show archived (${archivedCountRow[0]?.total ?? 0})`}
+              </Link>
+            </div>
+            {campaigns.length ? (
+              <div className="space-y-3">
+                {campaigns.map((item) => {
+                  const stats = countsByCampaign.get(item.id);
+                  return (
+                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-4" key={item.id}>
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-semibold text-navy">{item.name}</p>
+                          <Badge tone={item.status === "active" ? "success" : item.status === "paused" ? "warning" : "neutral"}>{item.status}</Badge>
+                          {item.archivedAt ? <Badge tone="neutral">archived</Badge> : null}
+                        </div>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {item.senderAccountId} · queued {(stats?.get("pending_approval") ?? 0) + (stats?.get("approved") ?? 0)} · sent {stats?.get("sent") ?? 0} · replied {stats?.get("replied") ?? 0} · bounced {stats?.get("bounced") ?? 0} · opted out {stats?.get("opted_out") ?? 0}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        {item.status === "draft" || item.status === "paused" ? (
+                          <Link className="text-sm font-semibold text-royal hover:underline" href={`/admin/assistant/campaigns?edit=${item.id}`}>Edit</Link>
+                        ) : null}
+                        {item.status === "active" || item.status === "paused" ? (
+                          <form action={updateCampaignStatusAction}>
+                            <input name="campaignId" type="hidden" value={item.id} />
+                            <input name="status" type="hidden" value={item.status === "active" ? "paused" : "active"} />
+                            <Button size="sm" type="submit" variant="secondary">{item.status === "active" ? "Pause" : "Resume"}</Button>
+                          </form>
+                        ) : null}
+                        <form action={setCampaignArchivedAction}>
+                          <input name="campaignId" type="hidden" value={item.id} />
+                          <input name="archived" type="hidden" value={item.archivedAt ? "false" : "true"} />
+                          <Button size="sm" type="submit" variant="ghost">{item.archivedAt ? "Restore" : "Archive"}</Button>
+                        </form>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : <p className="text-sm text-slate-600">No campaigns yet. Create one above.</p>}
           </Card>
         </>
       ) : null}
 
-      {campaigns.length ? (
-        <Card className="space-y-4">
-          <h2 className="text-lg font-bold text-navy">Campaigns and stats</h2>
-          <div className="space-y-3">
-            {campaigns.map((item) => {
-              const stats = countsByCampaign.get(item.id);
-              return (
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-4" key={item.id}>
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2"><p className="font-semibold text-navy">{item.name}</p><Badge tone={item.status === "active" ? "success" : "neutral"}>{item.status}</Badge></div>
-                    <p className="mt-1 text-xs text-slate-500">{item.senderAccountId} · queued {(stats?.get("pending_approval") ?? 0) + (stats?.get("approved") ?? 0)} · sent {stats?.get("sent") ?? 0} · replied {stats?.get("replied") ?? 0} · bounced {stats?.get("bounced") ?? 0} · opted out {stats?.get("opted_out") ?? 0}</p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {item.status === "draft" ? <Link className="text-sm font-semibold text-royal hover:underline" href={`/admin/assistant/campaigns?edit=${item.id}`}>Edit</Link> : null}
-                    {item.status === "active" || item.status === "paused" ? (
-                      <form action={updateCampaignStatusAction}><input name="campaignId" type="hidden" value={item.id} /><input name="status" type="hidden" value={item.status === "active" ? "paused" : "active"} /><Button size="sm" type="submit" variant="secondary">{item.status === "active" ? "Pause" : "Resume"}</Button></form>
-                    ) : null}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </Card>
-      ) : null}
-
-      <Card className="space-y-4">
-        <h2 className="text-lg font-bold text-navy">Manual approval queue</h2>
+      <Card className="space-y-4" >
+        <h2 className="text-lg font-bold text-navy" id="approval-queue">Manual approval queue</h2>
         <p className="text-sm text-slate-600">Nothing in this queue is sent until you approve each message or approve a selected batch.</p>
         {pendingMessages.length ? (
           <form action={approveCampaignMessagesAction} className="space-y-3">

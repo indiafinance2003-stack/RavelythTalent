@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   campaignActivationBlockReasons,
   campaignDailyLimit,
+  campaignDeletionDecision,
+  campaignFollowupMinDays,
   campaignLeadBlockReasons,
+  evaluateCampaignLead,
   hasCampaignSpacing,
   isWithinCampaignWindow,
   outreachBusinessAddress,
@@ -257,5 +260,120 @@ describe("planCampaignStep", () => {
       lastContactedAt: new Date("2026-07-01T06:30:00.000Z"), // > 60 days ago
     });
     expect(plan).toEqual({ action: "first_email", step: 1, scheduledAt: now });
+  });
+});
+
+describe("follow-up campaign mode", () => {
+  const now = new Date("2026-10-08T04:00:00.000Z");
+  const base: PlanCampaignStepInput = {
+    now,
+    email: "hr@example.test",
+    emailValid: true,
+    suppressed: false,
+    doNotContact: false,
+    status: "emailed",
+    lastContactedAt: null,
+    hasReplied: false,
+    emailedWithin14Days: true,
+    hasSentCampaignMessage: false,
+    followupSequence: [
+      { delayDays: 3, subject: "Follow-up one", body: "Body one", enabled: true },
+      { delayDays: 4, subject: "Follow-up two", body: "Body two", enabled: true },
+    ],
+    followsUpPrevious: true,
+    minDaysSinceLastContact: 3,
+  };
+
+  const daysBefore = (days: number) => new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+
+  it("clamps the minimum days option to a floor of 2 and defaults to 3", () => {
+    expect(campaignFollowupMinDays(undefined)).toBe(3);
+    expect(campaignFollowupMinDays(1)).toBe(2);
+    expect(campaignFollowupMinDays(10)).toBe(10);
+  });
+
+  it("starts a fresh first email once the minimum days have passed (boundary inclusive)", () => {
+    expect(planCampaignStep({ ...base, lastContactedAt: daysBefore(3) }))
+      .toEqual({ action: "first_email", step: 1, scheduledAt: now });
+    expect(planCampaignStep({ ...base, lastContactedAt: daysBefore(2.5) }).action).toBe("followup");
+  });
+
+  it("honours a custom minimum days value", () => {
+    const custom = { ...base, minDaysSinceLastContact: 5 };
+    expect(planCampaignStep({ ...custom, lastContactedAt: daysBefore(5) }).action).toBe("first_email");
+    expect(planCampaignStep({ ...custom, lastContactedAt: daysBefore(4) }).action).toBe("followup");
+  });
+
+  it("does not apply follow-up mode when the lead already has an in-system sent message", () => {
+    const plan = planCampaignStep({
+      ...base,
+      lastContactedAt: daysBefore(10),
+      hasSentCampaignMessage: true,
+    });
+    expect(plan).toEqual(expect.objectContaining({
+      action: "blocked",
+      reasons: ["Lead was emailed in the last 14 days."],
+    }));
+  });
+
+  it("still blocks opted-out leads in follow-up mode", () => {
+    expect(planCampaignStep({
+      ...base,
+      lastContactedAt: daysBefore(10),
+      doNotContact: true,
+    })).toEqual(expect.objectContaining({ action: "blocked", reasons: ["Lead opted out."] }));
+  });
+});
+
+describe("evaluateCampaignLead", () => {
+  const now = new Date("2026-10-08T04:00:00.000Z");
+  const lastEmailedAt = new Date("2026-10-05T04:00:00.000Z");
+  const input = {
+    now,
+    email: "hr@example.test",
+    emailValid: true,
+    suppressed: false,
+    doNotContact: false,
+    status: "new",
+    lastContactedAt: null,
+    hasReplied: false,
+    emailedWithin14Days: true,
+    hasSentCampaignMessage: false,
+    followupSequence: [],
+    lastEmailedAt,
+  };
+
+  it("reports the date the 14-day recency block clears when it is the only reason", () => {
+    const result = evaluateCampaignLead(input);
+    expect(result.eligible).toBe(false);
+    expect(result.reasons).toEqual(["Lead was emailed in the last 14 days."]);
+    expect(result.eligibleFrom?.getTime())
+      .toBe(lastEmailedAt.getTime() + 14 * 24 * 60 * 60 * 1000);
+  });
+
+  it("returns no eligibleFrom when other blockers exist or the lead is eligible", () => {
+    expect(evaluateCampaignLead({ ...input, suppressed: true }).eligibleFrom).toBeNull();
+    expect(evaluateCampaignLead({
+      ...input,
+      emailedWithin14Days: false,
+      lastEmailedAt: null,
+    })).toMatchObject({ eligible: true, reasons: [], eligibleFrom: null });
+  });
+});
+
+describe("campaignDeletionDecision", () => {
+  it("allows deleting a campaign with only unsent messages", () => {
+    expect(campaignDeletionDecision({
+      messageStatuses: ["pending_approval", "approved", "queued", "failed", "skipped"],
+    })).toEqual({ allowed: true, reason: null });
+    expect(campaignDeletionDecision({ messageStatuses: [] })).toEqual({ allowed: true, reason: null });
+  });
+
+  it("refuses deletion once any message was handed to SMTP", () => {
+    for (const status of ["sending", "sent", "replied", "bounced", "opted_out"]) {
+      const decision = campaignDeletionDecision({ messageStatuses: ["approved", status] });
+      expect(decision.allowed).toBe(false);
+      expect(decision.reason).toContain("cannot be deleted");
+    }
   });
 });
